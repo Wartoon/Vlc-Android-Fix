@@ -1384,6 +1384,14 @@
     <string name="export_settings">Exporteinstellungen</string>
     <string name="restore_settings_summary">Ihre Einstellungen aus einem vorherigen Export wiederherstellen</string>
     <string name="restore_settings">Einstellungen wiederherstellen</string>
+    <string name="restore_media_db">Mediendatenbank wiederherstellen</string>
+    <string name="restore_media_db_summary">vlc_media.db aus dem internen Speicherstammordner wiederherstellen. VLC wird anschließend beendet.</string>
+    <string name="restore_app_db">App-Datenbank wiederherstellen</string>
+    <string name="restore_app_db_summary">vlc_database.zip aus dem internen Speicherstammordner wiederherstellen. VLC wird anschließend beendet.</string>
+    <string name="restore_media_db_missing">vlc_media.db wurde im internen Speicherstammordner nicht gefunden</string>
+    <string name="restore_app_db_missing">vlc_database.zip wurde im internen Speicherstammordner nicht gefunden</string>
+    <string name="restore_db_success_restart">Datenbank wiederhergestellt. VLC wird jetzt beendet. Öffnen Sie die App anschließend erneut.</string>
+    <string name="restore_db_failure">Datenbank konnte nicht wiederhergestellt werden</string>
     <string name="obsolete_restore_settings">Ihr Einstellungsexport ist veraltet. Bitte exportieren Sie ihn erneut.</string>
     <string name="export_settings_success">Einstellungen erfolgreich in das interne Speicherstammverzeichnis exportiert</string>
     <string name="export_settings_failure">Beim Exportieren Ihrer Einstellungen ist ein Fehler aufgetreten</string>
