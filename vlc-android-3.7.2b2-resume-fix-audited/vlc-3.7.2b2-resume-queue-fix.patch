@@ -1,0 +1,110 @@
+diff --git a/application/vlc-android/src/org/videolan/vlc/media/PlaylistManager.kt b/application/vlc-android/src/org/videolan/vlc/media/PlaylistManager.kt
+index 31f8506..160f570 100644
+--- a/application/vlc-android/src/org/videolan/vlc/media/PlaylistManager.kt
++++ b/application/vlc-android/src/org/videolan/vlc/media/PlaylistManager.kt
+@@ -353,13 +353,15 @@ class PlaylistManager(val service: PlaybackService) : MediaWrapperList.EventList
+ 
+     fun pause() {
+         if (player.pause()) {
+-            savePosition()
++            val playAsAudio = isVideoPlayedAsAudio()
++            savePosition(forceAudio = playAsAudio)
+             launch {
+-                //needed to save the current media in audio mode when it's a video played as audio
+-                saveCurrentMedia()
+-                saveMediaList()
++                // A video explicitly played as audio must also refresh the audio resume queue.
++                saveCurrentMedia(forceVideo = playAsAudio)
++                saveMediaList(forceVideo = playAsAudio)
+             }
+-            if (getCurrentMedia()?.isPodcast == true) saveMediaMeta()
++            // Video-as-audio has no VideoPlayerActivity lifecycle to guarantee a final progress save.
++            if (getCurrentMedia()?.isPodcast == true || playAsAudio) saveMediaMeta()
+         }
+     }
+ 
+@@ -392,10 +394,14 @@ class PlaylistManager(val service: PlaybackService) : MediaWrapperList.EventList
+         clearABRepeat()
+         if (stopAfter != -1) Settings.getInstance(AppContextProvider.appContext).putSingle(AUDIO_STOP_AFTER, stopAfter)
+         stopAfter = -1
++        val playAsAudio = isVideoPlayedAsAudio()
+         videoBackground = false
+         val job = getCurrentMedia()?.let {
+-            savePosition(video = video)
++            savePosition(video = video, forceAudio = playAsAudio)
+             launch(start = CoroutineStart.UNDISPATCHED) {
++                // Persist the exact audio-resume queue before the list is cleared.
++                saveCurrentMedia(forceVideo = playAsAudio)
++                saveMediaList(forceVideo = playAsAudio)
+                 saveMediaMeta().join()
+                 if (AndroidDevices.isAndroidTv && AndroidUtil.isOOrLater && video) {
+                     setResumeProgram(service.applicationContext, it)
+@@ -686,7 +692,17 @@ class PlaylistManager(val service: PlaybackService) : MediaWrapperList.EventList
+         val length = player.getLength()
+         val canSwitchToVideo = player.canSwitchToVideo()
+         launch(Dispatchers.IO) innerLaunch@ {
+-            val media = if (entryUrl != null) medialibrary.getMedia(entryUrl) else medialibrary.findMedia(currentMedia) ?: return@innerLaunch
++            var media = if (entryUrl != null) medialibrary.getMedia(entryUrl) else medialibrary.findMedia(currentMedia)
++            // Browser/local media can have no MediaLibrary row yet. Without an id, setLastTime()
++            // cannot persist progress, which is especially visible when a video is played as audio.
++            if (media == null || media.id == 0L) {
++                media = if (currentMedia.type == MediaWrapper.TYPE_STREAM || isSchemeStreaming(currentMedia.uri.scheme)) {
++                    medialibrary.addStream(entryUrl ?: currentMedia.uri.toString(), currentMedia.title)
++                } else {
++                    medialibrary.addMedia(currentMedia.uri.toString(), if (currentMedia.length > 0) currentMedia.length else length)
++                }
++            }
++            media ?: return@innerLaunch
+             if (showAudioPlayer.value != true) BaseBrowserFragment.needRefresh.postValue(true)
+             if (media.id == 0L) return@innerLaunch
+             if (titleIdx > 0) media.setLongMeta(MediaWrapper.META_TITLE, titleIdx.toLong())
+@@ -796,7 +812,7 @@ class PlaylistManager(val service: PlaybackService) : MediaWrapperList.EventList
+     fun saveCurrentMedia(forceVideo:Boolean = false) {
+         if (settings.getBoolean(KEY_INCOGNITO, false)) return
+         val media = getCurrentMedia() ?: return
+-        val isAudio = isAudioList() || forceVideo
++        val isAudio = isAudioList() || forceVideo || isVideoPlayedAsAudio()
+         settings.putSingle(KEY_CURRENT_MEDIA_IS_AUDIO, isAudio)
+ 
+         if (media.uri.scheme.isSchemeFD()) {
+@@ -834,7 +850,7 @@ class PlaylistManager(val service: PlaybackService) : MediaWrapperList.EventList
+         val currentMedia = getCurrentMedia() ?: return
+         if (currentMedia.uri.scheme.isSchemeFD()) return
+         val locations = StringBuilder()
+-        val isAudio = isAudioList() || forceVideo
++        val isAudio = isAudioList() || forceVideo || isVideoPlayedAsAudio()
+         withContext(Dispatchers.Default) {
+             val list = mediaList.copy.takeIf { it.isNotEmpty() } ?: return@withContext
+             for (mw in list) locations.append(" ").append(mw.uri.toString())
+@@ -1027,11 +1043,11 @@ class PlaylistManager(val service: PlaybackService) : MediaWrapperList.EventList
+     }
+ 
+     @Synchronized
+-    private fun savePosition(reset: Boolean = false, video: Boolean = false) {
++    private fun savePosition(reset: Boolean = false, video: Boolean = false, forceAudio: Boolean = false) {
+         if (settings.getBoolean(KEY_INCOGNITO, false)) return
+         if (!hasMedia()) return
+         settings.edit {
+-            val audio = !video && isAudioList()
++            val audio = forceAudio || (!video && (isAudioList() || isVideoPlayedAsAudio()))
+             putBoolean(if (audio) AUDIO_SHUFFLING else MEDIA_SHUFFLING, shuffling)
+             putInt(if (audio) POSITION_IN_AUDIO_LIST else POSITION_IN_MEDIA_LIST, if (reset) 0 else currentIndex)
+             putLong(if (audio) POSITION_IN_SONG else POSITION_IN_MEDIA, if (reset) 0L else player.getCurrentTime())
+@@ -1340,6 +1356,17 @@ class PlaylistManager(val service: PlaybackService) : MediaWrapperList.EventList
+         }
+     }
+ 
++    /**
++     * True when the current item is a video intentionally routed through the audio/background path.
++     * MEDIA_FORCE_AUDIO is the authoritative signal; the second branch covers an already-running
++     * video whose video output is detached but that can still switch back to video.
++     */
++    private fun isVideoPlayedAsAudio(): Boolean {
++        val media = getCurrentMedia() ?: return false
++        if (media.hasFlag(MediaWrapper.MEDIA_FORCE_AUDIO)) return true
++        return media.type == MediaWrapper.TYPE_VIDEO && !player.isVideoPlaying() && player.canSwitchToVideo()
++    }
++
+     internal fun isAudioList() = !player.isVideoPlaying() && mediaList.isAudioList
+ }
+ 
