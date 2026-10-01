@@ -3,7 +3,7 @@ name: Build VLC Android Resume Fix
 on:
   workflow_dispatch:
   push:
-    branches: [ main, master ]
+    branches: [ dual-fix ]
 
 jobs:
   build:
@@ -69,10 +69,12 @@ jobs:
 
           echo "All required Gradle project directories exist."
 
-      - name: Build installable debug APK
+      - name: Build Internal Storage and SMB APKs
         shell: bash
         run: |
-          gradle :application:app:assembleDebug \
+          gradle \
+            :application:app:assembleInternalStorage \
+            :application:app:assembleSmb \
             --stacktrace \
             --no-daemon
 
@@ -86,7 +88,8 @@ jobs:
             -name '*.apk' \
             -exec cp {} out/ \;
 
-          test -n "$(find out -type f -name '*.apk' -print -quit)"
+          test -f out/VLC-Internal-Storage-all.apk
+          test -f out/VLC-SMB-all.apk
 
           echo "Generated APK files:"
           ls -lh out
@@ -94,6 +97,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: vlc-android-3.7.2-beta2-resume-fix-debug
+          name: vlc-android-3.7.2-beta2-dual-resume-fix
           path: out/*.apk
           if-no-files-found: error
