@@ -108,6 +108,10 @@ import org.videolan.vlc.util.Permissions
 import org.videolan.vlc.util.share
 import java.io.File
 import java.io.IOException
+import java.io.BufferedInputStream
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.util.zip.ZipInputStream
 
 private const val FILE_PICKER_RESULT_CODE = 10000
 private const val RESULT_VALUE_CLEAR_HISTORY = 1
@@ -324,6 +328,14 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                 }
                 return true
             }
+            "restore_media_db" -> {
+                restoreMediaDatabase()
+                return true
+            }
+            "restore_app_db" -> {
+                restoreAppDatabase()
+                return true
+            }
             "dump_app_db" -> {
                 val dst = File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY + ROOM_DATABASE)
                 lifecycleScope.launch {
@@ -404,6 +416,98 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                         UiTools.snacker(requireActivity(), getString(R.string.invalid_settings_file))
                     }
                 }
+            }
+        }
+    }
+
+    private fun restoreMediaDatabase() {
+        val src = File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY + Medialibrary.VLC_MEDIA_DB_NAME)
+        if (!src.isFile) {
+            Toast.makeText(requireContext(), getString(R.string.restore_media_db_missing), Toast.LENGTH_LONG).show()
+            return
+        }
+        lifecycleScope.launch {
+            val restored = withContext(Dispatchers.IO) {
+                try {
+                    val db = File(requireContext().getDir("db", Context.MODE_PRIVATE).toString() + Medialibrary.VLC_MEDIA_DB_NAME)
+                    val parent = db.parentFile ?: return@withContext false
+                    val names = arrayOf(db.name, db.name + "-wal", db.name + "-shm", db.name + "-journal")
+                    names.forEach { name ->
+                        val current = File(parent, name)
+                        if (current.exists()) {
+                            val old = File(parent, name + ".restore-old")
+                            if (old.exists()) old.delete()
+                            current.renameTo(old)
+                        }
+                    }
+                    FileUtils.copyFile(src, db)
+                } catch (e: Exception) {
+                    Log.e("DatabaseRestore", "Media database restore failed", e)
+                    false
+                }
+            }
+            if (restored) {
+                Toast.makeText(requireContext(), getString(R.string.restore_db_success_restart), Toast.LENGTH_LONG).show()
+                requireActivity().window.decorView.postDelayed({
+                    android.os.Process.killProcess(android.os.Process.myPid())
+                }, 1200L)
+            } else {
+                Toast.makeText(requireContext(), getString(R.string.restore_db_failure), Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun restoreAppDatabase() {
+        val src = File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY + ROOM_DATABASE)
+        if (!src.isFile) {
+            Toast.makeText(requireContext(), getString(R.string.restore_app_db_missing), Toast.LENGTH_LONG).show()
+            return
+        }
+        lifecycleScope.launch {
+            val restored = withContext(Dispatchers.IO) {
+                try {
+                    val dbDir = File(requireContext().getDir("db", Context.MODE_PRIVATE).parent!!, "databases")
+                    if (!dbDir.exists()) dbDir.mkdirs()
+
+                    // Keep the currently opened SQLite files on their old inodes until this
+                    // process exits, then place the restored files at their normal paths.
+                    dbDir.listFiles()?.forEach { current ->
+                        if (!current.name.endsWith(".restore-old")) {
+                            val old = File(dbDir, current.name + ".restore-old")
+                            if (old.exists()) old.delete()
+                            current.renameTo(old)
+                        }
+                    }
+
+                    ZipInputStream(BufferedInputStream(FileInputStream(src))).use { zip ->
+                        var entry = zip.nextEntry
+                        var extracted = false
+                        while (entry != null) {
+                            if (!entry.isDirectory) {
+                                val safeName = File(entry.name).name
+                                if (safeName.isNotEmpty()) {
+                                    val outFile = File(dbDir, safeName)
+                                    FileOutputStream(outFile).use { output -> zip.copyTo(output) }
+                                    extracted = true
+                                }
+                            }
+                            zip.closeEntry()
+                            entry = zip.nextEntry
+                        }
+                        extracted
+                    }
+                } catch (e: Exception) {
+                    Log.e("DatabaseRestore", "App database restore failed", e)
+                    false
+                }
+            }
+            if (restored) {
+                Toast.makeText(requireContext(), getString(R.string.restore_db_success_restart), Toast.LENGTH_LONG).show()
+                requireActivity().window.decorView.postDelayed({
+                    android.os.Process.killProcess(android.os.Process.myPid())
+                }, 1200L)
+            } else {
+                Toast.makeText(requireContext(), getString(R.string.restore_db_failure), Toast.LENGTH_LONG).show()
             }
         }
     }
