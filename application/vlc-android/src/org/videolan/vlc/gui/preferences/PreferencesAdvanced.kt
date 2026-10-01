@@ -313,7 +313,7 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                 return true
             }
             "full_restore" -> {
-                restoreFullBackup()
+                showFullRestoreSelection()
                 return true
             }
             "dump_media_db" -> {
@@ -431,13 +431,8 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
         }
     }
 
-    private fun fullBackupFile(): File {
-        val name = if (requireContext().packageName.endsWith(".smb"))
-            "/VLC-SMB-Full-Backup.zip"
-        else
-            "/VLC-Internal-Storage-Full-Backup.zip"
-        return File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY + name)
-    }
+    private fun fullBackupFile(): File =
+        File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY + "/VLC-Full-Backup.zip")
 
     private fun createFullBackup() {
         val medialibrary = Medialibrary.getInstance()
@@ -515,12 +510,51 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
         zip.closeEntry()
     }
 
-    private fun restoreFullBackup() {
+    private fun showFullRestoreSelection() {
         val src = fullBackupFile()
         if (!src.isFile) {
             Toast.makeText(requireContext(), getString(R.string.full_restore_missing, src.name), Toast.LENGTH_LONG).show()
             return
         }
+        val labels = arrayOf(
+            getString(R.string.full_restore_item_settings),
+            getString(R.string.full_restore_item_media_db),
+            getString(R.string.full_restore_item_app_db),
+            getString(R.string.full_restore_item_artwork),
+            getString(R.string.full_restore_item_subtitles),
+            getString(R.string.full_restore_item_credentials)
+        )
+        val selected = booleanArrayOf(true, true, true, true, true, false)
+        android.app.AlertDialog.Builder(requireActivity())
+            .setTitle(R.string.full_restore_choose)
+            .setMultiChoiceItems(labels, selected) { _, which, checked -> selected[which] = checked }
+            .setPositiveButton(R.string.full_restore_start) { _, _ ->
+                if (selected.none { it }) {
+                    Toast.makeText(requireContext(), R.string.full_restore_nothing_selected, Toast.LENGTH_LONG).show()
+                } else {
+                    restoreFullBackup(
+                        restoreSettings = selected[0],
+                        restoreMediaDb = selected[1],
+                        restoreAppDb = selected[2],
+                        restoreArtwork = selected[3],
+                        restoreSubtitles = selected[4],
+                        restoreCredentials = selected[5]
+                    )
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun restoreFullBackup(
+        restoreSettings: Boolean,
+        restoreMediaDb: Boolean,
+        restoreAppDb: Boolean,
+        restoreArtwork: Boolean,
+        restoreSubtitles: Boolean,
+        restoreCredentials: Boolean
+    ) {
+        val src = fullBackupFile()
         if (Medialibrary.getInstance().isWorking) {
             UiTools.snacker(requireActivity(), getString(R.string.settings_ml_block_scan))
             return
@@ -551,16 +585,16 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                     }
 
                     val manifest = File(staging, "manifest.json")
+                    if (!manifest.isFile || !manifest.readText().contains("\"format\":1"))
+                        throw IOException("Unsupported backup format")
+
                     val settingsFile = File(staging, "settings/settings.json")
                     val mediaDb = File(staging, "medialibrary/db/${Medialibrary.VLC_MEDIA_DB_NAME.removePrefix("/")}")
-                    if (!manifest.isFile || !settingsFile.isFile || !mediaDb.isFile)
-                        throw IOException("Incomplete backup")
-                    val manifestText = manifest.readText()
-                    if (!manifestText.contains("\"format\":1") ||
-                        !manifestText.contains("\"package\":\"${context.packageName}\""))
-                        throw IOException("Backup belongs to another app or format")
+                    if (restoreSettings && !settingsFile.isFile) throw IOException("Settings missing")
+                    if (restoreMediaDb && !mediaDb.isFile) throw IOException("Media database missing")
 
-                    PreferenceParser.restoreSettings(requireActivity(), Uri.fromFile(settingsFile))
+                    if (restoreSettings)
+                        PreferenceParser.restoreSettings(requireActivity(), Uri.fromFile(settingsFile))
 
                     val dataRoot = context.getDir("db", Context.MODE_PRIVATE).parentFile
                         ?: throw IOException("No app data directory")
@@ -571,32 +605,44 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                     val artworkDir = external?.let { File(it, Medialibrary.MEDIALIB_FOLDER_NAME.removePrefix("/")) }
                     val subtitlesDir = external?.let { File(it, "subtitles") }
 
-                    mediaDbDir.listFiles()?.filter {
-                        it.name.startsWith(Medialibrary.VLC_MEDIA_DB_NAME.removePrefix("/"))
-                    }?.forEach { if (!it.delete()) throw IOException("Cannot replace media database") }
-                    copyDirectoryContents(File(staging, "medialibrary/db"), mediaDbDir)
-
-                    if (!appDbDir.exists()) appDbDir.mkdirs()
-                    appDbDir.listFiles()?.forEach {
-                        if (!it.deleteRecursively()) throw IOException("Cannot replace app database")
+                    if (restoreMediaDb) {
+                        mediaDbDir.listFiles()?.filter {
+                            it.name.startsWith(Medialibrary.VLC_MEDIA_DB_NAME.removePrefix("/"))
+                        }?.forEach { if (!it.delete()) throw IOException("Cannot replace media database") }
+                        copyDirectoryContents(File(staging, "medialibrary/db"), mediaDbDir)
                     }
-                    copyDirectoryContents(File(staging, "appdb"), appDbDir)
 
-                    artworkDir?.let {
-                        it.deleteRecursively()
-                        copyDirectoryContents(File(staging, "artwork/medialib"), it)
+                    if (restoreAppDb) {
+                        if (!appDbDir.exists()) appDbDir.mkdirs()
+                        appDbDir.listFiles()?.forEach {
+                            if (!it.deleteRecursively()) throw IOException("Cannot replace app database")
+                        }
+                        copyDirectoryContents(File(staging, "appdb"), appDbDir)
                     }
-                    subtitlesDir?.let {
-                        val saved = File(staging, "external/subtitles")
-                        if (saved.exists()) {
+
+                    if (restoreArtwork) {
+                        artworkDir?.let {
                             it.deleteRecursively()
-                            copyDirectoryContents(saved, it)
+                            copyDirectoryContents(File(staging, "artwork/medialib"), it)
                         }
                     }
-                    val savedKeyStore = File(staging, "keystore")
-                    if (savedKeyStore.exists()) {
-                        keyStoreDir.deleteRecursively()
-                        copyDirectoryContents(savedKeyStore, keyStoreDir)
+
+                    if (restoreSubtitles) {
+                        subtitlesDir?.let {
+                            val saved = File(staging, "external/subtitles")
+                            if (saved.exists()) {
+                                it.deleteRecursively()
+                                copyDirectoryContents(saved, it)
+                            }
+                        }
+                    }
+
+                    if (restoreCredentials) {
+                        val savedKeyStore = File(staging, "keystore")
+                        if (savedKeyStore.exists()) {
+                            keyStoreDir.deleteRecursively()
+                            copyDirectoryContents(savedKeyStore, keyStoreDir)
+                        }
                     }
 
                     staging.deleteRecursively()

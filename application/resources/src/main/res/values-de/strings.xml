@@ -1393,6 +1393,15 @@
     <string name="full_restore_missing">%1$s wurde im Stammordner des internen Speichers nicht gefunden</string>
     <string name="full_restore_success">Vollständige Sicherung wiederhergestellt. VLC wird jetzt beendet. Öffnen Sie die App anschließend erneut.</string>
     <string name="full_restore_failure">Die vollständige Sicherung konnte nicht wiederhergestellt werden</string>
+    <string name="full_restore_choose">Auswählen, was wiederhergestellt werden soll</string>
+    <string name="full_restore_item_settings">Einstellungen</string>
+    <string name="full_restore_item_media_db">Mediathek und Wiedergabedaten</string>
+    <string name="full_restore_item_app_db">App-Datenbank (Favoriten, eigene Ordner, Widgets, Equalizer)</string>
+    <string name="full_restore_item_artwork">Cover und Vorschaubilder</string>
+    <string name="full_restore_item_subtitles">Von VLC verwaltete Untertitel</string>
+    <string name="full_restore_item_credentials">Netzwerk-Zugangsdaten (vorzugsweise auf demselben Gerät)</string>
+    <string name="full_restore_start">Ausgewählte Daten wiederherstellen</string>
+    <string name="full_restore_nothing_selected">Wählen Sie mindestens einen Bereich aus</string>
     <string name="restore_media_db">Mediendatenbank wiederherstellen</string>
     <string name="restore_media_db_summary">vlc_media.db aus dem internen Speicherstammordner wiederherstellen. VLC wird anschließend beendet.</string>
     <string name="restore_app_db">App-Datenbank wiederherstellen</string>
