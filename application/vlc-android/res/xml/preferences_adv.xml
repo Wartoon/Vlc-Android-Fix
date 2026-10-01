@@ -55,6 +55,18 @@
 
         <Preference
                 android:enabled="true"
+                android:key="restore_media_db"
+                android:summary="@string/restore_media_db_summary"
+                android:title="@string/restore_media_db"/>
+
+        <Preference
+                android:enabled="true"
+                android:key="restore_app_db"
+                android:summary="@string/restore_app_db_summary"
+                android:title="@string/restore_app_db"/>
+
+        <Preference
+                android:enabled="true"
                 android:key="clear_media_db"
                 android:summary="@string/clear_media_database_summary"
                 android:title="@string/clear_media_db"/>
