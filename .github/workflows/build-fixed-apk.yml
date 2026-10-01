@@ -37,8 +37,8 @@ jobs:
       - name: Initialize VLC build dependencies
         shell: bash
         env:
-          ANDROID_SDK: ${{ env.ANDROID_HOME }}
-          ANDROID_NDK: ${{ env.ANDROID_HOME }}/ndk/21.4.7075529
+          ANDROID_SDK: /usr/local/lib/android/sdk
+          ANDROID_NDK: /usr/local/lib/android/sdk/ndk/21.4.7075529
         run: |
           chmod +x buildsystem/compile.sh
           buildsystem/compile.sh --init -a arm64
@@ -46,8 +46,8 @@ jobs:
       - name: Build installable debug APK
         shell: bash
         env:
-          ANDROID_SDK: ${{ env.ANDROID_HOME }}
-          ANDROID_NDK: ${{ env.ANDROID_HOME }}/ndk/21.4.7075529
+          ANDROID_SDK: /usr/local/lib/android/sdk
+          ANDROID_NDK: /usr/local/lib/android/sdk/ndk/21.4.7075529
         run: |
           gradle :application:app:assembleDebug --stacktrace --no-daemon
 
