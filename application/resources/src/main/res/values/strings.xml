@@ -1405,6 +1405,14 @@
     <string name="export_settings">Export settings</string>
     <string name="restore_settings_summary">Restore your settings from a previous export</string>
     <string name="restore_settings">Restore settings</string>
+    <string name="restore_media_db">Restore media database</string>
+    <string name="restore_media_db_summary">Restore vlc_media.db from the internal storage root. VLC will close afterwards.</string>
+    <string name="restore_app_db">Restore app database</string>
+    <string name="restore_app_db_summary">Restore vlc_database.zip from the internal storage root. VLC will close afterwards.</string>
+    <string name="restore_media_db_missing">vlc_media.db was not found in the internal storage root</string>
+    <string name="restore_app_db_missing">vlc_database.zip was not found in the internal storage root</string>
+    <string name="restore_db_success_restart">Database restored. VLC will now close. Open it again.</string>
+    <string name="restore_db_failure">Database could not be restored</string>
     <string name="obsolete_restore_settings">Your settings export is obsolete. Please export them again</string>
     <string name="export_settings_success">Settings exported successfully to the internal storage root</string>
     <string name="export_settings_failure">Something went wrong while exporting your settings</string>
