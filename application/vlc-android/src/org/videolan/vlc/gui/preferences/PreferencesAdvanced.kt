@@ -434,11 +434,7 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                     val names = arrayOf(db.name, db.name + "-wal", db.name + "-shm", db.name + "-journal")
                     names.forEach { name ->
                         val current = File(parent, name)
-                        if (current.exists()) {
-                            val old = File(parent, name + ".restore-old")
-                            if (old.exists()) old.delete()
-                            current.renameTo(old)
-                        }
+                        if (current.exists() && !current.delete()) return@withContext false
                     }
                     FileUtils.copyFile(src, db)
                 } catch (e: Exception) {
@@ -469,14 +465,8 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                     val dbDir = File(requireContext().getDir("db", Context.MODE_PRIVATE).parent!!, "databases")
                     if (!dbDir.exists()) dbDir.mkdirs()
 
-                    // Keep the currently opened SQLite files on their old inodes until this
-                    // process exits, then place the restored files at their normal paths.
                     dbDir.listFiles()?.forEach { current ->
-                        if (!current.name.endsWith(".restore-old")) {
-                            val old = File(dbDir, current.name + ".restore-old")
-                            if (old.exists()) old.delete()
-                            current.renameTo(old)
-                        }
+                        if (!current.delete()) return@withContext false
                     }
 
                     ZipInputStream(BufferedInputStream(FileInputStream(src))).use { zip ->
