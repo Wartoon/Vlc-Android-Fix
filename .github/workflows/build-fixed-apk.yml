@@ -11,7 +11,7 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      - name: Checkout
+      - name: Checkout VLC Android
         uses: actions/checkout@v4
 
       - name: Set up Java 17
@@ -34,29 +34,61 @@ jobs:
             "build-tools;36.0.0" \
             "ndk;21.4.7075529"
 
-      - name: Initialize VLC build dependencies
+          cat > local.properties <<EOF
+          sdk.dir=$ANDROID_HOME
+          android.ndkPath=$ANDROID_HOME/ndk/21.4.7075529
+          android.ndkFullVersion=21.4.7075529
+          EOF
+
+      - name: Fetch exact VLC 3.x libvlcjni dependency
         shell: bash
-        env:
-          ANDROID_SDK: /usr/local/lib/android/sdk
-          ANDROID_NDK: /usr/local/lib/android/sdk/ndk/21.4.7075529
         run: |
-          chmod +x buildsystem/compile.sh
-          buildsystem/compile.sh --init -a arm64
+          git clone \
+            --branch libvlcjni-3.x \
+            --single-branch \
+            https://code.videolan.org/videolan/libvlcjni.git \
+            libvlcjni
+
+          cd libvlcjni
+
+          git checkout c0cc8ce6443dcb09be9b43c7b7a3ed01e33cb3ac
+
+          echo "libvlcjni revision:"
+          git rev-parse HEAD
+
+          test -d libvlc
+
+      - name: Verify build inputs
+        shell: bash
+        run: |
+          test -d application/app
+          test -d application/vlc-android
+          test -d libvlcjni/libvlc
+          test -f build.gradle
+          test -f settings.gradle
+
+          echo "All required Gradle project directories exist."
 
       - name: Build installable debug APK
         shell: bash
-        env:
-          ANDROID_SDK: /usr/local/lib/android/sdk
-          ANDROID_NDK: /usr/local/lib/android/sdk/ndk/21.4.7075529
         run: |
-          gradle :application:app:assembleDebug --stacktrace --no-daemon
+          gradle :application:app:assembleDebug \
+            --stacktrace \
+            --no-daemon
 
       - name: Collect APK
         shell: bash
         run: |
           mkdir -p out
-          find application/app/build/outputs/apk -type f -name '*.apk' -exec cp {} out/ \;
+
+          find application/app/build/outputs/apk \
+            -type f \
+            -name '*.apk' \
+            -exec cp {} out/ \;
+
           test -n "$(find out -type f -name '*.apk' -print -quit)"
+
+          echo "Generated APK files:"
           ls -lh out
 
       - name: Upload APK
