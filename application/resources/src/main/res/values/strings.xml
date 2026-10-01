@@ -1405,6 +1405,15 @@
     <string name="export_settings">Export settings</string>
     <string name="restore_settings_summary">Restore your settings from a previous export</string>
     <string name="restore_settings">Restore settings</string>
+    <string name="full_backup">Back up complete app</string>
+    <string name="full_backup_summary">Back up media library, playback data, app database, settings, artwork, thumbnails and app-managed subtitles to one ZIP file</string>
+    <string name="full_restore">Restore complete app</string>
+    <string name="full_restore_summary">Restore the complete backup for this VLC app and close VLC afterwards</string>
+    <string name="full_backup_success">Complete app backup created successfully</string>
+    <string name="full_backup_failure">Complete app backup could not be created</string>
+    <string name="full_restore_missing">%1$s was not found in the internal storage root</string>
+    <string name="full_restore_success">Complete backup restored. VLC will now close. Open the app again afterwards.</string>
+    <string name="full_restore_failure">Complete backup could not be restored</string>
     <string name="restore_media_db">Restore media database</string>
     <string name="restore_media_db_summary">Restore vlc_media.db from the internal storage root. VLC will close afterwards.</string>
     <string name="restore_app_db">Restore app database</string>
