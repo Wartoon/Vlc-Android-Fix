@@ -9,6 +9,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -19,7 +20,6 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # AGP 9.1.1 requires Gradle >= 9.3.1.
       - name: Set up Gradle 9.3.1
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -28,15 +28,28 @@ jobs:
       - name: Prepare Android SDK
         shell: bash
         run: |
-          echo "sdk.dir=$ANDROID_HOME" > local.properties
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
             "platforms;android-36" \
             "build-tools;36.0.0" \
             "ndk;21.4.7075529"
 
+      - name: Initialize VLC build dependencies
+        shell: bash
+        env:
+          ANDROID_SDK: ${{ env.ANDROID_HOME }}
+          ANDROID_NDK: ${{ env.ANDROID_HOME }}/ndk/21.4.7075529
+        run: |
+          chmod +x buildsystem/compile.sh
+          buildsystem/compile.sh --init -a arm64
+
       - name: Build installable debug APK
-        run: gradle :application:app:assembleDebug --stacktrace --no-daemon
+        shell: bash
+        env:
+          ANDROID_SDK: ${{ env.ANDROID_HOME }}
+          ANDROID_NDK: ${{ env.ANDROID_HOME }}/ndk/21.4.7075529
+        run: |
+          gradle :application:app:assembleDebug --stacktrace --no-daemon
 
       - name: Collect APK
         shell: bash
