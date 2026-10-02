@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# VLC TV Fix V1 reproducible build patch.
 from pathlib import Path
 
 
