@@ -60,13 +60,41 @@ jobs:
       - name: Verify TV V1 patch
         shell: bash
         run: |
-          grep -q 'android:defaultValue="2"' application/vlc-android/res/xml/preferences.xml
-          grep -q 'android:defaultValue="5000"' application/vlc-android/res/xml/preferences_adv.xml
-          grep -q 'applicationIdSuffix ".tvfix"' application/app/build.gradle
-          grep -q 'getInt(KEY_NETWORK_CACHING_VALUE, 5000)' application/resources/src/main/java/org/videolan/resources/VLCOptions.kt
-          grep -q 'getBoolean(KEY_PREFER_SMBV1, false)' application/resources/src/main/java/org/videolan/resources/VLCOptions.kt
-          grep -q 'encodedParent' application/television/src/main/java/org/videolan/television/ui/MediaItemDetailsFragment.kt
-          grep -q 'Uri.parse(encodedParent)' application/television/src/main/java/org/videolan/television/ui/MediaItemDetailsFragment.kt
+          python3 - <<'PY'
+          from pathlib import Path
+
+          checks = {
+              "application/vlc-android/res/xml/preferences.xml": [
+                  'android:defaultValue="2"',
+                  'android:key="hardware_acceleration"',
+              ],
+              "application/vlc-android/res/xml/preferences_adv.xml": [
+                  'android:defaultValue="5000"',
+                  'android:key="network_caching"',
+                  'android:key="prefer_smbv1"',
+              ],
+              "application/app/build.gradle": [
+                  'applicationIdSuffix ".tvfix"',
+                  'VLC-TV-Fix',
+              ],
+              "application/resources/src/main/java/org/videolan/resources/VLCOptions.kt": [
+                  'getInt(KEY_NETWORK_CACHING_VALUE, 5000)',
+                  'getBoolean(KEY_PREFER_SMBV1, false)',
+                  'HW_ACCELERATION_FULL',
+              ],
+              "application/television/src/main/java/org/videolan/television/ui/MediaItemDetailsFragment.kt": [
+                  'encodedParent',
+                  'Uri.parse(encodedParent)',
+              ],
+          }
+
+          for filename, needles in checks.items():
+              text = Path(filename).read_text()
+              for needle in needles:
+                  if needle not in text:
+                      raise SystemExit(f"Verification failed: {needle!r} missing from {filename}")
+              print(f"verified {filename}")
+          PY
 
       - name: Build single TV APK
         shell: bash
