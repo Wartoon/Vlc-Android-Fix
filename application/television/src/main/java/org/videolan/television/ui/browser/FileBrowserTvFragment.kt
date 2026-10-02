@@ -75,20 +75,14 @@ class FileBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>(), PathAda
 
     override fun provideAdapter(eventsHandler: IEventsHandler<MediaLibraryItem>, itemSize: Int): TvItemAdapter {
         val fileTvItemAdapter = FileTvItemAdapter(this, itemSize, isRootLevel && getCategory() == TYPE_NETWORK)
-        // restore the position from the source when navigating from Arian
         dataObserver = fileTvItemAdapter.onAnyChange {
             val source = (viewModel as IPathOperationDelegate).getSource()
             val selectedIndex = if (source != null) {
-                if (fileTvItemAdapter.dataset.contains(source)) {
-                    //the source has been found because we are on its direct parent
-                    fileTvItemAdapter.dataset.indexOf(source)
-                } else {
-                    // we look for the item included in the source path to find what item to focus
+                if (fileTvItemAdapter.dataset.contains(source)) fileTvItemAdapter.dataset.indexOf(source)
+                else {
                     var index: Int? = null
                     fileTvItemAdapter.dataset.forEach {
-                        if ((source as? MediaWrapper)?.uri?.toString()?.startsWith(it.uri.toString()) == true) {
-                            index = fileTvItemAdapter.dataset.indexOf(it)
-                        }
+                        if ((source as? MediaWrapper)?.uri?.toString()?.startsWith(it.uri.toString()) == true) index = fileTvItemAdapter.dataset.indexOf(it)
                     }
                     index
                 }
@@ -111,23 +105,17 @@ class FileBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>(), PathAda
         super.onCreate(savedInstanceState)
         currentItem = if (savedInstanceState != null) savedInstanceState.parcelable<Parcelable>(ITEM) as? MediaLibraryItem
         else arguments?.parcelable(ITEM) as? MediaLibraryItem
-
         isRootLevel = arguments?.getBoolean("rootLevel") == true
         (currentItem as? MediaWrapper)?.run { mrl = location }
         val category = arguments?.getLong(CATEGORY, TYPE_FILE) ?: TYPE_FILE
         viewModel = getBrowserModel(category = category, url = mrl)
-
         viewModel.currentItem = currentItem
         browserFavRepository = BrowserFavRepository.getInstance(requireContext())
-
-        if (getCategory() == TYPE_NETWORK) {
-            dialogsDelegate.observeDialogs(this, this)
-        }
+        if (getCategory() == TYPE_NETWORK) dialogsDelegate.observeDialogs(this, this)
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
         (viewModel as BrowserModel).dataset.observe(viewLifecycleOwner) { items ->
             if (items == null) return@observe
             val lm = binding.list.layoutManager as LinearLayoutManager
@@ -142,14 +130,10 @@ class FileBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>(), PathAda
                 }
             }
             binding.emptyLoading.state = if (items.isEmpty()) EmptyLoadingState.EMPTY else EmptyLoadingState.NONE
-
-            //headers
             val nbColumns = if ((viewModel as BrowserModel).sort == Medialibrary.SORT_ALPHA || (viewModel as BrowserModel).sort == Medialibrary.SORT_DEFAULT) 9 else 1
-
             binding.headerList.layoutManager = GridLayoutManager(requireActivity(), nbColumns)
             headerAdapter.sortType = (viewModel as BrowserModel).sort
         }
-
         viewModel.provider.liveHeaders.observe(viewLifecycleOwner) {
             updateHeaders(it)
             binding.list.invalidateItemDecorations()
@@ -157,12 +141,10 @@ class FileBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>(), PathAda
             animationDelegate.setVisibility(binding.headerButton, if (viewModel.provider.headers.isEmpty) View.GONE else View.VISIBLE)
             animationDelegate.setVisibility(binding.headerDescription, if (viewModel.provider.headers.isEmpty) View.GONE else View.VISIBLE)
         }
-
         (viewModel.provider as BrowserProvider).loading.observe(viewLifecycleOwner) {
             if (it) binding.emptyLoading.state = EmptyLoadingState.LOADING
             if (!it && (viewModel as BrowserModel).dataset.isEmpty()) binding.emptyLoading.state = EmptyLoadingState.EMPTY
         }
-
         (viewModel as BrowserModel).getDescriptionUpdate().observe(viewLifecycleOwner) { pair ->
             if (pair != null) (adapter as RecyclerView.Adapter<*>).notifyItemChanged(pair.first, pair.second)
         }
@@ -183,12 +165,7 @@ class FileBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>(), PathAda
                 val did = object : VLCDividerItemDecoration(requireActivity(), HORIZONTAL, VectorDrawableCompat.create(requireActivity().resources, R.drawable.ic_divider, requireActivity().theme)!!) {
                     override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State) {
                         val position = parent.getChildAdapterPosition(view)
-                        // hide the divider for the last child
-                        if (position == parent.adapter?.itemCount ?: 0 - 1) {
-                            outRect.setEmpty()
-                        } else {
-                            super.getItemOffsets(outRect, view, parent, state)
-                        }
+                        if (position == (parent.adapter?.itemCount ?: 0) - 1) outRect.setEmpty() else super.getItemOffsets(outRect, view, parent, state)
                     }
                 }
                 did.setDrawable(VectorDrawableCompat.create(requireActivity().resources, R.drawable.ic_divider, requireActivity().theme)!!)
@@ -200,17 +177,12 @@ class FileBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>(), PathAda
     }
 
     override fun backTo(tag: String) {
-        if (tag == "root") {
-            requireActivity().finish()
-            return
-        }
+        if (tag == "root") { requireActivity().finish(); return }
         val supportFragmentManager = requireActivity().supportFragmentManager
         var poped = false
         for (i in 0 until supportFragmentManager.backStackEntryCount) {
             if (tag == supportFragmentManager.getBackStackEntryAt(i).name) {
-                supportFragmentManager.popBackStack(tag, FragmentManager.POP_BACK_STACK_INCLUSIVE)
-                poped = true
-                break
+                supportFragmentManager.popBackStack(tag, FragmentManager.POP_BACK_STACK_INCLUSIVE); poped = true; break
             }
         }
         if (!poped) {
@@ -224,9 +196,7 @@ class FileBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>(), PathAda
     }
 
     override fun currentContext(): Context = requireActivity()
-
     override fun showRoot(): Boolean = true
-
     override fun getPathOperationDelegate() = viewModel as IPathOperationDelegate
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
@@ -249,10 +219,8 @@ class FileBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>(), PathAda
     override fun onResume() {
         super.onResume()
         if (currentItem == null) (viewModel.provider as BrowserProvider).browseRoot()
-        else if (restarted) refresh()
-        (viewModel as IPathOperationDelegate).getAndRemoveDestination()?.let {
-            browse(it, true)
-        }
+        else refresh()
+        (viewModel as IPathOperationDelegate).getAndRemoveDestination()?.let { browse(it, true) }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -261,11 +229,7 @@ class FileBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>(), PathAda
         super.onSaveInstanceState(outState)
     }
 
-    override fun onStop() {
-        super.onStop()
-        (viewModel as BrowserModel).stop()
-    }
-
+    override fun onStop() { super.onStop(); (viewModel as BrowserModel).stop() }
     override fun onDestroy() {
         super.onDestroy()
         if (::dataObserver.isInitialized) (adapter as FileTvItemAdapter).unregisterAdapterDataObserver(dataObserver)
@@ -275,10 +239,8 @@ class FileBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>(), PathAda
 
     override fun onClick(v: View, position: Int, item: MediaLibraryItem) {
         val mediaWrapper = item as MediaWrapper
-
         mediaWrapper.removeFlags(MediaWrapper.MEDIA_FORCE_AUDIO)
-        if (mediaWrapper.type == MediaWrapper.TYPE_DIR) browse(mediaWrapper, true)
-        else TvUtil.openMedia(requireActivity(), item, viewModel as BrowserModel)
+        if (mediaWrapper.type == MediaWrapper.TYPE_DIR) browse(mediaWrapper, true) else TvUtil.openMedia(requireActivity(), item, viewModel as BrowserModel)
     }
 
     fun browse(media: MediaWrapper, save: Boolean) {
@@ -287,28 +249,22 @@ class FileBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>(), PathAda
         val ft = ctx.supportFragmentManager.beginTransaction()
         val next = newInstance(getCategory(), media)
         (viewModel as BrowserModel).saveList(media)
-        if (save) ft.addToBackStack(if (mrl == null) "root" else viewModel.currentItem?.title
-                ?: FileUtils.getFileNameFromPath(mrl))
+        if (save) ft.addToBackStack(if (mrl == null) "root" else viewModel.currentItem?.title ?: FileUtils.getFileNameFromPath(mrl))
         ft.replace(R.id.tv_fragment_placeholder, next, media.title)
         ft.commit()
     }
 
     override fun onKeyPressed(keyCode: Int): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_BOOKMARK) {
-            togglefavorite()
-            return true
-        }
+        if (keyCode == KeyEvent.KEYCODE_BOOKMARK) { togglefavorite(); return true }
         return super.onKeyPressed(keyCode)
     }
 
-    private val favoriteClickListener: (View) -> Unit = {
-        togglefavorite()
-    }
+    private val favoriteClickListener: (View) -> Unit = { togglefavorite() }
 
     private fun togglefavorite() {
         currentItem?.let { item ->
             lifecycleScope.launch {
-                val mw = (item as MediaWrapper)
+                val mw = item as MediaWrapper
                 withContext(Dispatchers.IO) {
                     when {
                         browserFavRepository.browserFavExists(mw.uri) -> browserFavRepository.deleteBrowserFav(mw.uri)
@@ -326,10 +282,9 @@ class FileBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>(), PathAda
     }
 
     companion object {
-        fun newInstance(type: Long, item: MediaLibraryItem?, root: Boolean = false) =
-                FileBrowserTvFragment().apply {
-                    arguments = bundleOf(CATEGORY to type, ITEM to item, "rootLevel" to root)
-                }
+        fun newInstance(type: Long, item: MediaLibraryItem?, root: Boolean = false) = FileBrowserTvFragment().apply {
+            arguments = bundleOf(CATEGORY to type, ITEM to item, "rootLevel" to root)
+        }
     }
 
     override fun fireDialog(dialog: Dialog) {
@@ -338,22 +293,16 @@ class FileBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>(), PathAda
     }
 
     override fun dialogCanceled(dialog: Dialog?) {
-        when(dialog) {
+        when (dialog) {
             is Dialog.LoginDialog -> goBack()
-            is Dialog.ErrorMessage -> {
-                view?.let { Snackbar.make(it, "${dialog.title}: ${dialog.text}", Snackbar.LENGTH_LONG).show() }
-                goBack()
-            }
+            is Dialog.ErrorMessage -> { view?.let { Snackbar.make(it, "${dialog.title}: ${dialog.text}", Snackbar.LENGTH_LONG).show() }; goBack() }
         }
     }
 
     private fun goBack() {
         val activity = activity
         if (activity?.isStarted() != true) return
-        if (tag == "root") {
-            activity.finish()
-        } else if  (!activity.isFinishing && !activity.isDestroyed) {
-            activity.supportFragmentManager.popBackStack()
-        }
+        if (tag == "root") activity.finish()
+        else if (!activity.isFinishing && !activity.isDestroyed) activity.supportFragmentManager.popBackStack()
     }
 }
