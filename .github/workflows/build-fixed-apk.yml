@@ -50,14 +50,14 @@ jobs:
             libvlcjni
           cd libvlcjni
           git checkout c0cc8ce6443dcb09be9b43c7b7a3ed01e33cb3ac
-          git rev-parse HEAD
+          test "$(git rev-parse HEAD)" = "c0cc8ce6443dcb09be9b43c7b7a3ed01e33cb3ac"
           test -d libvlc
 
       - name: Apply TV V1 changes
         shell: bash
         run: python3 buildsystem/apply-tv-v1.py
 
-      - name: Verify TV V1 patch
+      - name: Verify complete TV V1 patch
         shell: bash
         run: |
           python3 - <<'PY'
@@ -72,6 +72,8 @@ jobs:
                   'android:defaultValue="5000"',
                   'android:key="network_caching"',
                   'android:key="prefer_smbv1"',
+                  'android:key="full_backup"',
+                  'android:key="full_restore"',
               ],
               "application/app/build.gradle": [
                   'applicationIdSuffix ".tvfix"',
@@ -82,10 +84,31 @@ jobs:
                   'getBoolean(KEY_PREFER_SMBV1, false)',
                   'HW_ACCELERATION_FULL',
               ],
+              "application/vlc-android/src/org/videolan/vlc/media/PlaylistManager.kt": [
+                  'getCurrentMedia()?.type == MediaWrapper.TYPE_VIDEO',
+                  'saveMediaMeta()',
+              ],
               "application/television/src/main/java/org/videolan/television/ui/MediaItemDetailsFragment.kt": [
                   'val mrl = mediaUri.toString().trimEnd',
                   'mrl.substring(0, separator + 1).toUri()',
                   'intent.data = parent',
+              ],
+              "application/television/src/main/java/org/videolan/television/ui/browser/FileBrowserTvFragment.kt": [
+                  'if (currentItem == null) (viewModel.provider as BrowserProvider).browseRoot()',
+                  'else refresh()',
+              ],
+              "application/television/src/main/java/org/videolan/television/ui/FileTvItemAdapter.kt": [
+                  'oldItem.displayTime == newItem.displayTime',
+                  'oldItem.time == newItem.time',
+                  'oldItem.length == newItem.length',
+                  'oldItem.seen == newItem.seen',
+              ],
+              "application/television/src/main/java/org/videolan/television/ui/preferences/PreferencesAdvanced.kt": [
+                  '"full_backup" ->',
+                  'createFullBackup()',
+                  '"full_restore" ->',
+                  'showFullRestoreSelection()',
+                  'Toast.makeText(activity, getString(R.string.full_backup_success), Toast.LENGTH_LONG).show()',
               ],
           }
 
@@ -95,6 +118,14 @@ jobs:
                   if needle not in text:
                       raise SystemExit(f"Verification failed: {needle!r} missing from {filename}")
               print(f"verified {filename}")
+
+          # Regression guard: this exact Material Snackbar caused the TV preferences crash
+          # after a successful full backup and must never return to the TV implementation.
+          tv_prefs = Path("application/television/src/main/java/org/videolan/television/ui/preferences/PreferencesAdvanced.kt").read_text()
+          bad = 'snackerConfirm(activity, getString(R.string.full_backup_success)'
+          if bad in tv_prefs:
+              raise SystemExit("Regression: AppCompat-only full-backup Snackbar is present in TV preferences")
+          print("verified TV backup crash regression guard")
           PY
 
       - name: Build single TV APK
@@ -116,6 +147,7 @@ jobs:
           test -f out/VLC-TV-Fix-all.apk
           echo "Generated APK:"
           ls -lh out/VLC-TV-Fix-all.apk
+          sha256sum out/VLC-TV-Fix-all.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
