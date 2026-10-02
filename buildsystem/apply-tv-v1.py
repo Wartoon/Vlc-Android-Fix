@@ -125,6 +125,18 @@ backup_helpers = backup_helpers.replace(
     "activity.share(dst)",
     "(activity as FragmentActivity).share(dst)"
 )
+# Material Snackbar requires an AppCompat theme, which the TV preferences activity does not use.
+# The archive is already complete at this point, so use a TV-safe Toast instead of snackerConfirm.
+backup_helpers = backup_helpers.replace(
+    '''            if (success)
+                UiTools.snackerConfirm(activity, getString(R.string.full_backup_success), confirmMessage = R.string.share, overAudioPlayer = false) {
+                    (activity as FragmentActivity).share(dst)
+                }
+            else''',
+    '''            if (success)
+                Toast.makeText(activity, getString(R.string.full_backup_success), Toast.LENGTH_LONG).show()
+            else'''
+)
 
 # Imports required by the shared ZIP implementation and its success/share action.
 for imp in [
