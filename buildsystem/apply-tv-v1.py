@@ -112,10 +112,18 @@ backup_helpers = mobile[start:end]
 backup_helpers = backup_helpers.replace("requireActivity()", "activity")
 backup_helpers = backup_helpers.replace("requireContext()", "activity")
 backup_helpers = backup_helpers.replace("lifecycleScope.launch", "launch")
-# StoragePermissionsDelegate.getWritePermission is an extension on FragmentActivity in TV code.
+# StoragePermissionsDelegate.getWritePermission and share are FragmentActivity extensions.
 backup_helpers = backup_helpers.replace(
     "if (getWritePermission(Uri.fromFile(dst)))",
     "if ((activity as FragmentActivity).getWritePermission(Uri.fromFile(dst)))"
+)
+backup_helpers = backup_helpers.replace(
+    "if (!getWritePermission(Uri.fromFile(dst)))",
+    "if (!(activity as FragmentActivity).getWritePermission(Uri.fromFile(dst)))"
+)
+backup_helpers = backup_helpers.replace(
+    "activity.share(dst)",
+    "(activity as FragmentActivity).share(dst)"
 )
 
 # Imports required by the shared ZIP implementation and its success/share action.
