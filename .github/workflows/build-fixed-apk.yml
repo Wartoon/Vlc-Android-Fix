@@ -65,7 +65,8 @@ jobs:
           grep -q 'applicationIdSuffix ".tvfix"' application/app/build.gradle
           grep -q 'getInt(KEY_NETWORK_CACHING_VALUE, 5000)' application/resources/src/main/java/org/videolan/resources/VLCOptions.kt
           grep -q 'getBoolean(KEY_PREFER_SMBV1, false)' application/resources/src/main/java/org/videolan/resources/VLCOptions.kt
-          grep -q 'endsWith("/")' application/television/src/main/java/org/videolan/television/ui/MediaItemDetailsFragment.kt
+          grep -q 'encodedParent' application/television/src/main/java/org/videolan/television/ui/MediaItemDetailsFragment.kt
+          grep -q 'Uri.parse(encodedParent)' application/television/src/main/java/org/videolan/television/ui/MediaItemDetailsFragment.kt
 
       - name: Build single TV APK
         shell: bash
