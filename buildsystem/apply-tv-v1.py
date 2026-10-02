@@ -66,9 +66,6 @@ replace("application/resources/src/main/java/org/videolan/resources/VLCOptions.k
 replace("application/vlc-android/src/org/videolan/vlc/media/PlaylistManager.kt", '            if (getCurrentMedia()?.isPodcast == true || playAsAudio) saveMediaMeta()', '            if (getCurrentMedia()?.type == MediaWrapper.TYPE_VIDEO || getCurrentMedia()?.isPodcast == true || playAsAudio) saveMediaMeta()')
 
 # SMB "go to containing folder": preserve the original encoded MRL exactly.
-# retrieveParent() rebuilds a Uri with Uri.Builder.authority(authority), which can encode the
-# SMB host/port separator ':' as %3A. Build the parent from the existing MRL string instead,
-# retaining the valid smb://host:port authority and already-encoded path components.
 replace("application/television/src/main/java/org/videolan/television/ui/MediaItemDetailsFragment.kt", '''                ID_NAVIGATE_PARENT -> {
                     viewModel.media.uri.retrieveParent()?.let { item ->
                         val intent = Intent(activity, VerticalGridActivity::class.java)
@@ -96,5 +93,58 @@ replace("application/television/src/main/java/org/videolan/television/ui/MediaIt
                         activity.startActivity(intent)
                     }
                 }''')
+
+# Full backup/restore was originally implemented only in the phone PreferencesAdvanced fragment.
+# The TV advanced screen uses a separate fragment, so the visible TV preferences had no click
+# handlers at all. Reuse the already-tested implementation in the TV fragment.
+mobile_path = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/PreferencesAdvanced.kt")
+tv_path = Path("application/television/src/main/java/org/videolan/television/ui/preferences/PreferencesAdvanced.kt")
+mobile = mobile_path.read_text()
+tv = tv_path.read_text()
+
+start = mobile.index("    private fun fullBackupFile()")
+end = mobile.index("    override fun onSharedPreferenceChanged", start)
+backup_helpers = mobile[start:end]
+
+# Imports required by the shared ZIP implementation.
+for imp in [
+    "import java.io.BufferedInputStream\n",
+    "import java.io.BufferedOutputStream\n",
+    "import java.io.FileInputStream\n",
+    "import java.io.FileOutputStream\n",
+    "import java.util.zip.ZipEntry\n",
+    "import java.util.zip.ZipInputStream\n",
+    "import java.util.zip.ZipOutputStream\n",
+]:
+    if imp not in tv:
+        tv = tv.replace("import java.io.File\n", "import java.io.File\n" + imp)
+
+# Wire the two visible preferences to their actual TV actions.
+anchor = '''            "restore_settings" -> {
+                val filePickerIntent = Intent(activity, FilePickerActivity::class.java)
+                filePickerIntent.putExtra(KEY_PICKER_TYPE, PickerType.SETTINGS.ordinal)
+                startActivityForResult(filePickerIntent, FILE_PICKER_RESULT_CODE)
+                return true
+            }
+'''
+if anchor not in tv:
+    raise SystemExit("TV restore_settings click handler anchor not found")
+tv = tv.replace(anchor, anchor + '''            "full_backup" -> {
+                createFullBackup()
+                return true
+            }
+            "full_restore" -> {
+                showFullRestoreSelection()
+                return true
+            }
+''', 1)
+
+# Add the same tested backup/restore implementation used by the phone build.
+shared_anchor = "    override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {"
+if shared_anchor not in tv:
+    raise SystemExit("TV onSharedPreferenceChanged anchor not found")
+tv = tv.replace(shared_anchor, backup_helpers + shared_anchor, 1)
+tv_path.write_text(tv)
+print("patched TV full backup/restore handlers")
 
 print("TV V1 patch applied successfully")
