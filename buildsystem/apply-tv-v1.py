@@ -65,7 +65,10 @@ replace("application/resources/src/main/java/org/videolan/resources/VLCOptions.k
 # TV resume/progress: persist the current normal-video position when playback is paused/exited.
 replace("application/vlc-android/src/org/videolan/vlc/media/PlaylistManager.kt", '            if (getCurrentMedia()?.isPodcast == true || playAsAudio) saveMediaMeta()', '            if (getCurrentMedia()?.type == MediaWrapper.TYPE_VIDEO || getCurrentMedia()?.isPodcast == true || playAsAudio) saveMediaMeta()')
 
-# SMB "go to containing folder": normalize the directly reconstructed network-directory URI.
+# SMB "go to containing folder": preserve the original encoded MRL exactly.
+# retrieveParent() rebuilds a Uri with Uri.Builder.authority(authority), which can encode the
+# SMB host/port separator ':' as %3A. Build the parent from the existing MRL string instead,
+# retaining the valid smb://host:port authority and already-encoded path components.
 replace("application/television/src/main/java/org/videolan/television/ui/MediaItemDetailsFragment.kt", '''                ID_NAVIGATE_PARENT -> {
                     viewModel.media.uri.retrieveParent()?.let { item ->
                         val intent = Intent(activity, VerticalGridActivity::class.java)
@@ -76,14 +79,19 @@ replace("application/television/src/main/java/org/videolan/television/ui/MediaIt
                         activity.startActivity(intent)
                     }
                 }''', '''                ID_NAVIGATE_PARENT -> {
-                    viewModel.media.uri.retrieveParent()?.let { parent ->
-                        val item = if (parent.scheme != "file" && !parent.toString().endsWith("/"))
-                            "${parent}/".toUri()
-                        else parent
+                    val mediaUri = viewModel.media.uri
+                    val item = if (mediaUri.scheme == "file") {
+                        mediaUri.retrieveParent()
+                    } else {
+                        val mrl = mediaUri.toString().trimEnd('/')
+                        val separator = mrl.lastIndexOf('/')
+                        if (separator > mrl.indexOf("://") + 2) mrl.substring(0, separator + 1).toUri() else null
+                    }
+                    item?.let { parent ->
                         val intent = Intent(activity, VerticalGridActivity::class.java)
-                        intent.putExtra(MainTvActivity.BROWSER_TYPE, if ("file" == item.scheme) HEADER_DIRECTORIES else HEADER_NETWORK)
-                        intent.putExtra(FAVORITE_TITLE, item.lastPathSegment)
-                        intent.data = item
+                        intent.putExtra(MainTvActivity.BROWSER_TYPE, if ("file" == parent.scheme) HEADER_DIRECTORIES else HEADER_NETWORK)
+                        intent.putExtra(FAVORITE_TITLE, parent.lastPathSegment)
+                        intent.data = parent
                         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
                         activity.startActivity(intent)
                     }
