@@ -66,10 +66,21 @@ replace("application/resources/src/main/java/org/videolan/resources/VLCOptions.k
 replace("application/vlc-android/src/org/videolan/vlc/media/PlaylistManager.kt", '            if (getCurrentMedia()?.isPodcast == true || playAsAudio) saveMediaMeta()', '            if (getCurrentMedia()?.type == MediaWrapper.TYPE_VIDEO || getCurrentMedia()?.isPodcast == true || playAsAudio) saveMediaMeta()')
 
 # TV browser: refresh the current folder whenever it becomes active again after playback.
-# This re-reads the saved media position so the orange thumbnail progress is updated immediately.
-replace("application/television/src/main/java/org/videolan/television/ui/browser/FileBrowserTvFragment.kt", '''        if (currentItem == null) (viewModel.provider as BrowserProvider).browseRoot()
-        else if (restarted) refresh()''', '''        if (currentItem == null) (viewModel.provider as BrowserProvider).browseRoot()
-        else refresh()''')
+# Older work on tv-v1 already contains this source change directly, while clean baselines do not.
+# Apply it only when needed so the reproducible patch works in both cases.
+progress_path = Path("application/television/src/main/java/org/videolan/television/ui/browser/FileBrowserTvFragment.kt")
+progress_text = progress_path.read_text()
+old_progress = '''        if (currentItem == null) (viewModel.provider as BrowserProvider).browseRoot()
+        else if (restarted) refresh()'''
+new_progress = '''        if (currentItem == null) (viewModel.provider as BrowserProvider).browseRoot()
+        else refresh()'''
+if old_progress in progress_text:
+    progress_path.write_text(progress_text.replace(old_progress, new_progress, 1))
+    print("patched TV thumbnail progress refresh")
+elif new_progress in progress_text:
+    print("TV thumbnail progress refresh already present")
+else:
+    raise SystemExit("Expected TV progress refresh source block not found")
 
 # SMB "go to containing folder": preserve the original encoded MRL exactly.
 replace("application/television/src/main/java/org/videolan/television/ui/MediaItemDetailsFragment.kt", '''                ID_NAVIGATE_PARENT -> {
