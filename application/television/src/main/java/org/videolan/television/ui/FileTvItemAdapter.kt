@@ -41,13 +41,11 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
     }
 
     override var focusNext = -1
-    override fun displaySwitch(inGrid: Boolean) {
-        this.inGrid = inGrid
-    }
+    override fun displaySwitch(inGrid: Boolean) { this.inGrid = inGrid }
 
     private val defaultCover: BitmapDrawable?
     private var focusListener: FocusListener? = null
-    private var seenMediaMarkerVisible: Boolean  =true
+    private var seenMediaMarkerVisible: Boolean = true
 
     init {
         val ctx = when (eventsHandler) {
@@ -68,53 +66,42 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
             MediaItemTVListViewHolder(MediaBrowserTvItemListBinding.inflate(inflater, parent, false), eventsHandler, showProtocol) as MediaTvItemAdapter.AbstractMediaItemViewHolder<ViewDataBinding>
     }
 
-    override fun getItemViewType(position: Int): Int {
-        return if (inGrid) 0 else 1
-    }
+    override fun getItemViewType(position: Int) = if (inGrid) 0 else 1
 
     override fun onBindViewHolder(holder: MediaTvItemAdapter.AbstractMediaItemViewHolder<ViewDataBinding>, position: Int) {
         if (position >= itemCount) return
         val item = getItem(position)
         holder.setItem(item)
         holder.binding.executePendingBindings()
-        if (position == focusNext) {
-            holder.binding.root.requestFocus()
-            focusNext = -1
-        }
+        if (position == focusNext) { holder.binding.root.requestFocus(); focusNext = -1 }
     }
 
     override fun onBindViewHolder(holder: MediaTvItemAdapter.AbstractMediaItemViewHolder<ViewDataBinding>, position: Int, payloads: MutableList<Any>) {
         if (payloads.isNullOrEmpty()) onBindViewHolder(holder, position)
         else for (payload in payloads) {
             when (holder.binding) {
-                is MediaBrowserTvItemBinding -> if (payload is String) (holder.binding as MediaBrowserTvItemBinding).description =  payload else onBindViewHolder(holder, position)
+                is MediaBrowserTvItemBinding -> if (payload is String) (holder.binding as MediaBrowserTvItemBinding).description = payload else onBindViewHolder(holder, position)
                 is MediaBrowserTvItemListBinding -> if (payload is String) (holder.binding as MediaBrowserTvItemListBinding).description = payload else onBindViewHolder(holder, position)
             }
-
         }
     }
 
-    override fun onViewRecycled(holder: MediaTvItemAdapter.AbstractMediaItemViewHolder<ViewDataBinding>) {
-        super.onViewRecycled(holder)
-        holder.recycle()
-    }
-
+    override fun onViewRecycled(holder: MediaTvItemAdapter.AbstractMediaItemViewHolder<ViewDataBinding>) { super.onViewRecycled(holder); holder.recycle() }
     override fun hasSections() = true
-
-    override fun setOnFocusChangeListener(focusListener: FocusListener?) {
-        this.focusListener = focusListener
-    }
+    override fun setOnFocusChangeListener(focusListener: FocusListener?) { this.focusListener = focusListener }
 
     override fun createCB(): DiffCallback<MediaWrapper> = object : DiffCallback<MediaWrapper>() {
-        override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int) = try {
-            oldList[oldItemPosition] == newList[newItemPosition]
-        } catch (e: IndexOutOfBoundsException) {
-            false
-        }
+        override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int) = try { oldList[oldItemPosition] == newList[newItemPosition] } catch (e: IndexOutOfBoundsException) { false }
 
         override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
-            return oldList[oldItemPosition].description == newList[newItemPosition].description
-                    && oldList[oldItemPosition].title == newList[newItemPosition].title
+            val oldItem = oldList[oldItemPosition]
+            val newItem = newList[newItemPosition]
+            return oldItem.description == newItem.description
+                    && oldItem.title == newItem.title
+                    && oldItem.time == newItem.time
+                    && oldItem.displayTime == newItem.displayTime
+                    && oldItem.length == newItem.length
+                    && oldItem.seen == newItem.seen
         }
 
         override fun getChangePayload(oldItemPosition: Int, newItemPosition: Int) = arrayListOf(UPDATE_PAYLOAD)
@@ -123,84 +110,31 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
     private fun getProtocol(media: MediaWrapper) = if (media.type != MediaWrapper.TYPE_DIR) null else media.uri.scheme
 
     @RequiresApi(Build.VERSION_CODES.M)
-    inner class MediaItemTVViewHolder(
-            binding: MediaBrowserTvItemBinding,
-            override val eventsHandler: IEventsHandler<MediaLibraryItem>,
-            private val showProtocol: Boolean
-    ) : MediaTvItemAdapter.AbstractMediaItemViewHolder<MediaBrowserTvItemBinding>(binding)
-    {
-
+    inner class MediaItemTVViewHolder(binding: MediaBrowserTvItemBinding, override val eventsHandler: IEventsHandler<MediaLibraryItem>, private val showProtocol: Boolean) : MediaTvItemAdapter.AbstractMediaItemViewHolder<MediaBrowserTvItemBinding>(binding) {
         override fun getItem(layoutPosition: Int) = this@FileTvItemAdapter.getItem(layoutPosition)
-
         override fun getView() = binding.container
-
         init {
-            binding.holder = this
-            binding.isPresent = true
-            binding.scaleType = ImageView.ScaleType.CENTER_INSIDE
+            binding.holder = this; binding.isPresent = true; binding.scaleType = ImageView.ScaleType.CENTER_INSIDE
             defaultCover?.let { binding.cover = it }
-            if (AndroidUtil.isMarshMallowOrLater)
-                itemView.setOnContextClickListener { v ->
-                    onMoreClick(v)
-                    true
-                }
+            if (AndroidUtil.isMarshMallowOrLater) itemView.setOnContextClickListener { v -> onMoreClick(v); true }
             binding.container.layoutParams.width = itemSize
             binding.container.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
-                binding.container.post {
-                    TvAdapterUtils.itemFocusChange(hasFocus, itemSize, binding.container, false) {
-                        if (layoutPosition in dataset.indices) {
-                            eventsHandler.onItemFocused(binding.root, getItem(layoutPosition))
-                            focusListener?.onFocusChanged(layoutPosition)
-                        }
-                    }
-                }
+                binding.container.post { TvAdapterUtils.itemFocusChange(hasFocus, itemSize, binding.container, false) { if (layoutPosition in dataset.indices) { eventsHandler.onItemFocused(binding.root, getItem(layoutPosition)); focusListener?.onFocusChanged(layoutPosition) } } }
             }
             if (VlcMigrationHelper.isLolliPopOrLater) binding.container.clipToOutline = true
             binding.showSeen = seenMediaMarkerVisible
         }
-
-        override fun recycle() {
-            defaultCover?.let { binding.cover = it }
-            binding.title.text = ""
-            binding.subtitle.text = ""
-            binding.mediaCover.resetFade()
-        }
-
+        override fun recycle() { defaultCover?.let { binding.cover = it }; binding.title.text = ""; binding.subtitle.text = ""; binding.mediaCover.resetFade() }
         override fun setItem(item: MediaLibraryItem?) {
-            binding.item = item
-            var progress = 0
-            var seen = 0L
-            var description = item?.description
-            var resolution = ""
-            if (item is MediaWrapper) {
-                if (item.type == MediaWrapper.TYPE_VIDEO) {
-                    resolution = generateResolutionClass(item.width, item.height) ?: ""
-                    description = when {
-                        item.description?.isNotEmpty() == true -> item.description
-                        item.time != 0L -> Tools.getProgressText(item)
-                        item.time == 0L && item.length != 0L -> Tools.millisToString(item.length)
-                        else -> ""
-
-                    }
-                    binding.badge = resolution
-                    seen = item.seen
-                    var max = 0
-
-                    if (item.length > 0) {
-                        val lastTime = item.displayTime
-                        if (lastTime > 0) {
-                            max = (item.length / 1000).toInt()
-                            progress = (lastTime / 1000).toInt()
-                        }
-                    }
-                    binding.max = max
-                }
+            binding.item = item; var progress = 0; var seen = 0L; var description = item?.description; var resolution = ""
+            if (item is MediaWrapper && item.type == MediaWrapper.TYPE_VIDEO) {
+                resolution = generateResolutionClass(item.width, item.height) ?: ""
+                description = when { item.description?.isNotEmpty() == true -> item.description; item.time != 0L -> Tools.getProgressText(item); item.time == 0L && item.length != 0L -> Tools.millisToString(item.length); else -> "" }
+                binding.badge = resolution; seen = item.seen; var max = 0
+                if (item.length > 0) { val lastTime = item.displayTime; if (lastTime > 0) { max = (item.length / 1000).toInt(); progress = (lastTime / 1000).toInt() } }
+                binding.max = max
             }
-
-            binding.progress = progress
-            binding.isSquare = true
-            binding.seen = seen
-            binding.description = description
+            binding.progress = progress; binding.isSquare = true; binding.seen = seen; binding.description = description
             if (showProtocol && item is MediaWrapper) binding.protocol = getProtocol(item)
             val cover = if (item is MediaWrapper) getMediaIconDrawable(binding.root.context, item.type, true) else defaultCover
             cover?.let { binding.cover = it }
@@ -208,83 +142,31 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
             binding.progressBar.visibility = if (progress <= 0L) View.GONE else View.VISIBLE
             binding.badgeTV.visibility = if (resolution.isBlank()) View.GONE else View.VISIBLE
         }
-
-        override fun setCoverlay(selected: Boolean) {
-        }
+        override fun setCoverlay(selected: Boolean) {}
     }
 
     @TargetApi(Build.VERSION_CODES.M)
-    inner class MediaItemTVListViewHolder(
-            binding: MediaBrowserTvItemListBinding,
-            override val eventsHandler: IEventsHandler<MediaLibraryItem>,
-            private val showProtocol: Boolean
-    ) : MediaTvItemAdapter.AbstractMediaItemViewHolder<MediaBrowserTvItemListBinding>(binding) {
-
+    inner class MediaItemTVListViewHolder(binding: MediaBrowserTvItemListBinding, override val eventsHandler: IEventsHandler<MediaLibraryItem>, private val showProtocol: Boolean) : MediaTvItemAdapter.AbstractMediaItemViewHolder<MediaBrowserTvItemListBinding>(binding) {
         override fun getItem(layoutPosition: Int) = this@FileTvItemAdapter.getItem(layoutPosition)
-
         override fun getView() = binding.container
-
         init {
-            binding.holder = this
-            binding.isPresent = true
-            binding.scaleType = ImageView.ScaleType.CENTER_INSIDE
+            binding.holder = this; binding.isPresent = true; binding.scaleType = ImageView.ScaleType.CENTER_INSIDE
             defaultCover?.let { binding.cover = it }
-            if (AndroidUtil.isMarshMallowOrLater)
-                itemView.setOnContextClickListener { v ->
-                    onMoreClick(v)
-                    true
-                }
-//            binding.container.layoutParams.width = itemSize
-            binding.container.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
-                TvAdapterUtils.itemFocusChange(hasFocus, itemSize, binding.container, true) {
-                    if (layoutPosition in dataset.indices) {
-                        eventsHandler.onItemFocused(binding.root, getItem(layoutPosition))
-                        focusListener?.onFocusChanged(layoutPosition)
-                    }
-                }
-            }
-            binding.container.clipToOutline = true
-            binding.showSeen = seenMediaMarkerVisible
+            if (AndroidUtil.isMarshMallowOrLater) itemView.setOnContextClickListener { v -> onMoreClick(v); true }
+            binding.container.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus -> binding.container.post { TvAdapterUtils.itemFocusChange(hasFocus, itemSize, binding.container, true) { if (layoutPosition in dataset.indices) { eventsHandler.onItemFocused(binding.root, getItem(layoutPosition)); focusListener?.onFocusChanged(layoutPosition) } } } }
+            binding.container.clipToOutline = true; binding.showSeen = seenMediaMarkerVisible
         }
-
-        override fun recycle() {
-            defaultCover?.let { binding.cover = it }
-            binding.title.text = ""
-            binding.subtitle.text = ""
-            binding.mediaCover.resetFade()
-        }
-
+        override fun recycle() { defaultCover?.let { binding.cover = it }; binding.title.text = ""; binding.subtitle.text = ""; binding.mediaCover.resetFade() }
         override fun setItem(item: MediaLibraryItem?) {
-            binding.item = item
-            var isSquare = true
-            var progress = 0
-            var seen = 0L
-            var description = item?.description
-            var resolution = ""
-            if (item is MediaWrapper) {
-                if (item.type == MediaWrapper.TYPE_VIDEO) {
-                    resolution = generateResolutionClass(item.width, item.height) ?: ""
-                    isSquare = false
-                    description = if (item.time == 0L) Tools.millisToString(item.length) else Tools.getProgressText(item)
-                    binding.badge = resolution
-                    seen = item.seen
-                    var max = 0
-
-                    if (item.length > 0) {
-                        val lastTime = item.displayTime
-                        if (lastTime > 0) {
-                            max = (item.length / 1000).toInt()
-                            progress = (lastTime / 1000).toInt()
-                        }
-                    }
-                    binding.max = max
-                }
+            binding.item = item; var isSquare = true; var progress = 0; var seen = 0L; var description = item?.description; var resolution = ""
+            if (item is MediaWrapper && item.type == MediaWrapper.TYPE_VIDEO) {
+                resolution = generateResolutionClass(item.width, item.height) ?: ""; isSquare = false
+                description = if (item.time == 0L) Tools.millisToString(item.length) else Tools.getProgressText(item)
+                binding.badge = resolution; seen = item.seen; var max = 0
+                if (item.length > 0) { val lastTime = item.displayTime; if (lastTime > 0) { max = (item.length / 1000).toInt(); progress = (lastTime / 1000).toInt() } }
+                binding.max = max
             }
-
-            binding.progress = progress
-            binding.isSquare = isSquare
-            binding.seen = seen
-            binding.description = description
+            binding.progress = progress; binding.isSquare = isSquare; binding.seen = seen; binding.description = description
             if (showProtocol && item is MediaWrapper) binding.protocol = getProtocol(item)
             val cover = if (item is MediaWrapper) getMediaIconDrawable(binding.root.context, item.type, true) else defaultCover
             cover?.let { binding.cover = it }
@@ -292,8 +174,6 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
             binding.progressBar.visibility = if (progress <= 0L) View.GONE else View.VISIBLE
             binding.badgeTV.visibility = if (resolution.isBlank()) View.GONE else View.VISIBLE
         }
-
-        override fun setCoverlay(selected: Boolean) {
-        }
+        override fun setCoverlay(selected: Boolean) {}
     }
 }
