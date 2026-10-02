@@ -83,8 +83,9 @@ jobs:
                   'HW_ACCELERATION_FULL',
               ],
               "application/television/src/main/java/org/videolan/television/ui/MediaItemDetailsFragment.kt": [
-                  'encodedParent',
-                  'Uri.parse(encodedParent)',
+                  'val mrl = mediaUri.toString().trimEnd',
+                  'mrl.substring(0, separator + 1).toUri()',
+                  'intent.data = parent',
               ],
           }
 
