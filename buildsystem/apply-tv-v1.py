@@ -95,8 +95,8 @@ replace("application/television/src/main/java/org/videolan/television/ui/MediaIt
                 }''')
 
 # Full backup/restore was originally implemented only in the phone PreferencesAdvanced fragment.
-# The TV advanced screen uses a separate fragment, so the visible TV preferences had no click
-# handlers at all. Reuse the already-tested implementation in the TV fragment.
+# The TV screen has its own BasePreferenceFragment and CoroutineScope. Reuse the tested archive
+# implementation, but adapt Fragment-only APIs to the TV fragment's activity/scope APIs.
 mobile_path = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/PreferencesAdvanced.kt")
 tv_path = Path("application/television/src/main/java/org/videolan/television/ui/preferences/PreferencesAdvanced.kt")
 mobile = mobile_path.read_text()
@@ -106,8 +106,21 @@ start = mobile.index("    private fun fullBackupFile()")
 end = mobile.index("    override fun onSharedPreferenceChanged", start)
 backup_helpers = mobile[start:end]
 
-# Imports required by the shared ZIP implementation.
+# TV BasePreferenceFragment is not an AndroidX Fragment: requireActivity(), requireContext() and
+# Fragment.lifecycleScope are unavailable. The TV implementation already exposes a non-null
+# activity and delegates CoroutineScope by MainScope().
+backup_helpers = backup_helpers.replace("requireActivity()", "activity")
+backup_helpers = backup_helpers.replace("requireContext()", "activity")
+backup_helpers = backup_helpers.replace("lifecycleScope.launch", "launch")
+# StoragePermissionsDelegate.getWritePermission is an extension on FragmentActivity in TV code.
+backup_helpers = backup_helpers.replace(
+    "if (getWritePermission(Uri.fromFile(dst)))",
+    "if ((activity as FragmentActivity).getWritePermission(Uri.fromFile(dst)))"
+)
+
+# Imports required by the shared ZIP implementation and its success/share action.
 for imp in [
+    "import org.videolan.vlc.util.share\n",
     "import java.io.BufferedInputStream\n",
     "import java.io.BufferedOutputStream\n",
     "import java.io.FileInputStream\n",
@@ -117,7 +130,10 @@ for imp in [
     "import java.util.zip.ZipOutputStream\n",
 ]:
     if imp not in tv:
-        tv = tv.replace("import java.io.File\n", "import java.io.File\n" + imp)
+        if imp.startswith("import org.videolan"):
+            tv = tv.replace("import org.videolan.vlc.util.FileUtils\n", "import org.videolan.vlc.util.FileUtils\n" + imp)
+        else:
+            tv = tv.replace("import java.io.File\n", "import java.io.File\n" + imp)
 
 # Wire the two visible preferences to their actual TV actions.
 anchor = '''            "restore_settings" -> {
@@ -139,7 +155,7 @@ tv = tv.replace(anchor, anchor + '''            "full_backup" -> {
             }
 ''', 1)
 
-# Add the same tested backup/restore implementation used by the phone build.
+# Add the adapted backup/restore implementation to the TV fragment.
 shared_anchor = "    override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {"
 if shared_anchor not in tv:
     raise SystemExit("TV onSharedPreferenceChanged anchor not found")
