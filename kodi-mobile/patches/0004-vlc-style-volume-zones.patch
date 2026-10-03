@@ -56,9 +56,7 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUI
  #include <algorithm>
  #include <cmath>
  #include <stdio.h>
-@@ -253,38 +256,130 @@ EVENT_RESULT CGUIWindowFullScreen::OnMouseEvent(const CPoint& point,
-     return g_application.OnAction(CAction(ACTION_ANALOG_SEEK_BACK, 0.5f)) ? EVENT_RESULT_HANDLED : EVENT_RESULT_UNHANDLED;
-   }
+@@ -256,36 +259,126 @@ EVENT_RESULT CGUIWindowFullScreen::OnMouseEvent(const CPoint& point,
    if (event.m_id == ACTION_GESTURE_NOTIFY)
 +    return static_cast<EVENT_RESULT>(EVENT_RESULT_PAN_HORIZONTAL | EVENT_RESULT_PAN_VERTICAL);
 +
@@ -187,8 +185,6 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUI
      }
 +#endif
 +
-+    // Left-side brightness is deliberately isolated as its own Android bridge
-+    // step. Owning the gesture here prevents accidental volume changes meanwhile.
 +    if (m_playerGesture == PlayerGesture::Brightness ||
 +        m_playerGesture == PlayerGesture::Ignored)
 +      return EVENT_RESULT_HANDLED;
