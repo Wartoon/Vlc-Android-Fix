@@ -1,7 +1,7 @@
 diff --git a/system/keymaps/keyboard.xml b/system/keymaps/keyboard.xml
 --- a/system/keymaps/keyboard.xml
 +++ b/system/keymaps/keyboard.xml
-@@ -196,6 +196,27 @@
+@@ -196,4 +196,26 @@
    </global>
 +  <FullscreenVideo>
 +    <keyboard>
