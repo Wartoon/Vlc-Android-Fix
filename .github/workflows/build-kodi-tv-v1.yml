@@ -1,0 +1,108 @@
+name: Build Kodi TV V1
+
+on:
+  push:
+    branches: [kodi-tv-v1]
+    paths:
+      - '.github/workflows/build-kodi-tv-v1.yml'
+      - 'kodi-tv/**'
+  workflow_dispatch:
+
+jobs:
+  build-arm64:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      KODI_REF: e513e0ff4331fc25fd2454659a9dd3e6b7670146
+      ANDROID_SDK_ROOT: /opt/android-sdk
+      DEPENDS_PREFIX: /opt/kodi-tv-depends
+      TARBALLS: /opt/kodi-tv-tarballs
+    steps:
+      - name: Checkout TV project controls
+        uses: actions/checkout@v4
+
+      - name: Install host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf bison build-essential curl flex gawk git gperf \
+            lib32stdc++6 lib32z1 lib32z1-dev libcurl4-openssl-dev unzip zip zlib1g-dev
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK and exact NDK
+        run: |
+          sudo mkdir -p "$ANDROID_SDK_ROOT"
+          sudo chown -R "$USER:$USER" "$ANDROID_SDK_ROOT"
+          curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip -o /tmp/cmdline-tools.zip
+          mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools/latest"
+          unzip -q /tmp/cmdline-tools.zip -d /tmp/android-cli
+          mv /tmp/android-cli/cmdline-tools/* "$ANDROID_SDK_ROOT/cmdline-tools/latest/"
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" --licenses >/dev/null || true
+          "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" platform-tools 'platforms;android-37.0' 'build-tools;37.0.0' 'ndk;28.2.13676358'
+          test -d "$ANDROID_SDK_ROOT/ndk/28.2.13676358"
+
+      - name: Create Kodi debug signing key
+        run: |
+          mkdir -p "$HOME/.android"
+          keytool -genkeypair -noprompt -keystore "$HOME/.android/debug.keystore" -alias androiddebugkey \
+            -dname "CN=Android Debug,O=Android,C=US" -keypass android -storepass android \
+            -keyalg RSA -keysize 2048 -validity 10000
+
+      - name: Clone and pin Kodi 22 Beta 2
+        run: |
+          git clone --filter=blob:none https://github.com/xbmc/xbmc.git kodi
+          git -C kodi checkout --detach "$KODI_REF"
+          test "$(git -C kodi rev-parse HEAD)" = "$KODI_REF"
+
+      - name: Verify clean TV baseline
+        run: |
+          test -z "$(git -C kodi status --porcelain)"
+          echo "Kodi TV V1 baseline uses unmodified pinned Kodi source."
+
+      - name: Bootstrap and configure ARM64 depends
+        run: |
+          sudo mkdir -p "$DEPENDS_PREFIX" "$TARBALLS"
+          sudo chown -R "$USER:$USER" "$DEPENDS_PREFIX" "$TARBALLS"
+          cd kodi/tools/depends
+          ./bootstrap
+          ./configure --with-tarballs="$TARBALLS" --host=aarch64-linux-android \
+            --with-sdk-path="$ANDROID_SDK_ROOT" --prefix="$DEPENDS_PREFIX"
+
+      - name: Build Kodi dependencies
+        run: make -j"$(nproc)" -C kodi/tools/depends
+
+      - name: Configure Kodi
+        run: make -C kodi/tools/depends/target/cmakebuildsys BUILD_DIR="$GITHUB_WORKSPACE/kodi-tv-build"
+
+      - name: Build Kodi
+        run: make -j"$(nproc)" -C kodi-tv-build
+
+      - name: Package APK
+        env:
+          KODI_ANDROID_KEY_ALIAS: androiddebugkey
+          KODI_ANDROID_KEY_PASSWORD: android
+          KODI_ANDROID_STORE_PASSWORD: android
+          KODI_ANDROID_STORE_FILE: /home/runner/.android/debug.keystore
+        run: make -C kodi-tv-build apk
+
+      - name: Verify and checksum APK
+        run: |
+          mapfile -t APKS < <(find kodi kodi-tv-build -type f -name '*.apk' | sort -u)
+          test "${#APKS[@]}" -gt 0
+          sha256sum "${APKS[@]}" | tee kodi-tv-sha256.txt
+          mkdir -p kodi-tv-artifact
+          cp "${APKS[@]}" kodi-tv-artifact/
+          cp kodi-tv-sha256.txt kodi-tv-artifact/
+
+      - name: Upload ARM64 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kodi-TV-V1-baseline-arm64
+          path: kodi-tv-artifact/
+          if-no-files-found: error
+          retention-days: 14
