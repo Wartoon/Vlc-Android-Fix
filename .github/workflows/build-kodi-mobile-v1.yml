@@ -82,8 +82,8 @@ jobs:
           test "${#PATCHES[@]}" -gt 0
           for patch in "${PATCHES[@]}"; do
             echo "Checking $(basename "$patch")"
-            git -C kodi apply --check "$patch"
-            git -C kodi apply "$patch"
+            git -C kodi apply --recount --check "$patch"
+            git -C kodi apply --recount "$patch"
           done
           grep -Fq '<tap>OSD</tap>' kodi/system/keymaps/touchscreen.xml
           grep -Fq '<swipe direction="left">Seek(-10)</swipe>' kodi/system/keymaps/touchscreen.xml
