@@ -1,0 +1,30 @@
+diff --git a/system/keymaps/keyboard.xml b/system/keymaps/keyboard.xml
+--- a/system/keymaps/keyboard.xml
++++ b/system/keymaps/keyboard.xml
+@@ -196,6 +196,25 @@
+   </global>
++  <FullscreenVideo>
++    <keyboard>
++      <!-- Kodi TV V1: remote-first playback controls for Android/Google TV. -->
++      <left>StepBack</left>
++      <right>StepForward</right>
++      <up>ChapterOrBigStepForward</up>
++      <down>ChapterOrBigStepBack</down>
++      <return>OSD</return>
++      <enter>OSD</enter>
++      <ok>OSD</ok>
++      <select>OSD</select>
++      <return mod="longpress">ContextMenu</return>
++      <enter mod="longpress">ContextMenu</enter>
++      <ok mod="longpress">ContextMenu</ok>
++      <select mod="longpress">ContextMenu</select>
++      <browser_back>Back</browser_back>
++      <exit>Back</exit>
++      <play_pause>PlayPause</play_pause>
++      <info>Info</info>
++      <menu>OSD</menu>
++    </keyboard>
++  </FullscreenVideo>
+   <Home>
+     <keyboard>
+       <home>noop</home>
