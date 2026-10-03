@@ -75,6 +75,20 @@ jobs:
           test "$(git rev-parse HEAD)" = "$KODI_REF"
           echo "Pinned Kodi commit: $(git rev-parse HEAD)"
 
+      - name: Apply and verify Kodi Mobile patches
+        run: |
+          set -euo pipefail
+          test -f kodi-mobile/patches/0001-mobile-player-touch-keymap.patch
+          git -C kodi apply --check "$GITHUB_WORKSPACE/kodi-mobile/patches/0001-mobile-player-touch-keymap.patch"
+          git -C kodi apply "$GITHUB_WORKSPACE/kodi-mobile/patches/0001-mobile-player-touch-keymap.patch"
+          grep -Fq '<tap>OSD</tap>' kodi/system/keymaps/touchscreen.xml
+          grep -Fq '<swipe direction="left">Seek(-10)</swipe>' kodi/system/keymaps/touchscreen.xml
+          grep -Fq '<swipe direction="right">Seek(10)</swipe>' kodi/system/keymaps/touchscreen.xml
+          test "$(grep -Fc '<swipe direction="left">Seek(-10)</swipe>' kodi/system/keymaps/touchscreen.xml)" -eq 1
+          test "$(grep -Fc '<swipe direction="right">Seek(10)</swipe>' kodi/system/keymaps/touchscreen.xml)" -eq 1
+          git -C kodi diff --check
+          git -C kodi diff -- system/keymaps/touchscreen.xml
+
       - name: Bootstrap and configure ARM64 depends
         run: |
           sudo mkdir -p "$DEPENDS_PREFIX" "$TARBALLS"
@@ -119,7 +133,7 @@ jobs:
       - name: Upload ARM64 APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kodi-Mobile-V1-baseline-arm64
+          name: Kodi-Mobile-V1-player-gestures-arm64
           path: kodi-mobile-artifact/
           if-no-files-found: error
           retention-days: 14
