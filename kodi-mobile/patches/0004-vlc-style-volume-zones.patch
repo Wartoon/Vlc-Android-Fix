@@ -1,0 +1,46 @@
+diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUIWindowFullScreen.cpp
+--- a/xbmc/video/windows/GUIWindowFullScreen.cpp
++++ b/xbmc/video/windows/GUIWindowFullScreen.cpp
+@@ -31,6 +31,9 @@
+ #include "video/dialogs/GUIDialogSubtitleSettings.h"
+ #include "windowing/WinSystem.h"
+ 
++#if defined(TARGET_ANDROID)
++#include "platform/android/activity/XBMCApp.h"
++#endif
+ #include <algorithm>
+ #include <cmath>
+ #include <stdio.h>
+@@ -280,11 +283,26 @@ EVENT_RESULT CGUIWindowFullScreen::OnMouseEvent(const CPoint& point,
+     }
+     if (absY > 0.0f)
+     {
+-      // First vertical implementation: up raises and down lowers volume.
+-      // Left-side display brightness is kept for a dedicated Android patch.
+-      const int action = event.m_offsetY < 0.0f ? ACTION_VOLUME_UP : ACTION_VOLUME_DOWN;
+-      g_application.OnAction(CAction(action));
+-      return EVENT_RESULT_HANDLED;
++#if defined(TARGET_ANDROID)
++      // Match VLC Android's interaction model: vertical gestures only own the
++      // outer screen zones. The right side controls the real Android media
++      // stream, starting from its current hardware-key volume. The middle is
++      // intentionally inert and the left side is reserved for brightness.
++      const auto& res = CServiceBroker::GetWinSystem()->GetGfxContext().GetResInfo();
++      const float width = static_cast<float>(res.iWidth);
++      const float height = static_cast<float>(res.iHeight);
++      if (width > 0.0f && height > 0.0f && point.x > width * 4.0f / 7.0f)
++      {
++        const float current = CXBMCApp::GetSystemVolume();
++        // A full-height swipe changes about 60 percentage points. This is
++        // deliberately gentler than the old one-step-per-pan-event mapping.
++        const float delta = -event.m_offsetY / height * 0.60f;
++        CXBMCApp::SetSystemVolume(std::clamp(current + delta, 0.0f, 1.0f));
++        return EVENT_RESULT_HANDLED;
++      }
++      if (point.x < width * 3.0f / 7.0f)
++        return EVENT_RESULT_HANDLED; // brightness follows in the Android patch
++#endif
++      return EVENT_RESULT_HANDLED;
+     }
+   }
+   return EVENT_RESULT_UNHANDLED;
