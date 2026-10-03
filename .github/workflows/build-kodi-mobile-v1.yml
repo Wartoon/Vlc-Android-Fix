@@ -52,6 +52,21 @@ jobs:
           java -version
           "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" --list_installed
 
+      - name: Create Kodi debug signing key
+        run: |
+          mkdir -p "$HOME/.android"
+          keytool -genkeypair -noprompt \
+            -keystore "$HOME/.android/debug.keystore" \
+            -alias androiddebugkey \
+            -dname "CN=Android Debug,O=Android,C=US" \
+            -keypass android \
+            -storepass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000
+          test -s "$HOME/.android/debug.keystore"
+          keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey >/dev/null
+
       - name: Clone and pin Kodi 22 Beta 2
         run: |
           git clone --filter=blob:none https://github.com/xbmc/xbmc.git kodi
@@ -82,7 +97,14 @@ jobs:
         run: make -j"$(nproc)" -C kodi-build
 
       - name: Package APK
-        run: make -C kodi-build apk
+        env:
+          KODI_ANDROID_KEY_ALIAS: androiddebugkey
+          KODI_ANDROID_KEY_PASSWORD: android
+          KODI_ANDROID_STORE_PASSWORD: android
+          KODI_ANDROID_STORE_FILE: /home/runner/.android/debug.keystore
+        run: |
+          test -s "$KODI_ANDROID_STORE_FILE"
+          make -C kodi-build apk
 
       - name: Verify and checksum APK
         run: |
