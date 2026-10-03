@@ -11,7 +11,7 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUI
  #include <algorithm>
  #include <cmath>
  #include <stdio.h>
-@@ -280,11 +283,26 @@ EVENT_RESULT CGUIWindowFullScreen::OnMouseEvent(const CPoint& point,
+@@ -280,11 +283,30 @@ EVENT_RESULT CGUIWindowFullScreen::OnMouseEvent(const CPoint& point,
      }
      if (absY > 0.0f)
      {
