@@ -59,10 +59,20 @@ jobs:
           git -C kodi checkout --detach "$KODI_REF"
           test "$(git -C kodi rev-parse HEAD)" = "$KODI_REF"
 
-      - name: Verify clean TV baseline
+      - name: Apply and verify Kodi TV patch series
         run: |
-          test -z "$(git -C kodi status --porcelain)"
-          echo "Kodi TV V1 baseline uses unmodified pinned Kodi source."
+          set -euo pipefail
+          mapfile -t PATCHES < <(find "$GITHUB_WORKSPACE/kodi-tv/patches" -maxdepth 1 -type f -name '*.patch' | sort)
+          test "${#PATCHES[@]}" -gt 0
+          for patch in "${PATCHES[@]}"; do
+            echo "Checking $(basename "$patch")"
+            git -C kodi apply --check "$patch"
+            git -C kodi apply "$patch"
+          done
+          grep -Fq '<ok>OSD</ok>' kodi/system/keymaps/keyboard.xml
+          grep -Fq '<play_pause>PlayPause</play_pause>' kodi/system/keymaps/keyboard.xml
+          git -C kodi diff --check
+          git -C kodi diff --stat
 
       - name: Bootstrap and configure ARM64 depends
         run: |
@@ -102,7 +112,7 @@ jobs:
       - name: Upload ARM64 APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kodi-TV-V1-baseline-arm64
+          name: Kodi-TV-V1-remote-player-arm64
           path: kodi-tv-artifact/
           if-no-files-found: error
           retention-days: 14
