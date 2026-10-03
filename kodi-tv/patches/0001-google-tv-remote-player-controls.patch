@@ -1,7 +1,9 @@
 diff --git a/system/keymaps/keyboard.xml b/system/keymaps/keyboard.xml
 --- a/system/keymaps/keyboard.xml
 +++ b/system/keymaps/keyboard.xml
-@@ -196,4 +196,26 @@
+@@ -194,6 +194,28 @@
+       <f11>HDRToggle</f11>
+     </keyboard>
    </global>
 +  <FullscreenVideo>
 +    <keyboard>
@@ -25,6 +27,6 @@ diff --git a/system/keymaps/keyboard.xml b/system/keymaps/keyboard.xml
 +      <menu>OSD</menu>
 +    </keyboard>
 +  </FullscreenVideo>
-   <Home>
+   <LoginScreen>
      <keyboard>
-       <home>noop</home>
+       <end mod="ctrl">ShutDown()</end>
