@@ -9,7 +9,7 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.h b/xbmc/video/windows/GUIWi
  
  class CGUIDialog;
  
-@@ -31,12 +32,32 @@ protected:
+@@ -31,14 +32,34 @@ protected:
    EVENT_RESULT OnMouseEvent(const CPoint& point, const KODI::MOUSE::CMouseEvent& event) override;
  
  private:
