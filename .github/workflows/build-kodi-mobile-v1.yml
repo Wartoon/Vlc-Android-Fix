@@ -75,19 +75,24 @@ jobs:
           test "$(git rev-parse HEAD)" = "$KODI_REF"
           echo "Pinned Kodi commit: $(git rev-parse HEAD)"
 
-      - name: Apply and verify Kodi Mobile patches
+      - name: Apply and verify Kodi Mobile patch series
         run: |
           set -euo pipefail
-          test -f kodi-mobile/patches/0001-mobile-player-touch-keymap.patch
-          git -C kodi apply --check "$GITHUB_WORKSPACE/kodi-mobile/patches/0001-mobile-player-touch-keymap.patch"
-          git -C kodi apply "$GITHUB_WORKSPACE/kodi-mobile/patches/0001-mobile-player-touch-keymap.patch"
+          mapfile -t PATCHES < <(find "$GITHUB_WORKSPACE/kodi-mobile/patches" -maxdepth 1 -type f -name '*.patch' | sort)
+          test "${#PATCHES[@]}" -gt 0
+          for patch in "${PATCHES[@]}"; do
+            echo "Checking $(basename "$patch")"
+            git -C kodi apply --check "$patch"
+            git -C kodi apply "$patch"
+          done
           grep -Fq '<tap>OSD</tap>' kodi/system/keymaps/touchscreen.xml
           grep -Fq '<swipe direction="left">Seek(-10)</swipe>' kodi/system/keymaps/touchscreen.xml
           grep -Fq '<swipe direction="right">Seek(10)</swipe>' kodi/system/keymaps/touchscreen.xml
           test "$(grep -Fc '<swipe direction="left">Seek(-10)</swipe>' kodi/system/keymaps/touchscreen.xml)" -eq 1
           test "$(grep -Fc '<swipe direction="right">Seek(10)</swipe>' kodi/system/keymaps/touchscreen.xml)" -eq 1
           git -C kodi diff --check
-          git -C kodi diff -- system/keymaps/touchscreen.xml
+          git -C kodi diff --stat
+          git -C kodi diff
 
       - name: Bootstrap and configure ARM64 depends
         run: |
