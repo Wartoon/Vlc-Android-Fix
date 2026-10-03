@@ -56,7 +56,7 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUI
  #include <algorithm>
  #include <cmath>
  #include <stdio.h>
-@@ -267,8 +270,126 @@ EVENT_RESULT CGUIWindowFullScreen::OnMouseEvent(const CPoint& point,
+@@ -253,8 +256,126 @@ EVENT_RESULT CGUIWindowFullScreen::OnMouseEvent(const CPoint& point,
    {
      return g_application.OnAction(CAction(ACTION_ANALOG_SEEK_BACK, 0.5f)) ? EVENT_RESULT_HANDLED : EVENT_RESULT_UNHANDLED;
    }
@@ -84,7 +84,8 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUI
 +
 +  if (event.m_id == ACTION_GESTURE_ABORT)
 +  {
-+    if (m_playerGesture == PlayerGesture::Horizontal && m_resumeAfterScrub && appPlayer->IsPaused())
++    if (m_playerGesture == PlayerGesture::Horizontal && m_resumeAfterScrub &&
++        appPlayer->IsPausedPlayback())
 +      appPlayer->Pause();
 +    ResetPlayerGesture();
 +    return EVENT_RESULT_HANDLED;
@@ -96,7 +97,7 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUI
 +    {
 +      if (appPlayer->CanSeek())
 +        appPlayer->SeekTime(m_gestureTargetTime);
-+      if (m_resumeAfterScrub && appPlayer->IsPaused())
++      if (m_resumeAfterScrub && appPlayer->IsPausedPlayback())
 +        appPlayer->Pause();
 +    }
 +    ResetPlayerGesture();
@@ -133,7 +134,7 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUI
 +      else
 +      {
 +        m_playerGesture = PlayerGesture::Horizontal;
-+        m_resumeAfterScrub = !appPlayer->IsPaused();
++        m_resumeAfterScrub = !appPlayer->IsPausedPlayback();
 +        if (m_resumeAfterScrub && appPlayer->CanPause())
 +          appPlayer->Pause();
 +      }
@@ -143,9 +144,17 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUI
 +    {
 +      if (!appPlayer->CanSeek())
 +        return EVENT_RESULT_HANDLED;
-+      const double gestureFraction = static_cast<double>(m_gestureOffsetX / width);
-+      const double magnitude = 600000.0 * std::pow(std::abs(gestureFraction), 4.0) + 3000.0;
-+      const int64_t jump = static_cast<int64_t>(std::copysign(magnitude, gestureFraction));
++#if defined(TARGET_ANDROID)
++      const float dpi = static_cast<float>(std::max(1, CXBMCApp::Get().GetDPI()));
++#else
++      const float dpi = 160.0f;
++#endif
++      const double gestureCm = static_cast<double>(m_gestureOffsetX / dpi * 2.54f);
++      const double verticalInches = std::abs(static_cast<double>(m_gestureOffsetY / dpi));
++      const double coefficient = std::max(1.0, (verticalInches + 0.5) * 2.0);
++      const double magnitude =
++          (600000.0 * std::pow(std::abs(gestureCm) / 8.0, 4.0) + 3000.0) / coefficient;
++      const int64_t jump = static_cast<int64_t>(std::copysign(magnitude, gestureCm));
 +      const int64_t total = appPlayer->GetTotalTime();
 +      m_gestureTargetTime = std::clamp(m_gestureStartTime + jump, int64_t{0}, total);
 +      return EVENT_RESULT_HANDLED;
@@ -160,7 +169,8 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUI
 +    }
 +#endif
 +
-+    if (m_playerGesture == PlayerGesture::Brightness || m_playerGesture == PlayerGesture::Ignored)
++    if (m_playerGesture == PlayerGesture::Brightness ||
++        m_playerGesture == PlayerGesture::Ignored)
 +      return EVENT_RESULT_HANDLED;
 +  }
    return EVENT_RESULT_UNHANDLED;
