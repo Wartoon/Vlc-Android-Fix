@@ -9,11 +9,12 @@ diff --git a/system/keymaps/touchscreen.xml b/system/keymaps/touchscreen.xml
 -      <swipe direction="right">StepForward</swipe>
 -      <swipe direction="up">ChapterOrBigStepForward</swipe>
 -      <swipe direction="down">ChapterOrBigStepBack</swipe>
-+      <!-- Kodi Mobile V1: deterministic one-finger player gestures. -->
-+      <!-- Direction semantics follow the finger: right = forward, left = rewind. -->
++      <!-- Kodi Mobile V1: one-finger playback gestures are handled continuously. -->
 +      <tap>OSD</tap>
-+      <swipe direction="left">Seek(-10)</swipe>
-+      <swipe direction="right">Seek(10)</swipe>
++      <!-- Do not dispatch discrete one-finger swipes after a pan. Horizontal -->
++      <!-- seeking is committed exactly once by CGUIWindowFullScreen on release. -->
++      <swipe direction="left"></swipe>
++      <swipe direction="right"></swipe>
 +      <!-- Vertical one-finger swipes are intentionally unmapped here. -->
 +      <!-- Kodi Mobile handles them from continuous pan events so the start -->
 +      <!-- side can select brightness (left) or volume (right). -->
