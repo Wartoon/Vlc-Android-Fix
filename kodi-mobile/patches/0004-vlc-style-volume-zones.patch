@@ -53,13 +53,9 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUI
  #include <algorithm>
 +#include <cmath>
  #include <stdio.h>
-@@ -267,9 +271,149 @@ EVENT_RESULT CGUIWindowFullScreen::OnMouseEvent(const CPoint& point,
-   {
-     return g_application.OnAction(CAction(ACTION_ANALOG_SEEK_BACK, 0.5f)) ? EVENT_RESULT_HANDLED : EVENT_RESULT_UNHANDLED;
-   }
+@@ -270,4 +274,144 @@ EVENT_RESULT CGUIWindowFullScreen::OnMouseEvent(const CPoint& point,
 -  if (event.m_id >= ACTION_GESTURE_NOTIFY && event.m_id <= ACTION_GESTURE_END) // gestures
 -    return EVENT_RESULT_UNHANDLED;
-+
 +  if (event.m_id == ACTION_GESTURE_NOTIFY)
 +    return static_cast<EVENT_RESULT>(EVENT_RESULT_PAN_HORIZONTAL | EVENT_RESULT_PAN_VERTICAL);
 +
@@ -177,7 +173,6 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUI
 +#if defined(TARGET_ANDROID)
 +    if (m_playerGesture == PlayerGesture::Volume)
 +    {
-+      // Deliberately damped: a full-height swipe changes system volume by 50%.
 +      const float delta = -0.5f * m_gestureOffsetY / height;
 +      CXBMCApp::SetSystemVolume(std::clamp(m_gestureStartVolume + delta, 0.0f, 1.0f));
 +      return EVENT_RESULT_HANDLED;
@@ -187,8 +182,8 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUI
 +    if (m_playerGesture == PlayerGesture::Ignored)
 +      return EVENT_RESULT_HANDLED;
 +  }
-+  return EVENT_RESULT_UNHANDLED;
-+}
+   return EVENT_RESULT_UNHANDLED;
+ }
 +
 +void CGUIWindowFullScreen::ResetPlayerGesture()
 +{
@@ -201,5 +196,3 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUI
 +  m_gestureTargetTime = 0;
 +  m_pausedForScrub = false;
 +}
- 
- void CGUIWindowFullScreen::FrameMove()
