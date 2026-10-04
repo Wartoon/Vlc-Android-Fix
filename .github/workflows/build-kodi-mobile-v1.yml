@@ -86,10 +86,16 @@ jobs:
             git -C kodi apply --recount "$patch"
           done
           grep -Fq '<tap>OSD</tap>' kodi/system/keymaps/touchscreen.xml
-          grep -Fq '<swipe direction="left">Seek(-10)</swipe>' kodi/system/keymaps/touchscreen.xml
-          grep -Fq '<swipe direction="right">Seek(10)</swipe>' kodi/system/keymaps/touchscreen.xml
-          test "$(grep -Fc '<swipe direction="left">Seek(-10)</swipe>' kodi/system/keymaps/touchscreen.xml)" -eq 1
-          test "$(grep -Fc '<swipe direction="right">Seek(10)</swipe>' kodi/system/keymaps/touchscreen.xml)" -eq 1
+          grep -Fq '<pan>PanGesture</pan>' kodi/system/keymaps/touchscreen.xml
+          grep -Fq '<swipe direction="left"></swipe>' kodi/system/keymaps/touchscreen.xml
+          grep -Fq '<swipe direction="right"></swipe>' kodi/system/keymaps/touchscreen.xml
+          ! grep -Fq '<swipe direction="left">Seek(-10)</swipe>' kodi/system/keymaps/touchscreen.xml
+          ! grep -Fq '<swipe direction="right">Seek(10)</swipe>' kodi/system/keymaps/touchscreen.xml
+          grep -Fq 'const int64_t minTime = appPlayer->GetMinTime();' kodi/xbmc/video/windows/GUIWindowFullScreen.cpp
+          grep -Fq 'const int64_t maxTime = appPlayer->GetMaxTime();' kodi/xbmc/video/windows/GUIWindowFullScreen.cpp
+          grep -Fq 'm_pausedForScrub = true;' kodi/xbmc/video/windows/GUIWindowFullScreen.cpp
+          grep -Fq 'const float delta = -0.5f * m_gestureOffsetY / height;' kodi/xbmc/video/windows/GUIWindowFullScreen.cpp
+          ! grep -Fq 'PlayerGesture::Brightness' kodi/xbmc/video/windows/GUIWindowFullScreen.cpp
           git -C kodi diff --check
           git -C kodi diff --stat
           git -C kodi diff
