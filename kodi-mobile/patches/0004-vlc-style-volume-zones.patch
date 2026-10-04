@@ -53,11 +53,13 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUI
  #include <algorithm>
 +#include <cmath>
  #include <stdio.h>
-@@ -270,4 +274,144 @@ EVENT_RESULT CGUIWindowFullScreen::OnMouseEvent(const CPoint& point,
--  if (event.m_id >= ACTION_GESTURE_NOTIFY && event.m_id <= ACTION_GESTURE_END) // gestures
+@@ -270,3 +274,143 @@ EVENT_RESULT CGUIWindowFullScreen::OnMouseEvent(const CPoint& point,
+   if (event.m_id >= ACTION_GESTURE_NOTIFY && event.m_id <= ACTION_GESTURE_END) // gestures
 -    return EVENT_RESULT_UNHANDLED;
-+  if (event.m_id == ACTION_GESTURE_NOTIFY)
-+    return static_cast<EVENT_RESULT>(EVENT_RESULT_PAN_HORIZONTAL | EVENT_RESULT_PAN_VERTICAL);
++  {
++    if (event.m_id == ACTION_GESTURE_NOTIFY)
++      return static_cast<EVENT_RESULT>(EVENT_RESULT_PAN_HORIZONTAL | EVENT_RESULT_PAN_VERTICAL);
++  }
 +
 +  auto& components = CServiceBroker::GetAppComponents();
 +  const auto appPlayer = components.GetComponent<CApplicationPlayer>();
