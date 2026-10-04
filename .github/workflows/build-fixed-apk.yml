@@ -48,15 +48,42 @@ jobs:
             --single-branch \
             https://code.videolan.org/videolan/libvlcjni.git \
             libvlcjni
-
           cd libvlcjni
-
           git checkout c0cc8ce6443dcb09be9b43c7b7a3ed01e33cb3ac
-
-          echo "libvlcjni revision:"
-          git rev-parse HEAD
-
+          test "$(git rev-parse HEAD)" = "c0cc8ce6443dcb09be9b43c7b7a3ed01e33cb3ac"
           test -d libvlc
+
+      - name: Harden database restore
+        shell: bash
+        run: python3 buildsystem/harden-backup-restore.py
+
+      - name: Verify restore safety regression guards
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('application/vlc-android/src/org/videolan/vlc/gui/preferences/PreferencesAdvanced.kt')
+          s = p.read_text()
+          required = [
+              'replaceDirectoryContentsSafely(File(staging, "medialibrary/db"), mediaDbDir)',
+              'replaceDirectoryContentsSafely(savedAppDb, appDbDir)',
+              'replaceDatabaseFileSafely(src, db)',
+              'val manifestText = manifest.readText()',
+              'context.packageName',
+              'val stagedAppDb = File(requireContext().cacheDir, "vlc_appdb_restore")',
+          ]
+          for needle in required:
+              if needle not in s:
+                  raise SystemExit(f'missing restore safety guard: {needle}')
+          forbidden = [
+              'if (!it.deleteRecursively()) throw IOException("Cannot replace app database")',
+              'if (current.exists() && !current.delete()) return@withContext false',
+          ]
+          for needle in forbidden:
+              if needle in s:
+                  raise SystemExit(f'destructive pre-delete restore code remains: {needle}')
+          print('restore safety guards verified')
+          PY
 
       - name: Verify build inputs
         shell: bash
@@ -66,7 +93,7 @@ jobs:
           test -d libvlcjni/libvlc
           test -f build.gradle
           test -f settings.gradle
-
+          git diff --check
           echo "All required Gradle project directories exist."
 
       - name: Build Internal Storage and SMB APKs
@@ -82,15 +109,13 @@ jobs:
         shell: bash
         run: |
           mkdir -p out
-
           find application/app/build/outputs/apk \
             -type f \
             -name '*.apk' \
             -exec cp {} out/ \;
-
           test -f out/VLC-Internal-Storage-all.apk
           test -f out/VLC-SMB-all.apk
-
+          sha256sum out/VLC-Internal-Storage-all.apk out/VLC-SMB-all.apk
           echo "Generated APK files:"
           ls -lh out
 
