@@ -43,7 +43,7 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.h b/xbmc/video/windows/GUIWi
 diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUIWindowFullScreen.cpp
 --- a/xbmc/video/windows/GUIWindowFullScreen.cpp
 +++ b/xbmc/video/windows/GUIWindowFullScreen.cpp
-@@ -29,6 +29,9 @@
+@@ -29,6 +29,10 @@
  #include "video/dialogs/GUIDialogSubtitleSettings.h"
  #include "windowing/WinSystem.h"
  
@@ -51,9 +51,9 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUI
 +#include "platform/android/activity/XBMCApp.h"
 +#endif
  #include <algorithm>
- #include <cmath>
++#include <cmath>
  #include <stdio.h>
-@@ -247,8 +250,133 @@ EVENT_RESULT CGUIWindowFullScreen::OnMouseEvent(const CPoint& point,
+@@ -247,8 +251,133 @@ EVENT_RESULT CGUIWindowFullScreen::OnMouseEvent(const CPoint& point,
    {
      return g_application.OnAction(CAction(ACTION_ANALOG_SEEK_BACK, 0.5f)) ? EVENT_RESULT_HANDLED : EVENT_RESULT_UNHANDLED;
    }
