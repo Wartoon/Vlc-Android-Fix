@@ -33,7 +33,6 @@ jobs:
             "platforms;android-36" \
             "build-tools;36.0.0" \
             "ndk;21.4.7075529"
-
           cat > local.properties <<EOF
           sdk.dir=$ANDROID_HOME
           android.ndkPath=$ANDROID_HOME/ndk/21.4.7075529
@@ -43,11 +42,7 @@ jobs:
       - name: Fetch exact VLC 3.x libvlcjni dependency
         shell: bash
         run: |
-          git clone \
-            --branch libvlcjni-3.x \
-            --single-branch \
-            https://code.videolan.org/videolan/libvlcjni.git \
-            libvlcjni
+          git clone --branch libvlcjni-3.x --single-branch https://code.videolan.org/videolan/libvlcjni.git libvlcjni
           cd libvlcjni
           git checkout c0cc8ce6443dcb09be9b43c7b7a3ed01e33cb3ac
           test "$(git rev-parse HEAD)" = "c0cc8ce6443dcb09be9b43c7b7a3ed01e33cb3ac"
@@ -64,23 +59,27 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p = Path('application/vlc-android/src/org/videolan/vlc/gui/preferences/PreferencesAdvanced.kt')
-          s = p.read_text()
+          s = Path('application/vlc-android/src/org/videolan/vlc/gui/preferences/PreferencesAdvanced.kt').read_text()
           required = [
               'replaceDirectoryContentsSafely(File(staging, "medialibrary/db"), mediaDbDir)',
               'replaceDirectoryContentsSafely(savedAppDb, appDbDir)',
               'replaceDatabaseFileSafely(src, db)',
-              '\"format\":2',
-              '\"appFamily\":\"vlc-dual\"',
-              'org.videolan.vlc.internalstorage',
-              'org.videolan.vlc.smb',
+              '\"format\":2', '\"appFamily\":\"vlc-dual\"',
+              '"org.videolan.vlc.internalstorage" -> "internal"',
+              '"org.videolan.vlc.smb" -> "smb"',
               'VLC Complete Backup - Internal Storage.zip',
               'VLC Complete Backup - SMB.zip',
+              'Intent.ACTION_OPEN_DOCUMENT',
+              'data.data?.let { showFullRestoreSelection(it) }',
+              'private fun inspectFullBackup(src: Uri): BackupInspection',
+              'val sourcePackage = validateDualManifest',
+              'inspection.sourcePackage == requireContext().packageName',
+              'private fun restoreFullBackup(\n        src: Uri,',
+              'context.contentResolver.openInputStream(src)',
               'val stagedAppDb = File(requireContext().cacheDir, "vlc_appdb_restore")',
           ]
           for needle in required:
-              if needle not in s:
-                  raise SystemExit(f'missing dual backup/restore guard: {needle}')
+              if needle not in s: raise SystemExit(f'missing dual backup/restore guard: {needle}')
           forbidden = [
               '!manifestText.contains("\\\"package\\\":\\\"${context.packageName}\\\"")',
               '/VLC-Full-Backup.zip',
@@ -88,9 +87,8 @@ jobs:
               'if (current.exists() && !current.delete()) return@withContext false',
           ]
           for needle in forbidden:
-              if needle in s:
-                  raise SystemExit(f'forbidden legacy/destructive restore code remains: {needle}')
-          print('dual backup contract and restore safety guards verified')
+              if needle in s: raise SystemExit(f'forbidden legacy/destructive restore code remains: {needle}')
+          print('dual backup contract, file-first selection and restore safety verified')
           PY
 
       - name: Verify build inputs
@@ -107,24 +105,16 @@ jobs:
       - name: Build Internal Storage and SMB APKs
         shell: bash
         run: |
-          gradle \
-            :application:app:assembleInternalStorage \
-            :application:app:assembleSmb \
-            --stacktrace \
-            --no-daemon
+          gradle :application:app:assembleInternalStorage :application:app:assembleSmb --stacktrace --no-daemon
 
       - name: Collect APK
         shell: bash
         run: |
           mkdir -p out
-          find application/app/build/outputs/apk \
-            -type f \
-            -name '*.apk' \
-            -exec cp {} out/ \;
+          find application/app/build/outputs/apk -type f -name '*.apk' -exec cp {} out/ \;
           test -f out/VLC-Internal-Storage-all.apk
           test -f out/VLC-SMB-all.apk
           sha256sum out/VLC-Internal-Storage-all.apk out/VLC-SMB-all.apk
-          echo "Generated APK files:"
           ls -lh out
 
       - name: Upload APK
