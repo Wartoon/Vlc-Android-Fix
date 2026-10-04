@@ -8,7 +8,7 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.h b/xbmc/video/windows/GUIWi
 +#include <cstdint>
  
  class CGUIDialog;
-@@ -31,13 +32,33 @@ protected:
+@@ -31,13 +32,32 @@ protected:
    EVENT_RESULT OnMouseEvent(const CPoint& point, const KODI::MOUSE::CMouseEvent& event) override;
  
  private:
@@ -18,7 +18,6 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.h b/xbmc/video/windows/GUIWi
 +    Pending,
 +    Horizontal,
 +    Volume,
-+    Brightness,
 +    Ignored
 +  };
 +
@@ -39,7 +38,7 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.h b/xbmc/video/windows/GUIWi
 +  float m_gestureStartVolume{0.0f};
 +  int64_t m_gestureStartTime{0};
 +  int64_t m_gestureTargetTime{0};
-+  bool m_resumeAfterScrub{false};
++  bool m_pausedForScrub{false};
  };
 diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUIWindowFullScreen.cpp
 --- a/xbmc/video/windows/GUIWindowFullScreen.cpp
@@ -54,7 +53,7 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUI
  #include <algorithm>
  #include <cmath>
  #include <stdio.h>
-@@ -247,8 +250,129 @@ EVENT_RESULT CGUIWindowFullScreen::OnMouseEvent(const CPoint& point,
+@@ -247,8 +250,133 @@ EVENT_RESULT CGUIWindowFullScreen::OnMouseEvent(const CPoint& point,
    {
      return g_application.OnAction(CAction(ACTION_ANALOG_SEEK_BACK, 0.5f)) ? EVENT_RESULT_HANDLED : EVENT_RESULT_UNHANDLED;
    }
@@ -75,11 +74,14 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUI
 +      return EVENT_RESULT_UNHANDLED;
 +
 +    const int64_t now = appPlayer->GetTime();
-+    const int64_t total = appPlayer->GetTotalTime();
++    const int64_t minTime = appPlayer->GetMinTime();
++    const int64_t maxTime = appPlayer->GetMaxTime();
++    if (maxTime <= minTime)
++      return EVENT_RESULT_UNHANDLED;
 +    if (point.x < width / 3.0f)
-+      appPlayer->SeekTime(std::clamp(now - int64_t{10000}, int64_t{0}, total));
++      appPlayer->SeekTime(std::clamp(now - int64_t{10000}, minTime, maxTime));
 +    else if (point.x > width * 2.0f / 3.0f)
-+      appPlayer->SeekTime(std::clamp(now + int64_t{10000}, int64_t{0}, total));
++      appPlayer->SeekTime(std::clamp(now + int64_t{10000}, minTime, maxTime));
 +    else
 +      return EVENT_RESULT_UNHANDLED;
 +    return EVENT_RESULT_HANDLED;
@@ -100,7 +102,7 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUI
 +
 +  if (event.m_id == ACTION_GESTURE_ABORT)
 +  {
-+    if (m_playerGesture == PlayerGesture::Horizontal && m_resumeAfterScrub &&
++    if (m_playerGesture == PlayerGesture::Horizontal && m_pausedForScrub &&
 +        appPlayer->IsPausedPlayback())
 +      appPlayer->Pause();
 +    ResetPlayerGesture();
@@ -111,9 +113,11 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUI
 +  {
 +    if (m_playerGesture == PlayerGesture::Horizontal)
 +    {
-+      if (appPlayer->CanSeek())
-+        appPlayer->SeekTime(m_gestureTargetTime);
-+      if (m_resumeAfterScrub && appPlayer->IsPausedPlayback())
++      const int64_t minTime = appPlayer->GetMinTime();
++      const int64_t maxTime = appPlayer->GetMaxTime();
++      if (appPlayer->CanSeek() && maxTime > minTime)
++        appPlayer->SeekTime(std::clamp(m_gestureTargetTime, minTime, maxTime));
++      if (m_pausedForScrub && appPlayer->IsPausedPlayback())
 +        appPlayer->Pause();
 +    }
 +    ResetPlayerGesture();
@@ -135,24 +139,24 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUI
 +    {
 +      const float absX = std::abs(m_gestureOffsetX);
 +      const float absY = std::abs(m_gestureOffsetY);
-+      if (std::hypot(absX, absY) < height * 0.015f)
++      if (std::hypot(absX, absY) < height * 0.02f)
 +        return EVENT_RESULT_HANDLED;
 +
 +      if (absY > absX * 1.35f)
 +      {
 +        if (m_gestureStartX > width * 4.0f / 7.0f)
 +          m_playerGesture = PlayerGesture::Volume;
-+        else if (m_gestureStartX < width * 3.0f / 7.0f)
-+          m_playerGesture = PlayerGesture::Brightness;
 +        else
 +          m_playerGesture = PlayerGesture::Ignored;
 +      }
 +      else
 +      {
 +        m_playerGesture = PlayerGesture::Horizontal;
-+        m_resumeAfterScrub = !appPlayer->IsPausedPlayback();
-+        if (m_resumeAfterScrub && appPlayer->CanPause())
++        if (!appPlayer->IsPausedPlayback() && appPlayer->CanPause())
++        {
 +          appPlayer->Pause();
++          m_pausedForScrub = true;
++        }
 +      }
 +    }
 +
@@ -160,27 +164,31 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUI
 +    {
 +      if (!appPlayer->CanSeek())
 +        return EVENT_RESULT_HANDLED;
++      const int64_t minTime = appPlayer->GetMinTime();
++      const int64_t maxTime = appPlayer->GetMaxTime();
++      if (maxTime <= minTime)
++        return EVENT_RESULT_HANDLED;
 +      const double gestureFraction = static_cast<double>(m_gestureOffsetX / width);
 +      const int64_t jump = static_cast<int64_t>(gestureFraction * 240000.0);
-+      const int64_t total = appPlayer->GetTotalTime();
-+      m_gestureTargetTime = std::clamp(m_gestureStartTime + jump, int64_t{0}, total);
++      m_gestureTargetTime = std::clamp(m_gestureStartTime + jump, minTime, maxTime);
 +      return EVENT_RESULT_HANDLED;
 +    }
 +
 +#if defined(TARGET_ANDROID)
 +    if (m_playerGesture == PlayerGesture::Volume)
 +    {
-+      const float delta = -m_gestureOffsetY / height;
++      // Deliberately damped: a full-height swipe changes system volume by 50%.
++      const float delta = -0.5f * m_gestureOffsetY / height;
 +      CXBMCApp::SetSystemVolume(std::clamp(m_gestureStartVolume + delta, 0.0f, 1.0f));
 +      return EVENT_RESULT_HANDLED;
 +    }
 +#endif
 +
-+    if (m_playerGesture == PlayerGesture::Brightness || m_playerGesture == PlayerGesture::Ignored)
++    if (m_playerGesture == PlayerGesture::Ignored)
 +      return EVENT_RESULT_HANDLED;
 +  }
-   return EVENT_RESULT_UNHANDLED;
- }
++  return EVENT_RESULT_UNHANDLED;
++}
 +
 +void CGUIWindowFullScreen::ResetPlayerGesture()
 +{
@@ -191,7 +199,7 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUI
 +  m_gestureStartVolume = 0.0f;
 +  m_gestureStartTime = 0;
 +  m_gestureTargetTime = 0;
-+  m_resumeAfterScrub = false;
++  m_pausedForScrub = false;
 +}
  
  void CGUIWindowFullScreen::FrameMove()
