@@ -20,7 +20,7 @@
 
     <CheckBoxPreference
             app:singleLineTitle="false"
-            android:defaultValue="true"
+            android:defaultValue="false"
             android:key="prefer_smbv1"
             android:summary="@string/prefersmbv1_summary"
             android:title="@string/prefersmbv1"/>
@@ -99,7 +99,7 @@
                 android:entryValues="@array/deblocking_values"
                 android:key="deblocking"
                 android:summary="@string/deblocking_summary"
-                android:title="@string/deblocking"/>
+                android:title="@string/deblocking_title"/>
         <CheckBoxPreference
                 app:singleLineTitle="false"
                 android:defaultValue="false"
