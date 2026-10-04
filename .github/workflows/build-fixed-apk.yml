@@ -53,6 +53,7 @@ jobs:
         run: |
           python3 buildsystem/harden-backup-restore.py
           python3 buildsystem/portable-dual-backup.py
+          python3 buildsystem/remove-legacy-backup-ui.py
 
       - name: Verify dual backup contract and restore safety
         shell: bash
@@ -60,13 +61,17 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           s = Path('application/vlc-android/src/org/videolan/vlc/gui/preferences/PreferencesAdvanced.kt').read_text()
+          xml = Path('application/vlc-android/res/xml/preferences_adv.xml').read_text()
           required = [
               'replaceDirectoryContentsSafely(File(staging, "medialibrary/db"), mediaDbDir)',
               'replaceDirectoryContentsSafely(savedAppDb, appDbDir)',
-              'replaceDatabaseFileSafely(src, db)',
+              'replaceDirectoryContentsSafely(File(staging, "artwork/medialib"), it)',
+              'replaceDirectoryContentsSafely(File(staging, "external/subtitles"), it)',
+              'replaceDirectoryContentsSafely(File(staging, "keystore"), keyStoreDir)',
               '\"format\":2', '\"appFamily\":\"vlc-dual\"',
               '"org.videolan.vlc.internalstorage" -> "internal"',
               '"org.videolan.vlc.smb" -> "smb"',
+              'val targetVariant = dualVariantForPackage(context.packageName)',
               'VLC Complete Backup - Internal Storage.zip',
               'VLC Complete Backup - SMB.zip',
               'Intent.ACTION_OPEN_DOCUMENT',
@@ -76,7 +81,6 @@ jobs:
               'inspection.sourcePackage == requireContext().packageName',
               'private fun restoreFullBackup(\n        src: Uri,',
               'context.contentResolver.openInputStream(src)',
-              'val stagedAppDb = File(requireContext().cacheDir, "vlc_appdb_restore")',
           ]
           for needle in required:
               if needle not in s: raise SystemExit(f'missing dual backup/restore guard: {needle}')
@@ -84,11 +88,18 @@ jobs:
               '!manifestText.contains("\\\"package\\\":\\\"${context.packageName}\\\"")',
               '/VLC-Full-Backup.zip',
               'if (!it.deleteRecursively()) throw IOException("Cannot replace app database")',
-              'if (current.exists() && !current.delete()) return@withContext false',
+              '"dump_media_db" ->', '"restore_media_db" ->', '"restore_app_db" ->', '"dump_app_db" ->',
+              '"export_settings" ->', '"restore_settings" ->',
+              'private fun restoreMediaDatabase()', 'private fun restoreAppDatabase()',
+              'FILE_PICKER_RESULT_CODE) {',
           ]
           for needle in forbidden:
               if needle in s: raise SystemExit(f'forbidden legacy/destructive restore code remains: {needle}')
-          print('dual backup contract, file-first selection and restore safety verified')
+          for key in ('android:key="full_backup"', 'android:key="full_restore"'):
+              if key not in xml: raise SystemExit(f'missing complete backup UI: {key}')
+          for key in ('dump_media_db', 'restore_media_db', 'restore_app_db', 'dump_app_db', 'export_settings', 'restore_settings'):
+              if f'android:key="{key}"' in xml: raise SystemExit(f'legacy backup UI remains: {key}')
+          print('dual backup contract, transactional selective restore and legacy cleanup verified')
           PY
 
       - name: Verify build inputs
