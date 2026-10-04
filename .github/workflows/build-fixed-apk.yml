@@ -55,7 +55,9 @@ jobs:
 
       - name: Harden database restore
         shell: bash
-        run: python3 buildsystem/harden-backup-restore.py
+        run: |
+          python3 buildsystem/harden-backup-restore.py
+          python3 buildsystem/portable-dual-backup.py
 
       - name: Verify dual backup contract and restore safety
         shell: bash
