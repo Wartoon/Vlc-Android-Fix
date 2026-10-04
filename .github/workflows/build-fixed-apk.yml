@@ -33,7 +33,6 @@ jobs:
             "platforms;android-36" \
             "build-tools;36.0.0" \
             "ndk;21.4.7075529"
-
           cat > local.properties <<EOF
           sdk.dir=$ANDROID_HOME
           android.ndkPath=$ANDROID_HOME/ndk/21.4.7075529
@@ -43,15 +42,15 @@ jobs:
       - name: Fetch exact VLC 3.x libvlcjni dependency
         shell: bash
         run: |
-          git clone \
-            --branch libvlcjni-3.x \
-            --single-branch \
-            https://code.videolan.org/videolan/libvlcjni.git \
-            libvlcjni
+          git clone --branch libvlcjni-3.x --single-branch https://code.videolan.org/videolan/libvlcjni.git libvlcjni
           cd libvlcjni
           git checkout c0cc8ce6443dcb09be9b43c7b7a3ed01e33cb3ac
           test "$(git rev-parse HEAD)" = "c0cc8ce6443dcb09be9b43c7b7a3ed01e33cb3ac"
           test -d libvlc
+
+      - name: Harden database restore
+        shell: bash
+        run: python3 buildsystem/harden-backup-restore.py
 
       - name: Apply TV V1 changes
         shell: bash
@@ -62,88 +61,42 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-
           checks = {
-              "application/vlc-android/res/xml/preferences.xml": [
-                  'android:defaultValue="2"',
-                  'android:key="hardware_acceleration"',
-              ],
-              "application/vlc-android/res/xml/preferences_adv.xml": [
-                  'android:defaultValue="5000"',
-                  'android:key="network_caching"',
-                  'android:key="prefer_smbv1"',
-                  'android:key="full_backup"',
-                  'android:key="full_restore"',
-              ],
-              "application/app/build.gradle": [
-                  'applicationIdSuffix ".tvfix"',
-                  'VLC-TV-Fix',
-              ],
-              "application/resources/src/main/java/org/videolan/resources/VLCOptions.kt": [
-                  'getInt(KEY_NETWORK_CACHING_VALUE, 5000)',
-                  'getBoolean(KEY_PREFER_SMBV1, false)',
-                  'HW_ACCELERATION_FULL',
-              ],
-              "application/vlc-android/src/org/videolan/vlc/media/PlaylistManager.kt": [
-                  'getCurrentMedia()?.type == MediaWrapper.TYPE_VIDEO',
-                  'saveMediaMeta()',
-              ],
-              "application/television/src/main/java/org/videolan/television/ui/MediaItemDetailsFragment.kt": [
-                  'val mrl = mediaUri.toString().trimEnd',
-                  'mrl.substring(0, separator + 1).toUri()',
-                  'intent.data = parent',
-              ],
-              "application/television/src/main/java/org/videolan/television/ui/browser/FileBrowserTvFragment.kt": [
-                  'if (currentItem == null) (viewModel.provider as BrowserProvider).browseRoot()',
-                  'else refresh()',
-              ],
-              "application/television/src/main/java/org/videolan/television/ui/FileTvItemAdapter.kt": [
-                  'oldItem.displayTime == newItem.displayTime',
-                  'oldItem.time == newItem.time',
-                  'oldItem.length == newItem.length',
-                  'oldItem.seen == newItem.seen',
-              ],
-              "application/television/src/main/java/org/videolan/television/ui/preferences/PreferencesAdvanced.kt": [
-                  '"full_backup" ->',
-                  'createFullBackup()',
-                  '"full_restore" ->',
-                  'showFullRestoreSelection()',
-                  'Toast.makeText(activity, getString(R.string.full_backup_success), Toast.LENGTH_LONG).show()',
-              ],
+              "application/vlc-android/res/xml/preferences.xml": ['android:defaultValue="2"', 'android:key="hardware_acceleration"'],
+              "application/vlc-android/res/xml/preferences_adv.xml": ['android:defaultValue="5000"', 'android:key="network_caching"', 'android:key="prefer_smbv1"', 'android:key="full_backup"', 'android:key="full_restore"'],
+              "application/app/build.gradle": ['applicationIdSuffix ".tvfix"', 'VLC-TV-Fix'],
+              "application/resources/src/main/java/org/videolan/resources/VLCOptions.kt": ['getInt(KEY_NETWORK_CACHING_VALUE, 5000)', 'getBoolean(KEY_PREFER_SMBV1, false)', 'HW_ACCELERATION_FULL'],
+              "application/vlc-android/src/org/videolan/vlc/media/PlaylistManager.kt": ['getCurrentMedia()?.type == MediaWrapper.TYPE_VIDEO', 'saveMediaMeta()'],
+              "application/television/src/main/java/org/videolan/television/ui/MediaItemDetailsFragment.kt": ['val mrl = mediaUri.toString().trimEnd', 'mrl.substring(0, separator + 1).toUri()', 'intent.data = parent'],
+              "application/television/src/main/java/org/videolan/television/ui/browser/FileBrowserTvFragment.kt": ['if (currentItem == null) (viewModel.provider as BrowserProvider).browseRoot()', 'else refresh()'],
+              "application/television/src/main/java/org/videolan/television/ui/FileTvItemAdapter.kt": ['oldItem.displayTime == newItem.displayTime', 'oldItem.time == newItem.time', 'oldItem.length == newItem.length', 'oldItem.seen == newItem.seen'],
+              "application/television/src/main/java/org/videolan/television/ui/preferences/PreferencesAdvanced.kt": ['"full_backup" ->', 'createFullBackup()', '"full_restore" ->', 'showFullRestoreSelection()', 'Toast.makeText(activity, getString(R.string.full_backup_success), Toast.LENGTH_LONG).show()', 'replaceDirectoryContentsSafely(savedAppDb, appDbDir)', 'replaceDatabaseFileSafely(src, db)', 'val manifestText = manifest.readText()'],
           }
-
           for filename, needles in checks.items():
               text = Path(filename).read_text()
               for needle in needles:
                   if needle not in text:
                       raise SystemExit(f"Verification failed: {needle!r} missing from {filename}")
               print(f"verified {filename}")
-
-          # Regression guard: this exact Material Snackbar caused the TV preferences crash
-          # after a successful full backup and must never return to the TV implementation.
           tv_prefs = Path("application/television/src/main/java/org/videolan/television/ui/preferences/PreferencesAdvanced.kt").read_text()
-          bad = 'snackerConfirm(activity, getString(R.string.full_backup_success)'
-          if bad in tv_prefs:
+          if 'snackerConfirm(activity, getString(R.string.full_backup_success)' in tv_prefs:
               raise SystemExit("Regression: AppCompat-only full-backup Snackbar is present in TV preferences")
-          print("verified TV backup crash regression guard")
+          if 'if (!it.deleteRecursively()) throw IOException("Cannot replace app database")' in tv_prefs:
+              raise SystemExit("Regression: destructive app database pre-delete remains")
+          print("verified TV backup/restore regression guards")
           PY
+          git diff --check
 
       - name: Build single TV APK
         shell: bash
         run: |
-          gradle \
-            :application:app:assembleTvFix \
-            --stacktrace \
-            --no-daemon
+          gradle :application:app:assembleTvFix --stacktrace --no-daemon
 
       - name: Collect APK
         shell: bash
         run: |
           mkdir -p out
-          find application/app/build/outputs/apk \
-            -type f \
-            -name '*.apk' \
-            -exec cp {} out/ \;
+          find application/app/build/outputs/apk -type f -name '*.apk' -exec cp {} out/ \;
           test -f out/VLC-TV-Fix-all.apk
           echo "Generated APK:"
           ls -lh out/VLC-TV-Fix-all.apk
