@@ -153,5 +153,43 @@ text = replace_once(text, '''                    ZipInputStream(BufferedInputStr
                         ?: throw IOException("Cannot open backup")
                     ZipInputStream(BufferedInputStream(backupInput)).use { zip ->''', "restore chosen URI")
 
+# Target identity is build/package identity, not portable preference data. Refuse to
+# restore at all if the installed APK is not one of the two explicit Dual variants.
+text = replace_once(text, '''                try {
+                    staging.deleteRecursively()''', '''                try {
+                    val targetVariant = dualVariantForPackage(context.packageName)
+                        ?: throw IOException("Unsupported VLC Dual target package")
+                    staging.deleteRecursively()''', "target variant guard")
+
+# Directory components use the same stage/swap/rollback primitive as the databases.
+text = replace_once(text, '''                    if (restoreArtwork) {
+                        artworkDir?.let {
+                            it.deleteRecursively()
+                            copyDirectoryContents(File(staging, "artwork/medialib"), it)
+                        }
+                    }''', '''                    if (restoreArtwork) {
+                        artworkDir?.let { replaceDirectoryContentsSafely(File(staging, "artwork/medialib"), it) }
+                    }''', "transactional artwork restore")
+text = replace_once(text, '''                    if (restoreSubtitles) {
+                        subtitlesDir?.let {
+                            val saved = File(staging, "external/subtitles")
+                            if (saved.exists()) {
+                                it.deleteRecursively()
+                                copyDirectoryContents(saved, it)
+                            }
+                        }
+                    }''', '''                    if (restoreSubtitles) {
+                        subtitlesDir?.let { replaceDirectoryContentsSafely(File(staging, "external/subtitles"), it) }
+                    }''', "transactional subtitle restore")
+text = replace_once(text, '''                    if (restoreCredentials) {
+                        val savedKeyStore = File(staging, "keystore")
+                        if (savedKeyStore.exists()) {
+                            keyStoreDir.deleteRecursively()
+                            copyDirectoryContents(savedKeyStore, keyStoreDir)
+                        }
+                    }''', '''                    if (restoreCredentials) {
+                        replaceDirectoryContentsSafely(File(staging, "keystore"), keyStoreDir)
+                    }''', "transactional credential restore")
+
 TARGET.write_text(text)
 print(f"applied portable dual backup contract to {TARGET}")
