@@ -1,18 +1,14 @@
 diff --git a/system/keymaps/touchscreen.xml b/system/keymaps/touchscreen.xml
 --- a/system/keymaps/touchscreen.xml
 +++ b/system/keymaps/touchscreen.xml
-@@ -43,10 +43,14 @@
-   <FullScreenVideo>
+@@ -44,6 +44,10 @@
      <touch>
-       <!-- Kodi Mobile V1: deterministic one-finger player gestures. -->
-       <!-- Direction semantics follow the finger: right = forward, left = rewind. -->
+       <!-- Kodi Mobile V1: one-finger playback gestures are handled continuously. -->
        <tap>OSD</tap>
 +      <!-- Reserve hold for the Kodi Mobile core recognizer instead of global RightClick. -->
 +      <longpress></longpress>
 +      <!-- Keep continuous pan events explicit in FullScreenVideo for axis-locked gestures. -->
 +      <pan>PanGesture</pan>
-       <swipe direction="left">Seek(-10)</swipe>
-       <swipe direction="right">Seek(10)</swipe>
-       <!-- Vertical one-finger swipes are intentionally unmapped here. -->
-       <!-- Kodi Mobile handles them from continuous pan events so the start -->
-       <!-- side can select brightness (left) or volume (right). -->
+       <!-- Do not dispatch discrete one-finger swipes after a pan. Horizontal -->
+       <!-- seeking is committed exactly once by CGUIWindowFullScreen on release. -->
+       <swipe direction="left"></swipe>
