@@ -12,41 +12,28 @@ def replace_once(text: str, old: str, new: str, label: str) -> str:
 
 text = TARGET.read_text()
 
-text = replace_once(
-    text,
-    '''            "full_restore" -> {
+text = replace_once(text, '''            "full_restore" -> {
                 showFullRestoreSelection()
                 return true
-            }''',
-    '''            "full_restore" -> {
+            }''', '''            "full_restore" -> {
                 val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                     addCategory(Intent.CATEGORY_OPENABLE)
                     type = "application/zip"
                 }
                 startActivityForResult(intent, 4242)
                 return true
-            }''',
-    "file-first restore launcher",
-)
+            }''', "file-first restore launcher")
 
-text = replace_once(
-    text,
-    '''        if (data == null) return
-        if (requestCode == FILE_PICKER_RESULT_CODE) {''',
-    '''        if (data == null) return
+text = replace_once(text, '''        if (data == null) return
+        if (requestCode == FILE_PICKER_RESULT_CODE) {''', '''        if (data == null) return
         if (requestCode == 4242) {
             data.data?.let { showFullRestoreSelection(it) }
             return
         }
-        if (requestCode == FILE_PICKER_RESULT_CODE) {''',
-    "full backup picker result",
-)
+        if (requestCode == FILE_PICKER_RESULT_CODE) {''', "full backup picker result")
 
-text = replace_once(
-    text,
-    '''    private fun fullBackupFile(): File =
-        File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY + "/VLC-Full-Backup.zip")''',
-    '''    private fun dualVariantForPackage(packageName: String): String? = when (packageName) {
+text = replace_once(text, '''    private fun fullBackupFile(): File =
+        File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY + "/VLC-Full-Backup.zip")''', '''    private fun dualVariantForPackage(packageName: String): String? = when (packageName) {
         "org.videolan.vlc.internalstorage" -> "internal"
         "org.videolan.vlc.smb" -> "smb"
         else -> null
@@ -59,29 +46,17 @@ text = replace_once(
             else -> throw IllegalStateException("Unsupported VLC Dual package")
         }
         return File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY + "/" + name)
-    }''',
-    "variant backup filename",
-)
+    }''', "variant backup filename")
 
-text = replace_once(
-    text,
-    '''                        val manifest = """{"format":1,"package":"${context.packageName}","vlc":"3.7.2 Beta 2"}"""''',
-    '''                        val sourceVariant = dualVariantForPackage(context.packageName)
+text = replace_once(text, '''                        val manifest = """{"format":1,"package":"${context.packageName}","vlc":"3.7.2 Beta 2"}"""''', '''                        val sourceVariant = dualVariantForPackage(context.packageName)
                             ?: throw IOException("Unsupported VLC Dual package")
-                        val manifest = """{"format":2,"appFamily":"vlc-dual","variant":"$sourceVariant","package":"${context.packageName}","vlc":"3.7.2 Beta 2","components":["settings","mediaDb","appDb","artwork","subtitles","credentials"]}"""''',
-    "format 2 manifest",
-)
+                        val manifest = """{"format":2,"appFamily":"vlc-dual","variant":"$sourceVariant","package":"${context.packageName}","vlc":"3.7.2 Beta 2","components":["settings","mediaDb","appDb","artwork","subtitles","credentials"]}"""''', "format 2 manifest")
 
-text = replace_once(
-    text,
-    '''                    val manifestText = manifest.readText()
+text = replace_once(text, '''                    val manifestText = manifest.readText()
                     if (!manifestText.contains("\\\"format\\\":1") ||
                         !manifestText.contains("\\\"package\\\":\\\"${context.packageName}\\\""))
-                        throw IOException("Unsupported or incompatible backup")''',
-    '''                    val manifestText = manifest.readText()
-                    validateDualManifest(manifestText)''',
-    "dual-family manifest validation",
-)
+                        throw IOException("Unsupported or incompatible backup")''', '''                    val manifestText = manifest.readText()
+                    validateDualManifest(manifestText)''', "dual-family manifest validation")
 
 start = text.index("    private fun showFullRestoreSelection() {")
 end = text.index("    private fun restoreFullBackup(", start)
@@ -113,7 +88,7 @@ new_selection = r'''    private data class BackupInspection(val sourcePackage: S
                     if (name.startsWith("/") || name.split('/').any { it == ".." })
                         throw IOException("Invalid backup entry")
                     when {
-                        name == "manifest.json" -> manifestText = zip.bufferedReader(Charsets.UTF_8).readText()
+                        name == "manifest.json" -> manifestText = zip.readBytes().toString(Charsets.UTF_8)
                         name == "settings/settings.json" -> components += "settings"
                         name.startsWith("medialibrary/db/") && !entry.isDirectory -> components += "mediaDb"
                         name.startsWith("appdb/") && !entry.isDirectory -> components += "appDb"
@@ -157,19 +132,8 @@ new_selection = r'''    private data class BackupInspection(val sourcePackage: S
                 .setMultiChoiceItems(options.map { it.second }.toTypedArray(), selected) { _, which, checked -> selected[which] = checked }
                 .setPositiveButton(R.string.full_restore_start) { _, _ ->
                     val chosen = options.indices.filter { selected[it] }.map { options[it].first }.toSet()
-                    if (chosen.isEmpty()) {
-                        Toast.makeText(requireContext(), R.string.full_restore_nothing_selected, Toast.LENGTH_LONG).show()
-                    } else {
-                        restoreFullBackup(
-                            src = src,
-                            restoreSettings = "settings" in chosen,
-                            restoreMediaDb = "mediaDb" in chosen,
-                            restoreAppDb = "appDb" in chosen,
-                            restoreArtwork = "artwork" in chosen,
-                            restoreSubtitles = "subtitles" in chosen,
-                            restoreCredentials = "credentials" in chosen
-                        )
-                    }
+                    if (chosen.isEmpty()) Toast.makeText(requireContext(), R.string.full_restore_nothing_selected, Toast.LENGTH_LONG).show()
+                    else restoreFullBackup(src, "settings" in chosen, "mediaDb" in chosen, "appDb" in chosen, "artwork" in chosen, "subtitles" in chosen, "credentials" in chosen)
                 }
                 .setNegativeButton(R.string.cancel, null)
                 .show()
@@ -179,25 +143,15 @@ new_selection = r'''    private data class BackupInspection(val sourcePackage: S
 '''
 text = text[:start] + new_selection + text[end:]
 
-text = replace_once(
-    text,
-    '''    private fun restoreFullBackup(
-        restoreSettings: Boolean,''',
-    '''    private fun restoreFullBackup(
+text = replace_once(text, '''    private fun restoreFullBackup(
+        restoreSettings: Boolean,''', '''    private fun restoreFullBackup(
         src: Uri,
-        restoreSettings: Boolean,''',
-    "restore selected URI signature",
-)
+        restoreSettings: Boolean,''', "restore selected URI signature")
 text = replace_once(text, '''        val src = fullBackupFile()
         if (Medialibrary.getInstance().isWorking) {''', '''        if (Medialibrary.getInstance().isWorking) {''', "remove fixed restore source")
-text = replace_once(
-    text,
-    '''                    ZipInputStream(BufferedInputStream(FileInputStream(src))).use { zip ->''',
-    '''                    val backupInput = context.contentResolver.openInputStream(src)
+text = replace_once(text, '''                    ZipInputStream(BufferedInputStream(FileInputStream(src))).use { zip ->''', '''                    val backupInput = context.contentResolver.openInputStream(src)
                         ?: throw IOException("Cannot open backup")
-                    ZipInputStream(BufferedInputStream(backupInput)).use { zip ->''',
-    "restore chosen URI",
-)
+                    ZipInputStream(BufferedInputStream(backupInput)).use { zip ->''', "restore chosen URI")
 
 TARGET.write_text(text)
 print(f"applied portable dual backup contract to {TARGET}")
