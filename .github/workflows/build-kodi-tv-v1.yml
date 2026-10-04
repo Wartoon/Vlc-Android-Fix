@@ -71,6 +71,8 @@ jobs:
           done
           grep -Fq '<ok>OSD</ok>' kodi/system/keymaps/keyboard.xml
           grep -Fq '<play_pause>PlayPause</play_pause>' kodi/system/keymaps/keyboard.xml
+          grep -Fq '<play_pause mod="longpress">Info</play_pause>' kodi/system/keymaps/keyboard.xml
+          grep -Fq '<return mod="longpress">ContextMenu</return>' kodi/system/keymaps/keyboard.xml
           git -C kodi diff --check
           git -C kodi diff --stat
 
