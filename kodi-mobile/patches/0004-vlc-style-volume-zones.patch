@@ -34,7 +34,6 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.h b/xbmc/video/windows/GUIWi
    bool m_bShowCurrentTime;
 +  PlayerGesture m_playerGesture{PlayerGesture::None};
 +  float m_gestureStartX{0.0f};
-+  float m_gestureStartY{0.0f};
 +  float m_gestureOffsetX{0.0f};
 +  float m_gestureOffsetY{0.0f};
 +  float m_gestureStartVolume{0.0f};
@@ -55,156 +54,131 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUI
  #include <algorithm>
  #include <cmath>
  #include <stdio.h>
-@@ -247,25 +250,155 @@
- EVENT_RESULT CGUIWindowFullScreen::OnMouseEvent(const CPoint& point,
-                                                 const MOUSE::CMouseEvent& event)
- {
-   if (event.m_id == ACTION_MOUSE_RIGHT_CLICK)
-   { // no control found to absorb this click - go back to GUI
-     OnAction(CAction(ACTION_SHOW_GUI));
-     return EVENT_RESULT_HANDLED;
-   }
-   if (event.m_id == ACTION_MOUSE_WHEEL_UP)
-   {
-     return g_application.OnAction(CAction(ACTION_ANALOG_SEEK_FORWARD, 0.5f)) ? EVENT_RESULT_HANDLED : EVENT_RESULT_UNHANDLED;
-   }
-   if (event.m_id == ACTION_MOUSE_WHEEL_DOWN)
+@@ -247,8 +250,129 @@ EVENT_RESULT CGUIWindowFullScreen::OnMouseEvent(const CPoint& point,
    {
      return g_application.OnAction(CAction(ACTION_ANALOG_SEEK_BACK, 0.5f)) ? EVENT_RESULT_HANDLED : EVENT_RESULT_UNHANDLED;
    }
-+  // Full-screen playback must explicitly claim touch gestures. Otherwise the
-+  // running player/OSD consumes the stream before PAN reaches this window.
-   if (event.m_id == ACTION_GESTURE_NOTIFY)
-     return static_cast<EVENT_RESULT>(EVENT_RESULT_PAN_HORIZONTAL | EVENT_RESULT_PAN_VERTICAL);
- 
-   auto& components = CServiceBroker::GetAppComponents();
-   const auto appPlayer = components.GetComponent<CApplicationPlayer>();
+-  if (event.m_id >= ACTION_GESTURE_NOTIFY && event.m_id <= ACTION_GESTURE_END) // gestures
+-    return EVENT_RESULT_UNHANDLED;
 +
-+  // Kodi maps a completed double tap to ACTION_MOUSE_DOUBLE_CLICK. Keep the
-+  // centre zone untouched; VLC-style left/right taps seek by ten seconds.
++  if (event.m_id == ACTION_GESTURE_NOTIFY)
++    return static_cast<EVENT_RESULT>(EVENT_RESULT_PAN_HORIZONTAL | EVENT_RESULT_PAN_VERTICAL);
++
++  auto& components = CServiceBroker::GetAppComponents();
++  const auto appPlayer = components.GetComponent<CApplicationPlayer>();
++
 +  if (event.m_id == ACTION_MOUSE_DOUBLE_CLICK)
 +  {
 +    const auto& res = CServiceBroker::GetWinSystem()->GetGfxContext().GetResInfo();
 +    const float width = static_cast<float>(res.iWidth);
-+    if (width > 0.0f && appPlayer->CanSeek())
-+    {
-+      const int64_t now = appPlayer->GetTime();
-+      const int64_t total = appPlayer->GetTotalTime();
-+      if (point.x < width / 3.0f)
-+        appPlayer->SeekTime(std::clamp(now - int64_t{10000}, int64_t{0}, total));
-+      else if (point.x > width * 2.0f / 3.0f)
-+        appPlayer->SeekTime(std::clamp(now + int64_t{10000}, int64_t{0}, total));
-+      else
-+        return EVENT_RESULT_UNHANDLED;
-+      return EVENT_RESULT_HANDLED;
-+    }
++    if (width <= 0.0f || !appPlayer->CanSeek())
++      return EVENT_RESULT_UNHANDLED;
++
++    const int64_t now = appPlayer->GetTime();
++    const int64_t total = appPlayer->GetTotalTime();
++    if (point.x < width / 3.0f)
++      appPlayer->SeekTime(std::clamp(now - int64_t{10000}, int64_t{0}, total));
++    else if (point.x > width * 2.0f / 3.0f)
++      appPlayer->SeekTime(std::clamp(now + int64_t{10000}, int64_t{0}, total));
++    else
++      return EVENT_RESULT_UNHANDLED;
++    return EVENT_RESULT_HANDLED;
 +  }
- 
-   if (event.m_id == ACTION_GESTURE_BEGIN)
-   {
-     ResetPlayerGesture();
-     m_playerGesture = PlayerGesture::Pending;
-     m_gestureStartX = point.x;
-     m_gestureStartY = point.y;
-     m_gestureStartTime = appPlayer->GetTime();
-     m_gestureTargetTime = m_gestureStartTime;
- #if defined(TARGET_ANDROID)
-     m_gestureStartVolume = CXBMCApp::GetSystemVolume();
- #endif
-     return EVENT_RESULT_HANDLED;
-   }
- 
-   if (event.m_id == ACTION_GESTURE_ABORT)
-   {
--    if (m_playerGesture == PlayerGesture::Horizontal && m_resumeAfterScrub && appPlayer->IsPausedPlayback())
++
++  if (event.m_id == ACTION_GESTURE_BEGIN)
++  {
++    ResetPlayerGesture();
++    m_playerGesture = PlayerGesture::Pending;
++    m_gestureStartX = point.x;
++    m_gestureStartTime = appPlayer->GetTime();
++    m_gestureTargetTime = m_gestureStartTime;
++#if defined(TARGET_ANDROID)
++    m_gestureStartVolume = CXBMCApp::GetSystemVolume();
++#endif
++    return EVENT_RESULT_HANDLED;
++  }
++
++  if (event.m_id == ACTION_GESTURE_ABORT)
++  {
 +    if (m_playerGesture == PlayerGesture::Horizontal && m_resumeAfterScrub &&
 +        appPlayer->IsPausedPlayback())
-       appPlayer->Pause();
-     ResetPlayerGesture();
-     return EVENT_RESULT_HANDLED;
-   }
- 
-   if (event.m_id == ACTION_GESTURE_END)
-   {
-     if (m_playerGesture == PlayerGesture::Horizontal)
-     {
-       if (appPlayer->CanSeek())
-         appPlayer->SeekTime(m_gestureTargetTime);
-       if (m_resumeAfterScrub && appPlayer->IsPausedPlayback())
-         appPlayer->Pause();
-     }
-     ResetPlayerGesture();
-     return EVENT_RESULT_HANDLED;
-   }
- 
-   if (event.m_id == ACTION_GESTURE_PAN)
-   {
-     const auto& res = CServiceBroker::GetWinSystem()->GetGfxContext().GetResInfo();
-     const float width = static_cast<float>(res.iWidth);
-     const float height = static_cast<float>(res.iHeight);
-     if (width <= 0.0f || height <= 0.0f)
-       return EVENT_RESULT_HANDLED;
- 
-     m_gestureOffsetX += event.m_offsetX;
-     m_gestureOffsetY += event.m_offsetY;
- 
-     if (m_playerGesture == PlayerGesture::Pending)
-     {
-       const float absX = std::abs(m_gestureOffsetX);
-       const float absY = std::abs(m_gestureOffsetY);
--      if (std::hypot(absX, absY) < height * 0.05f)
-+      // Lock direction early. The previous 5% screen threshold made gestures
-+      // feel as if they only started after a large, slow drag.
++      appPlayer->Pause();
++    ResetPlayerGesture();
++    return EVENT_RESULT_HANDLED;
++  }
++
++  if (event.m_id == ACTION_GESTURE_END)
++  {
++    if (m_playerGesture == PlayerGesture::Horizontal)
++    {
++      if (appPlayer->CanSeek())
++        appPlayer->SeekTime(m_gestureTargetTime);
++      if (m_resumeAfterScrub && appPlayer->IsPausedPlayback())
++        appPlayer->Pause();
++    }
++    ResetPlayerGesture();
++    return EVENT_RESULT_HANDLED;
++  }
++
++  if (event.m_id == ACTION_GESTURE_PAN)
++  {
++    const auto& res = CServiceBroker::GetWinSystem()->GetGfxContext().GetResInfo();
++    const float width = static_cast<float>(res.iWidth);
++    const float height = static_cast<float>(res.iHeight);
++    if (width <= 0.0f || height <= 0.0f)
++      return EVENT_RESULT_HANDLED;
++
++    m_gestureOffsetX += event.m_offsetX;
++    m_gestureOffsetY += event.m_offsetY;
++
++    if (m_playerGesture == PlayerGesture::Pending)
++    {
++      const float absX = std::abs(m_gestureOffsetX);
++      const float absY = std::abs(m_gestureOffsetY);
 +      if (std::hypot(absX, absY) < height * 0.015f)
-         return EVENT_RESULT_HANDLED;
- 
--      if (absY > absX * 2.0f)
++        return EVENT_RESULT_HANDLED;
++
 +      if (absY > absX * 1.35f)
-       {
-         if (m_gestureStartX > width * 4.0f / 7.0f)
-           m_playerGesture = PlayerGesture::Volume;
-         else if (m_gestureStartX < width * 3.0f / 7.0f)
-           m_playerGesture = PlayerGesture::Brightness;
-         else
-           m_playerGesture = PlayerGesture::Ignored;
-       }
-       else
-       {
-         m_playerGesture = PlayerGesture::Horizontal;
-         m_resumeAfterScrub = !appPlayer->IsPausedPlayback();
-         if (m_resumeAfterScrub && appPlayer->CanPause())
-           appPlayer->Pause();
-       }
-     }
- 
-     if (m_playerGesture == PlayerGesture::Horizontal)
-     {
-       if (!appPlayer->CanSeek())
-         return EVENT_RESULT_HANDLED;
-+      // Linear scrubbing: a full-width swipe spans four minutes. Do not seek
-+      // repeatedly while the finger moves; seek once on release.
-       const double gestureFraction = static_cast<double>(m_gestureOffsetX / width);
--      const double magnitude = 600000.0 * std::pow(std::abs(gestureFraction), 4.0) + 3000.0;
--      const int64_t jump = static_cast<int64_t>(std::copysign(magnitude, gestureFraction));
++      {
++        if (m_gestureStartX > width * 4.0f / 7.0f)
++          m_playerGesture = PlayerGesture::Volume;
++        else if (m_gestureStartX < width * 3.0f / 7.0f)
++          m_playerGesture = PlayerGesture::Brightness;
++        else
++          m_playerGesture = PlayerGesture::Ignored;
++      }
++      else
++      {
++        m_playerGesture = PlayerGesture::Horizontal;
++        m_resumeAfterScrub = !appPlayer->IsPausedPlayback();
++        if (m_resumeAfterScrub && appPlayer->CanPause())
++          appPlayer->Pause();
++      }
++    }
++
++    if (m_playerGesture == PlayerGesture::Horizontal)
++    {
++      if (!appPlayer->CanSeek())
++        return EVENT_RESULT_HANDLED;
++      const double gestureFraction = static_cast<double>(m_gestureOffsetX / width);
 +      const int64_t jump = static_cast<int64_t>(gestureFraction * 240000.0);
-       const int64_t total = appPlayer->GetTotalTime();
-       m_gestureTargetTime = std::clamp(m_gestureStartTime + jump, int64_t{0}, total);
-       return EVENT_RESULT_HANDLED;
-     }
- 
- #if defined(TARGET_ANDROID)
-     if (m_playerGesture == PlayerGesture::Volume)
-     {
--      const float delta = -m_gestureOffsetY / height * 1.25f;
++      const int64_t total = appPlayer->GetTotalTime();
++      m_gestureTargetTime = std::clamp(m_gestureStartTime + jump, int64_t{0}, total);
++      return EVENT_RESULT_HANDLED;
++    }
++
++#if defined(TARGET_ANDROID)
++    if (m_playerGesture == PlayerGesture::Volume)
++    {
 +      const float delta = -m_gestureOffsetY / height;
-       CXBMCApp::SetSystemVolume(std::clamp(m_gestureStartVolume + delta, 0.0f, 1.0f));
-       return EVENT_RESULT_HANDLED;
-     }
- #endif
- 
-     if (m_playerGesture == PlayerGesture::Brightness || m_playerGesture == PlayerGesture::Ignored)
-       return EVENT_RESULT_HANDLED;
-   }
++      CXBMCApp::SetSystemVolume(std::clamp(m_gestureStartVolume + delta, 0.0f, 1.0f));
++      return EVENT_RESULT_HANDLED;
++    }
++#endif
++
++    if (m_playerGesture == PlayerGesture::Brightness || m_playerGesture == PlayerGesture::Ignored)
++      return EVENT_RESULT_HANDLED;
++  }
    return EVENT_RESULT_UNHANDLED;
  }
 +
@@ -212,7 +186,6 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUI
 +{
 +  m_playerGesture = PlayerGesture::None;
 +  m_gestureStartX = 0.0f;
-+  m_gestureStartY = 0.0f;
 +  m_gestureOffsetX = 0.0f;
 +  m_gestureOffsetY = 0.0f;
 +  m_gestureStartVolume = 0.0f;
