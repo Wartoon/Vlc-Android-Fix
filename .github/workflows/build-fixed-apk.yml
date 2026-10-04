@@ -57,7 +57,7 @@ jobs:
         shell: bash
         run: python3 buildsystem/harden-backup-restore.py
 
-      - name: Verify restore safety regression guards
+      - name: Verify dual backup contract and restore safety
         shell: bash
         run: |
           python3 - <<'PY'
@@ -68,21 +68,27 @@ jobs:
               'replaceDirectoryContentsSafely(File(staging, "medialibrary/db"), mediaDbDir)',
               'replaceDirectoryContentsSafely(savedAppDb, appDbDir)',
               'replaceDatabaseFileSafely(src, db)',
-              'val manifestText = manifest.readText()',
-              'context.packageName',
+              '\"format\":2',
+              '\"appFamily\":\"vlc-dual\"',
+              'org.videolan.vlc.internalstorage',
+              'org.videolan.vlc.smb',
+              'VLC Complete Backup - Internal Storage.zip',
+              'VLC Complete Backup - SMB.zip',
               'val stagedAppDb = File(requireContext().cacheDir, "vlc_appdb_restore")',
           ]
           for needle in required:
               if needle not in s:
-                  raise SystemExit(f'missing restore safety guard: {needle}')
+                  raise SystemExit(f'missing dual backup/restore guard: {needle}')
           forbidden = [
+              '!manifestText.contains("\\\"package\\\":\\\"${context.packageName}\\\"")',
+              '/VLC-Full-Backup.zip',
               'if (!it.deleteRecursively()) throw IOException("Cannot replace app database")',
               'if (current.exists() && !current.delete()) return@withContext false',
           ]
           for needle in forbidden:
               if needle in s:
-                  raise SystemExit(f'destructive pre-delete restore code remains: {needle}')
-          print('restore safety guards verified')
+                  raise SystemExit(f'forbidden legacy/destructive restore code remains: {needle}')
+          print('dual backup contract and restore safety guards verified')
           PY
 
       - name: Verify build inputs
