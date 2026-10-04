@@ -99,7 +99,7 @@
                 android:entryValues="@array/deblocking_values"
                 android:key="deblocking"
                 android:summary="@string/deblocking_summary"
-                android:title="@string/deblocking_title"/>
+                android:title="@string/deblocking"/>
         <CheckBoxPreference
                 app:singleLineTitle="false"
                 android:defaultValue="false"
