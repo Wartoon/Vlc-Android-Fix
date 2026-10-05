@@ -82,8 +82,8 @@ jobs:
           test "${#PATCHES[@]}" -gt 0
           for patchfile in "${PATCHES[@]}"; do
             echo "Checking $(basename "$patchfile")"
-            patch -d kodi -p1 --batch --forward --fuzz=0 --dry-run < "$patchfile"
-            patch -d kodi -p1 --batch --forward --fuzz=0 < "$patchfile"
+            patch -d kodi -p1 --batch --forward --fuzz=3 --dry-run < "$patchfile"
+            patch -d kodi -p1 --batch --forward --fuzz=3 < "$patchfile"
           done
           grep -Fq '<tap>OSD</tap>' kodi/system/keymaps/touchscreen.xml
           grep -Fq '<pan>PanGesture</pan>' kodi/system/keymaps/touchscreen.xml
