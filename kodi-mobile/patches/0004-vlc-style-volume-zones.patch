@@ -1,14 +1,14 @@
 diff --git a/xbmc/video/windows/GUIWindowFullScreen.h b/xbmc/video/windows/GUIWindowFullScreen.h
 --- a/xbmc/video/windows/GUIWindowFullScreen.h
 +++ b/xbmc/video/windows/GUIWindowFullScreen.h
-@@ -11,6 +11,7 @@
+@@ -11,5 +11,6 @@
  #include "guilib/GUIWindow.h"
  
  #include <chrono>
 +#include <cstdint>
  
  class CGUIDialog;
-@@ -31,12 +32,30 @@ protected:
+@@ -31,13 +32,31 @@ protected:
    EVENT_RESULT OnMouseEvent(const CPoint& point, const KODI::MOUSE::CMouseEvent& event) override;
  
  private:
@@ -43,7 +43,7 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.h b/xbmc/video/windows/GUIWi
 diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUIWindowFullScreen.cpp
 --- a/xbmc/video/windows/GUIWindowFullScreen.cpp
 +++ b/xbmc/video/windows/GUIWindowFullScreen.cpp
-@@ -29,5 +29,10 @@
+@@ -29,5 +29,9 @@
  #include "video/dialogs/GUIDialogSubtitleSettings.h"
  #include "windowing/WinSystem.h"
  
@@ -53,7 +53,7 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUI
  #include <algorithm>
 +#include <cmath>
  #include <stdio.h>
-@@ -265,9 +269,149 @@ EVENT_RESULT CGUIWindowFullScreen::OnMouseEvent(const CPoint& point,
+@@ -265,9 +269,148 @@ EVENT_RESULT CGUIWindowFullScreen::OnMouseEvent(const CPoint& point,
    }
    if (event.m_id == ACTION_MOUSE_WHEEL_DOWN)
    {
