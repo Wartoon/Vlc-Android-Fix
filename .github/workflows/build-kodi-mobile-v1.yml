@@ -80,10 +80,10 @@ jobs:
           set -euo pipefail
           mapfile -t PATCHES < <(find "$GITHUB_WORKSPACE/kodi-mobile/patches" -maxdepth 1 -type f -name '*.patch' | sort)
           test "${#PATCHES[@]}" -gt 0
-          for patch in "${PATCHES[@]}"; do
-            echo "Checking $(basename "$patch")"
-            git -C kodi apply --recount --check "$patch"
-            git -C kodi apply --recount "$patch"
+          for patchfile in "${PATCHES[@]}"; do
+            echo "Checking $(basename "$patchfile")"
+            patch -d kodi -p1 --batch --forward --fuzz=0 --dry-run < "$patchfile"
+            patch -d kodi -p1 --batch --forward --fuzz=0 < "$patchfile"
           done
           grep -Fq '<tap>OSD</tap>' kodi/system/keymaps/touchscreen.xml
           grep -Fq '<pan>PanGesture</pan>' kodi/system/keymaps/touchscreen.xml
