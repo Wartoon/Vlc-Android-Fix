@@ -8,7 +8,7 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.h b/xbmc/video/windows/GUIWi
 +#include <cstdint>
  
  class CGUIDialog;
-@@ -31,13 +32,32 @@ protected:
+@@ -31,12 +32,30 @@ protected:
    EVENT_RESULT OnMouseEvent(const CPoint& point, const KODI::MOUSE::CMouseEvent& event) override;
  
  private:
@@ -43,7 +43,7 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.h b/xbmc/video/windows/GUIWi
 diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUIWindowFullScreen.cpp
 --- a/xbmc/video/windows/GUIWindowFullScreen.cpp
 +++ b/xbmc/video/windows/GUIWindowFullScreen.cpp
-@@ -29,6 +29,10 @@
+@@ -29,5 +29,10 @@
  #include "video/dialogs/GUIDialogSubtitleSettings.h"
  #include "windowing/WinSystem.h"
  
