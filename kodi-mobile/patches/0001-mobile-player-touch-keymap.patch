@@ -1,7 +1,7 @@
 diff --git a/system/keymaps/touchscreen.xml b/system/keymaps/touchscreen.xml
 --- a/system/keymaps/touchscreen.xml
 +++ b/system/keymaps/touchscreen.xml
-@@ -42,10 +42,16 @@
+@@ -42,10 +42,17 @@
    </FileManager>
    <FullScreenVideo>
      <touch>
