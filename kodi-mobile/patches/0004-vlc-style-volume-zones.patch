@@ -53,12 +53,7 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUI
  #include <algorithm>
 +#include <cmath>
  #include <stdio.h>
-@@ -265,9 +269,148 @@ EVENT_RESULT CGUIWindowFullScreen::OnMouseEvent(const CPoint& point,
-   }
-   if (event.m_id == ACTION_MOUSE_WHEEL_DOWN)
-   {
-     return g_application.OnAction(CAction(ACTION_ANALOG_SEEK_BACK, 0.5f)) ? EVENT_RESULT_HANDLED : EVENT_RESULT_UNHANDLED;
-   }
+@@ -270,2 +274,129 @@ EVENT_RESULT CGUIWindowFullScreen::OnMouseEvent(const CPoint& point,
    if (event.m_id >= ACTION_GESTURE_NOTIFY && event.m_id <= ACTION_GESTURE_END) // gestures
 -    return EVENT_RESULT_UNHANDLED;
 +  {
@@ -189,6 +184,7 @@ diff --git a/xbmc/video/windows/GUIWindowFullScreen.cpp b/xbmc/video/windows/GUI
 +    if (m_playerGesture == PlayerGesture::Ignored)
 +      return EVENT_RESULT_HANDLED;
 +  }
+@@ -272,2 +403,14 @@ EVENT_RESULT CGUIWindowFullScreen::OnMouseEvent(const CPoint& point,
    return EVENT_RESULT_UNHANDLED;
  }
 +
