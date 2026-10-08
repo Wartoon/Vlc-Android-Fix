@@ -95,10 +95,12 @@ jobs:
           SIGNING_ALIAS: ${{ secrets.VLC_TV_KEY_ALIAS }}
         run: |
           set -euo pipefail
-          test -n "$SIGNING_KEYSTORE" && test -n "$SIGNING_PASSWORD" && test -n "$SIGNING_ALIAS"
+          if [[ -z "$SIGNING_KEYSTORE" ]]; then echo "::error::Keystore Base64 secret is empty"; exit 1; fi
+          if [[ -z "$SIGNING_PASSWORD" ]]; then echo "::error::Store password secret is empty"; exit 1; fi
+          if [[ -z "$SIGNING_ALIAS" ]]; then echo "::error::Key alias secret is empty"; exit 1; fi
           mkdir -p "$RUNNER_TEMP/signing"
-          printf '%s' "$SIGNING_KEYSTORE" | base64 --decode > "$RUNNER_TEMP/signing/app.jks"
-          keytool -list -keystore "$RUNNER_TEMP/signing/app.jks" -storepass "$SIGNING_PASSWORD" -alias "$SIGNING_ALIAS" >/dev/null
+          if ! printf '%s' "$SIGNING_KEYSTORE" | base64 --decode > "$RUNNER_TEMP/signing/app.jks"; then echo "::error::Invalid Base64 keystore"; exit 1; fi
+          if ! keytool -list -keystore "$RUNNER_TEMP/signing/app.jks" -storepass "$SIGNING_PASSWORD" -alias "$SIGNING_ALIAS" >/dev/null 2>&1; then echo "::error::Keystore cannot be opened with supplied password and alias (or file is invalid)"; exit 1; fi
           echo "SIGNING_KEYSTORE_PATH=$RUNNER_TEMP/signing/app.jks" >> "$GITHUB_ENV"
           echo "SIGNING_ALIAS=$SIGNING_ALIAS" >> "$GITHUB_ENV"
           echo "SIGNING_PASSWORD=$SIGNING_PASSWORD" >> "$GITHUB_ENV"
