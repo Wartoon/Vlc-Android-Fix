@@ -100,7 +100,14 @@ jobs:
           if [[ -z "$SIGNING_ALIAS" ]]; then echo "::error::Key alias secret is empty"; exit 1; fi
           mkdir -p "$RUNNER_TEMP/signing"
           if ! printf '%s' "$SIGNING_KEYSTORE" | base64 --decode > "$RUNNER_TEMP/signing/app.jks"; then echo "::error::Invalid Base64 keystore"; exit 1; fi
-          if ! keytool -list -keystore "$RUNNER_TEMP/signing/app.jks" -storepass "$SIGNING_PASSWORD" -alias "$SIGNING_ALIAS" >/dev/null 2>&1; then echo "::error::Keystore cannot be opened with supplied password and alias (or file is invalid)"; exit 1; fi
+          if ! keytool -list -keystore "$RUNNER_TEMP/signing/app.jks" -storepass "$SIGNING_PASSWORD" >/dev/null 2>&1; then
+            echo "::error::Keystore or store password invalid (alias not yet checked)"
+            exit 1
+          fi
+          if ! keytool -list -keystore "$RUNNER_TEMP/signing/app.jks" -storepass "$SIGNING_PASSWORD" -alias "$SIGNING_ALIAS" >/dev/null 2>&1; then
+            echo "::error::Key alias missing or mismatched (store password is valid)"
+            exit 1
+          fi
           echo "SIGNING_KEYSTORE_PATH=$RUNNER_TEMP/signing/app.jks" >> "$GITHUB_ENV"
           echo "SIGNING_ALIAS=$SIGNING_ALIAS" >> "$GITHUB_ENV"
           echo "SIGNING_PASSWORD=$SIGNING_PASSWORD" >> "$GITHUB_ENV"
