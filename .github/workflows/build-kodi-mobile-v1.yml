@@ -64,7 +64,14 @@ jobs:
           if [[ -z "$SIGNING_ALIAS" ]]; then echo "::error::Key alias secret is empty"; exit 1; fi
           mkdir -p "$HOME/.android"
           if ! printf '%s' "$SIGNING_KEYSTORE" | base64 --decode > "$HOME/.android/permanent.jks"; then echo "::error::Invalid Base64 keystore"; exit 1; fi
-          if ! keytool -list -keystore "$HOME/.android/permanent.jks" -storepass "$SIGNING_PASSWORD" -alias "$SIGNING_ALIAS" >/dev/null 2>&1; then echo "::error::Keystore cannot be opened with supplied password and alias (or file is invalid)"; exit 1; fi
+          if ! keytool -list -keystore "$HOME/.android/permanent.jks" -storepass "$SIGNING_PASSWORD" >/dev/null 2>&1; then
+            echo "::error::Keystore or store password invalid (alias not yet checked)"
+            exit 1
+          fi
+          if ! keytool -list -keystore "$HOME/.android/permanent.jks" -storepass "$SIGNING_PASSWORD" -alias "$SIGNING_ALIAS" >/dev/null 2>&1; then
+            echo "::error::Key alias missing or mismatched (store password is valid)"
+            exit 1
+          fi
 
       - name: Clone and pin Kodi 22 Beta 2
         run: |
