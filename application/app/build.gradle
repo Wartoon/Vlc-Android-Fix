@@ -102,6 +102,7 @@ android {
         }
         internalStorage {
             initWith debug
+            signingConfig = signingConfigs.release
             applicationIdSuffix ".internalstorage"
             matchingFallbacks = ['debug']
             resValue "string", "app_name", "VLC Internal Storage"
@@ -109,6 +110,7 @@ android {
         }
         smb {
             initWith debug
+            signingConfig = signingConfigs.release
             applicationIdSuffix ".smb"
             matchingFallbacks = ['debug']
             resValue "string", "app_name", "VLC SMB"
