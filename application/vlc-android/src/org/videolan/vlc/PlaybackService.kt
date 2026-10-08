@@ -386,8 +386,8 @@ class PlaybackService : MediaBrowserServiceCompat(), LifecycleOwner, CoroutineSc
                 }
                 playlistManager.videoBackground || canSwitchToVideo() && !currentMediaHasFlag(MediaWrapper.MEDIA_FORCE_AUDIO) -> {//resume video playback
                     /* Resume VideoPlayerActivity from ACTION_REMOTE_SWITCH_VIDEO intent */
-                    val notificationIntent = Intent(ACTION_REMOTE_SWITCH_VIDEO)
-                    PendingIntent.getBroadcast(this, 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                    val notificationIntent = Intent(this, PlaybackService::class.java).apply { action = ACTION_REMOTE_SWITCH_VIDEO }
+                    PendingIntent.getService(this, 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
                 }
                 else -> { /* Show audio player */
                     val notificationIntent = Intent(this, StartActivity::class.java)
