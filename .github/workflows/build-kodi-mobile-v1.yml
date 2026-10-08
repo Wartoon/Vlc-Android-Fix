@@ -52,20 +52,17 @@ jobs:
           java -version
           "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" --list_installed
 
-      - name: Create Kodi debug signing key
+      - name: Restore permanent Kodi signing key
+        env:
+          SIGNING_KEYSTORE: ${{ secrets.KODI_KEYSTORE_BASE64 }}
+          SIGNING_PASSWORD: ${{ secrets.KODI_STORE_PASSWORD }}
+          SIGNING_ALIAS: ${{ secrets.KODI_KEY_ALIAS }}
         run: |
+          set -euo pipefail
+          test -n "$SIGNING_KEYSTORE" && test -n "$SIGNING_PASSWORD" && test -n "$SIGNING_ALIAS"
           mkdir -p "$HOME/.android"
-          keytool -genkeypair -noprompt \
-            -keystore "$HOME/.android/debug.keystore" \
-            -alias androiddebugkey \
-            -dname "CN=Android Debug,O=Android,C=US" \
-            -keypass android \
-            -storepass android \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000
-          test -s "$HOME/.android/debug.keystore"
-          keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey >/dev/null
+          printf '%s' "$SIGNING_KEYSTORE" | base64 --decode > "$HOME/.android/permanent.jks"
+          keytool -list -keystore "$HOME/.android/permanent.jks" -storepass "$SIGNING_PASSWORD" -alias "$SIGNING_ALIAS" >/dev/null
 
       - name: Clone and pin Kodi 22 Beta 2
         run: |
@@ -123,10 +120,10 @@ jobs:
 
       - name: Package APK
         env:
-          KODI_ANDROID_KEY_ALIAS: androiddebugkey
-          KODI_ANDROID_KEY_PASSWORD: android
-          KODI_ANDROID_STORE_PASSWORD: android
-          KODI_ANDROID_STORE_FILE: /home/runner/.android/debug.keystore
+          KODI_ANDROID_KEY_ALIAS: ${{ secrets.KODI_KEY_ALIAS }}
+          KODI_ANDROID_KEY_PASSWORD: ${{ secrets.KODI_STORE_PASSWORD }}
+          KODI_ANDROID_STORE_PASSWORD: ${{ secrets.KODI_STORE_PASSWORD }}
+          KODI_ANDROID_STORE_FILE: /home/runner/.android/permanent.jks
         run: |
           test -s "$KODI_ANDROID_STORE_FILE"
           make -C kodi-build apk
