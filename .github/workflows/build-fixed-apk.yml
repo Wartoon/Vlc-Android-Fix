@@ -113,10 +113,26 @@ jobs:
           git diff --check
           echo "All required Gradle project directories exist."
 
+      - name: Restore permanent signing keystore
+        shell: bash
+        env:
+          SIGNING_KEYSTORE: ${{ secrets.VLC_DUAL_KEYSTORE_BASE64 }}
+          SIGNING_PASSWORD: ${{ secrets.VLC_DUAL_STORE_PASSWORD }}
+          SIGNING_ALIAS: ${{ secrets.VLC_DUAL_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          test -n "$SIGNING_KEYSTORE" && test -n "$SIGNING_PASSWORD" && test -n "$SIGNING_ALIAS"
+          mkdir -p "$RUNNER_TEMP/signing"
+          printf '%s' "$SIGNING_KEYSTORE" | base64 --decode > "$RUNNER_TEMP/signing/app.jks"
+          keytool -list -keystore "$RUNNER_TEMP/signing/app.jks" -storepass "$SIGNING_PASSWORD" -alias "$SIGNING_ALIAS" >/dev/null
+          echo "SIGNING_KEYSTORE_PATH=$RUNNER_TEMP/signing/app.jks" >> "$GITHUB_ENV"
+          echo "SIGNING_ALIAS=$SIGNING_ALIAS" >> "$GITHUB_ENV"
+          echo "SIGNING_PASSWORD=$SIGNING_PASSWORD" >> "$GITHUB_ENV"
+
       - name: Build Internal Storage and SMB APKs
         shell: bash
         run: |
-          gradle :application:app:assembleInternalStorage :application:app:assembleSmb --stacktrace --no-daemon
+          gradle -PkeyStoreFile="$SIGNING_KEYSTORE_PATH" -Pstorealias="$SIGNING_ALIAS" -Pstorepwd="$SIGNING_PASSWORD" :application:app:assembleInternalStorage :application:app:assembleSmb --stacktrace --no-daemon
 
       - name: Collect APK
         shell: bash
