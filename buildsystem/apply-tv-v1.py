@@ -34,6 +34,7 @@ replace("application/app/build.gradle", '''        dev {
         }
         tvFix {
             initWith debug
+            signingConfig = signingConfigs.release
             applicationIdSuffix ".tvfix"
             matchingFallbacks = ['debug']
             resValue "string", "app_name", "VLC TV Fix"
