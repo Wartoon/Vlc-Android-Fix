@@ -80,7 +80,10 @@ object ThumbnailsProvider {
         val thumbPath = getMediaThumbnailPath(true, media) ?: return null
         val cacheBM = if (hasCache) BitmapCache.getBitmapFromMemCache(getMediaCacheKey(true, media, width.toString())) else null
         if (cacheBM != null) return cacheBM
-        if (hasCache && File(thumbPath).exists()) return readCoverBitmap(thumbPath, width)
+        if (hasCache && media.id > 0L && File(thumbPath).isFile) {
+            readCoverBitmap(thumbPath, width)?.let { return it }
+            // A stale or unreadable cached JPEG must not suppress thumbnail generation.
+        }
         if (media.isThumbnailGenerated) return null
         var bitmap = synchronized(lock) {
             if (media.uri.scheme.isSchemeFile()) ThumbnailUtils.createVideoThumbnail(filePath, MediaStore.Video.Thumbnails.MINI_KIND) else null
