@@ -106,7 +106,7 @@ new_selection = r'''    private data class BackupInspection(val sourcePackage: S
                     val name = entry.name
                     if (!inspectedNames.add(name.trimEnd('/')))
                         throw IOException("Duplicate backup entry")
-                    if (name.startsWith("/") || name.contains('\\') ||
+                    if (name.startsWith("/") || name.contains(92.toChar()) ||
                         name.split('/').any { it.isEmpty() || it == "." || it == ".." })
                         throw IOException("Invalid backup entry")
                     when {
@@ -212,7 +212,7 @@ text = replace_once(text, '''                        var entry = zip.nextEntry
                             entryCount++
                             if (entryCount > 100000) throw IOException("Backup contains too many entries")
                             val normalizedName = entry.name.trimEnd('/')
-                            if (entry.name.startsWith("/") || entry.name.contains('\\') ||
+                            if (entry.name.startsWith("/") || entry.name.contains(92.toChar()) ||
                                 normalizedName.isEmpty() ||
                                 normalizedName.split('/').any { it.isEmpty() || it == "." || it == ".." })
                                 throw IOException("Invalid backup entry path")
