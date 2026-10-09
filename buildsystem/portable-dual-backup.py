@@ -86,9 +86,18 @@ new_selection = r'''    private data class BackupInspection(val sourcePackage: S
             ZipInputStream(BufferedInputStream(input)).use { zip ->
                 var entry = zip.nextEntry
                 var entryCount = 0
+                var totalDeclaredSize = 0L
                 while (entry != null) {
                     entryCount++
                     if (entryCount > 100000) throw IOException("Backup contains too many entries")
+                    // ZIP headers may omit sizes; this is an early rejection only,
+                    // not a substitute for bounded streaming during extraction.
+                    if (entry.size > 0L) {
+                        if (entry.size > 4L * 1024 * 1024 * 1024 ||
+                            totalDeclaredSize > 4L * 1024 * 1024 * 1024 - entry.size)
+                            throw IOException("Backup declares excessive uncompressed data")
+                        totalDeclaredSize += entry.size
+                    }
                     val name = entry.name
                     if (name.startsWith("/") || name.split('/').any { it == ".." })
                         throw IOException("Invalid backup entry")
