@@ -116,6 +116,7 @@ class MediaParsingService : LifecycleService(), DevicesDiscoveryCb {
     private var currentDiscovery: String? = null
     @Volatile private var lastNotificationTime = 0L
     @Volatile private var scanActivated = false
+    // Collapse repeated progress updates while preserving error and hide events.
 
     private val settings by lazy { Settings.getInstance(this) }
 
@@ -197,7 +198,7 @@ class MediaParsingService : LifecycleService(), DevicesDiscoveryCb {
     @OptIn(ObsoleteCoroutinesApi::class)
     private fun setupScope() {
         actions = lifecycleScope.actor(context = Dispatchers.IO, capacity = Channel.UNLIMITED) { processAction() }
-        notificationActor = lifecycleScope.actor(capacity = Channel.UNLIMITED) {
+        notificationActor = lifecycleScope.actor(capacity = Channel.CONFLATED) {
             for (update in channel) when (update) {
                 is Show -> showNotification(update.done, update.scheduled)
                 is Error -> discoveryError.value = DiscoveryError(update.entryPoint)
