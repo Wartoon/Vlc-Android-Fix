@@ -88,6 +88,7 @@ new_selection = r'''    private data class BackupInspection(val sourcePackage: S
             ZipInputStream(BufferedInputStream(input)).use { zip ->
                 var entry = zip.nextEntry
                 var entryCount = 0
+                val inspectedNames = HashSet<String>()
                 var totalDeclaredSize = 0L
                 var totalActualSize = 0L
                 val maxUncompressedSize = 4L * 1024 * 1024 * 1024
@@ -103,6 +104,8 @@ new_selection = r'''    private data class BackupInspection(val sourcePackage: S
                         totalDeclaredSize += entry.size
                     }
                     val name = entry.name
+                    if (!inspectedNames.add(name.trimEnd('/')))
+                        throw IOException("Duplicate backup entry")
                     if (name.startsWith("/") || name.split('/').any { it == ".." })
                         throw IOException("Invalid backup entry")
                     when {
