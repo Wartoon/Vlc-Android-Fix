@@ -63,16 +63,18 @@ end = text.index("    private fun restoreFullBackup(", start)
 new_selection = r'''    private data class BackupInspection(val sourcePackage: String, val components: Set<String>)
 
     private fun validateDualManifest(manifestText: String): String {
-        val sourcePackage = when {
-            manifestText.contains("\"package\":\"org.videolan.vlc.internalstorage\"") -> "org.videolan.vlc.internalstorage"
-            manifestText.contains("\"package\":\"org.videolan.vlc.smb\"") -> "org.videolan.vlc.smb"
-            else -> throw IOException("Backup package is not part of VLC Dual")
+        // Parse the manifest as JSON; substring matching can accept forged metadata.
+        val manifest = try {
+            org.json.JSONObject(manifestText)
+        } catch (e: org.json.JSONException) {
+            throw IOException("Invalid backup manifest", e)
         }
+        val sourcePackage = manifest.optString("package")
         val sourceVariant = dualVariantForPackage(sourcePackage)
             ?: throw IOException("Backup package is not part of VLC Dual")
-        if (!manifestText.contains("\"format\":2") ||
-            !manifestText.contains("\"appFamily\":\"vlc-dual\"") ||
-            !manifestText.contains("\"variant\":\"$sourceVariant\""))
+        if (manifest.optInt("format", -1) != 2 ||
+            manifest.optString("appFamily") != "vlc-dual" ||
+            manifest.optString("variant") != sourceVariant)
             throw IOException("Unsupported or incompatible backup")
         return sourcePackage
     }
