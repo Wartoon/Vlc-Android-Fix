@@ -193,6 +193,35 @@ text = replace_once(text, '''                    ZipInputStream(BufferedInputStr
                         ?: throw IOException("Cannot open backup")
                     ZipInputStream(BufferedInputStream(backupInput)).use { zip ->''', "restore chosen URI")
 
+# Enforce limits again during extraction; the selected document can change
+# between the preview/inspection and the actual restore.
+text = replace_once(text, '''                        var entry = zip.nextEntry
+                        while (entry != null) {
+                            val outFile = File(staging, entry.name)''', '''                        var entry = zip.nextEntry
+                        var entryCount = 0
+                        var totalExtracted = 0L
+                        val maxExtracted = 4L * 1024 * 1024 * 1024
+                        while (entry != null) {
+                            entryCount++
+                            if (entryCount > 100000) throw IOException("Backup contains too many entries")
+                            val outFile = File(staging, entry.name)''', "restore entry count limit")
+text = replace_once(text, '''                                FileOutputStream(outFile).use { output -> zip.copyTo(output) }
+                            }
+                            zip.closeEntry()''', '''                                FileOutputStream(outFile).use { output ->
+                                    val buffer = ByteArray(8192)
+                                    while (true) {
+                                        val count = zip.read(buffer)
+                                        if (count < 0) break
+                                        totalExtracted += count.toLong()
+                                        if (totalExtracted > maxExtracted)
+                                            throw IOException("Backup exceeds 4 GiB uncompressed")
+                                        output.write(buffer, 0, count)
+                                    }
+                                }
+                            }
+                            zip.closeEntry()''', "restore streamed size limit")
+
+
 # Target identity is build/package identity, not portable preference data. Refuse to
 # restore at all if the installed APK is not one of the two explicit Dual variants.
 text = replace_once(text, '''                try {
