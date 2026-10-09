@@ -199,11 +199,15 @@ text = replace_once(text, '''                        var entry = zip.nextEntry
                         while (entry != null) {
                             val outFile = File(staging, entry.name)''', '''                        var entry = zip.nextEntry
                         var entryCount = 0
+                        val extractedNames = HashSet<String>()
                         var totalExtracted = 0L
                         val maxExtracted = 4L * 1024 * 1024 * 1024
                         while (entry != null) {
                             entryCount++
                             if (entryCount > 100000) throw IOException("Backup contains too many entries")
+                            val normalizedName = entry.name.trimEnd('/')
+                            if (!extractedNames.add(normalizedName))
+                                throw IOException("Duplicate backup entry")
                             val outFile = File(staging, entry.name)''', "restore entry count limit")
 text = replace_once(text, '''                                FileOutputStream(outFile).use { output -> zip.copyTo(output) }
                             }
