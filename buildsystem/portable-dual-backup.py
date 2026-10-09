@@ -90,7 +90,20 @@ new_selection = r'''    private data class BackupInspection(val sourcePackage: S
                     if (name.startsWith("/") || name.split('/').any { it == ".." })
                         throw IOException("Invalid backup entry")
                     when {
-                        name == "manifest.json" -> manifestText = zip.readBytes().toString(Charsets.UTF_8)
+                        name == "manifest.json" -> {
+                            // Reject oversized manifests before allocating their full contents.
+                            val manifestBytes = java.io.ByteArrayOutputStream()
+                            val buffer = ByteArray(4096)
+                            var total = 0
+                            while (true) {
+                                val count = zip.read(buffer)
+                                if (count < 0) break
+                                total += count
+                                if (total > 65536) throw IOException("Backup manifest exceeds 64 KiB")
+                                manifestBytes.write(buffer, 0, count)
+                            }
+                            manifestText = manifestBytes.toString("UTF-8")
+                        }
                         name == "settings/settings.json" -> components += "settings"
                         name.startsWith("medialibrary/db/") && !entry.isDirectory -> components += "mediaDb"
                         name.startsWith("appdb/") && !entry.isDirectory -> components += "appDb"
