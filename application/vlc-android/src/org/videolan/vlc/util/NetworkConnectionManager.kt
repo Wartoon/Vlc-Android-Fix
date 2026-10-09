@@ -60,15 +60,24 @@ object NetworkConnectionManager {
             if (hasConnection.value == true) hasConnection.postValue(false)
         }
     }
+    @Volatile private var started = false
+
+    @Synchronized
     fun start(context: Context) {
+        if (started) return
         val networkRequest = NetworkRequest.Builder()
                 .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                 .build()
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         try {
-            connectivityManager.requestNetwork(networkRequest, networkCallback)
+            // Observe connectivity without asking Android to maintain a network.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                connectivityManager.registerDefaultNetworkCallback(networkCallback)
+            } else {
+                connectivityManager.registerNetworkCallback(networkRequest, networkCallback)
+            }
+            started = true
         } catch (e: SecurityException) {
-
         }
     }
 }
