@@ -234,7 +234,10 @@ class MediaParsingService : LifecycleService(), DevicesDiscoveryCb {
             ACTION_FORCE_RELOAD -> actions.trySend(ForceReload)
             ACTION_DISCOVER -> intent.getStringExtra(EXTRA_PATH)?.let { discover(it) }
             ACTION_DISCOVER_DEVICE -> intent.getStringExtra(EXTRA_PATH)?.let { discoverStorage(it) }
-            ACTION_CHECK_STORAGES -> if (settings.getInt(KEY_MEDIALIBRARY_SCAN, -1) != ML_SCAN_OFF) actions.trySend(UpdateStorages) else exitCommand()
+            ACTION_CHECK_STORAGES -> if (settings.getInt(KEY_MEDIALIBRARY_SCAN, -1) != ML_SCAN_OFF) actions.trySend(UpdateStorages) else {
+                exitCommand()
+                return START_NOT_STICKY
+            }
             else -> {
                 exitCommand()
                 return START_NOT_STICKY
@@ -513,6 +516,13 @@ class MediaParsingService : LifecycleService(), DevicesDiscoveryCb {
         medialibrary.removeDeviceDiscoveryCb(this)
         unregisterReceiver(receiver)
         medialibrary.exceptionHandler = null
+        if (::wakeLock.isInitialized && wakeLock.isHeld) {
+            try {
+                wakeLock.release()
+            } catch (t: RuntimeException) {
+                Log.w(TAG, "Unable to release scan wake lock during destruction", t)
+            }
+        }
         super.onDestroy()
     }
 
