@@ -87,6 +87,8 @@ new_selection = r'''    private data class BackupInspection(val sourcePackage: S
                 var entry = zip.nextEntry
                 var entryCount = 0
                 var totalDeclaredSize = 0L
+                var totalActualSize = 0L
+                val maxUncompressedSize = 4L * 1024 * 1024 * 1024
                 while (entry != null) {
                     entryCount++
                     if (entryCount > 100000) throw IOException("Backup contains too many entries")
@@ -112,6 +114,8 @@ new_selection = r'''    private data class BackupInspection(val sourcePackage: S
                                 val count = zip.read(buffer)
                                 if (count < 0) break
                                 total += count
+                                totalActualSize += count.toLong()
+                                if (totalActualSize > maxUncompressedSize) throw IOException("Backup exceeds 4 GiB uncompressed")
                                 if (total > 65536) throw IOException("Backup manifest exceeds 64 KiB")
                                 manifestBytes.write(buffer, 0, count)
                             }
@@ -123,6 +127,14 @@ new_selection = r'''    private data class BackupInspection(val sourcePackage: S
                         name.startsWith("artwork/medialib/") && !entry.isDirectory -> components += "artwork"
                         name.startsWith("external/subtitles/") && !entry.isDirectory -> components += "subtitles"
                         name.startsWith("keystore/") && !entry.isDirectory -> components += "credentials"
+                    }
+                    // Drain every entry with a running limit: ZIP size headers can be unknown.
+                    val drainBuffer = ByteArray(8192)
+                    while (true) {
+                        val count = zip.read(drainBuffer)
+                        if (count < 0) break
+                        totalActualSize += count.toLong()
+                        if (totalActualSize > maxUncompressedSize) throw IOException("Backup exceeds 4 GiB uncompressed")
                     }
                     zip.closeEntry()
                     entry = zip.nextEntry
