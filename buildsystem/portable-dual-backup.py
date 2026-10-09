@@ -56,7 +56,9 @@ text = replace_once(text, '''                    val manifestText = manifest.rea
                     if (!manifestText.contains("\\\"format\\\":1") ||
                         !manifestText.contains("\\\"package\\\":\\\"${context.packageName}\\\""))
                         throw IOException("Unsupported or incompatible backup")''', '''                    val manifestText = manifest.readText()
-                    validateDualManifest(manifestText)''', "dual-family manifest validation")
+                    val backupSourcePackage = validateDualManifest(manifestText)
+                    if (restoreCredentials && backupSourcePackage != context.packageName)
+                        throw IOException("Credentials cannot be restored across VLC Dual variants")''', "dual-family manifest validation")
 
 start = text.index("    private fun showFullRestoreSelection() {")
 end = text.index("    private fun restoreFullBackup(", start)
