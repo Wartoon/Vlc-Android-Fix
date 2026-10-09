@@ -85,12 +85,16 @@ new_selection = r'''    private data class BackupInspection(val sourcePackage: S
         requireContext().contentResolver.openInputStream(src)?.use { input ->
             ZipInputStream(BufferedInputStream(input)).use { zip ->
                 var entry = zip.nextEntry
+                var entryCount = 0
                 while (entry != null) {
+                    entryCount++
+                    if (entryCount > 100000) throw IOException("Backup contains too many entries")
                     val name = entry.name
                     if (name.startsWith("/") || name.split('/').any { it == ".." })
                         throw IOException("Invalid backup entry")
                     when {
                         name == "manifest.json" -> {
+                            if (manifestText != null) throw IOException("Duplicate backup manifest")
                             // Reject oversized manifests before allocating their full contents.
                             val manifestBytes = java.io.ByteArrayOutputStream()
                             val buffer = ByteArray(4096)
