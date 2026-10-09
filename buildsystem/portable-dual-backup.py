@@ -106,7 +106,8 @@ new_selection = r'''    private data class BackupInspection(val sourcePackage: S
                     val name = entry.name
                     if (!inspectedNames.add(name.trimEnd('/')))
                         throw IOException("Duplicate backup entry")
-                    if (name.startsWith("/") || name.split('/').any { it == ".." })
+                    if (name.startsWith("/") || name.contains('\\') ||
+                        name.split('/').any { it.isEmpty() || it == "." || it == ".." })
                         throw IOException("Invalid backup entry")
                     when {
                         name == "manifest.json" -> {
@@ -211,6 +212,10 @@ text = replace_once(text, '''                        var entry = zip.nextEntry
                             entryCount++
                             if (entryCount > 100000) throw IOException("Backup contains too many entries")
                             val normalizedName = entry.name.trimEnd('/')
+                            if (entry.name.startsWith("/") || entry.name.contains('\\') ||
+                                normalizedName.isEmpty() ||
+                                normalizedName.split('/').any { it.isEmpty() || it == "." || it == ".." })
+                                throw IOException("Invalid backup entry path")
                             if (!extractedNames.add(normalizedName))
                                 throw IOException("Duplicate backup entry")
                             val outFile = File(staging, entry.name)''', "restore entry count limit")
