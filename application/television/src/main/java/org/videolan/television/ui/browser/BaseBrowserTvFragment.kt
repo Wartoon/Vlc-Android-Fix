@@ -315,7 +315,7 @@ abstract class BaseBrowserTvFragment<T> : Fragment(), BrowserFragmentInterface, 
         (item as? MediaLibraryItem)?.run {
             if (currentArt == artworkMrl) return@run
             currentArt = artworkMrl
-            lifecycleScope.updateBackground(v.context as Activity, backgroundManager, this)
+            viewLifecycleOwnerLiveData.value?.lifecycleScope?.updateBackground(v.context as Activity, backgroundManager, this)
         }
     }
 
@@ -436,7 +436,7 @@ abstract class BaseBrowserTvFragment<T> : Fragment(), BrowserFragmentInterface, 
         adapter.submitList(pagedList)
         if (setFocus) {
             setFocus = false
-            lifecycleScope.launchWhenStarted {
+            viewLifecycleOwner.lifecycleScope.launchWhenStarted {
                 yield()
                 // If there is a previous selection, no need to request focus on the list here
                 // as it is requested for the specific item in the onLayoutChildren override above.

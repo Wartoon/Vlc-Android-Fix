@@ -231,9 +231,9 @@ class FileBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>(), PathAda
     }
 
     override fun onStop() { super.onStop(); (viewModel as BrowserModel).stop() }
-    override fun onDestroy() {
-        super.onDestroy()
+    override fun onDestroyView() {
         if (::dataObserver.isInitialized) (adapter as FileTvItemAdapter).unregisterAdapterDataObserver(dataObserver)
+        super.onDestroyView()
     }
 
     override fun getCategory() = (viewModel as BrowserModel).type
