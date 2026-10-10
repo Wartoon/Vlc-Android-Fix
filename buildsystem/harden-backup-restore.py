@@ -13,7 +13,8 @@ HELPERS = r'''
         val staged = File(parent, destination.name + ".restore-new")
         val previous = File(parent, destination.name + ".restore-old")
         staged.deleteRecursively()
-        previous.deleteRecursively()
+        // Preserve an interrupted restore rollback instead of silently deleting it.
+        if (previous.exists()) throw IOException("Previous restore backup still exists")
         copyDirectoryContents(source, staged)
         var movedOld = false
         try {
