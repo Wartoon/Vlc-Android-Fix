@@ -175,7 +175,7 @@ class MediaTvItemAdapter(type: Int, private val eventsHandler: IEventsHandler<Me
             override val eventsHandler: IEventsHandler<MediaLibraryItem>
     ) : AbstractMediaItemViewHolder<MediaBrowserTvItemBinding>(binding)
     {
-        override fun getItem(layoutPosition: Int) =  this@MediaTvItemAdapter.getItem(layoutPosition)
+        override fun getItem(layoutPosition: Int) = if (layoutPosition in 0 until itemCount) this@MediaTvItemAdapter.getItem(layoutPosition) else null
         override fun getView() = binding.container
 
         init {
@@ -262,7 +262,7 @@ class MediaTvItemAdapter(type: Int, private val eventsHandler: IEventsHandler<Me
             binding: MediaBrowserTvItemListBinding,
             override val eventsHandler: IEventsHandler<MediaLibraryItem>
     ) : AbstractMediaItemViewHolder<MediaBrowserTvItemListBinding>(binding) {
-        override fun getItem(layoutPosition: Int) = this@MediaTvItemAdapter.getItem(layoutPosition)
+        override fun getItem(layoutPosition: Int) = if (layoutPosition in 0 until itemCount) this@MediaTvItemAdapter.getItem(layoutPosition) else null
 
         override fun getView() = binding.container
 

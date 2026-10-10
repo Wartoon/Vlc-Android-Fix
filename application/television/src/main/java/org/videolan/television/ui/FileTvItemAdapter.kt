@@ -111,7 +111,7 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
 
     @RequiresApi(Build.VERSION_CODES.M)
     inner class MediaItemTVViewHolder(binding: MediaBrowserTvItemBinding, override val eventsHandler: IEventsHandler<MediaLibraryItem>, private val showProtocol: Boolean) : MediaTvItemAdapter.AbstractMediaItemViewHolder<MediaBrowserTvItemBinding>(binding) {
-        override fun getItem(layoutPosition: Int) = this@FileTvItemAdapter.getItem(layoutPosition)
+        override fun getItem(layoutPosition: Int) = if (layoutPosition in 0 until itemCount) this@FileTvItemAdapter.getItem(layoutPosition) else null
         override fun getView() = binding.container
         init {
             binding.holder = this; binding.isPresent = true; binding.scaleType = ImageView.ScaleType.CENTER_INSIDE
@@ -156,7 +156,7 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
 
     @TargetApi(Build.VERSION_CODES.M)
     inner class MediaItemTVListViewHolder(binding: MediaBrowserTvItemListBinding, override val eventsHandler: IEventsHandler<MediaLibraryItem>, private val showProtocol: Boolean) : MediaTvItemAdapter.AbstractMediaItemViewHolder<MediaBrowserTvItemListBinding>(binding) {
-        override fun getItem(layoutPosition: Int) = this@FileTvItemAdapter.getItem(layoutPosition)
+        override fun getItem(layoutPosition: Int) = if (layoutPosition in 0 until itemCount) this@FileTvItemAdapter.getItem(layoutPosition) else null
         override fun getView() = binding.container
         init {
             binding.holder = this; binding.isPresent = true; binding.scaleType = ImageView.ScaleType.CENTER_INSIDE

@@ -200,7 +200,7 @@ class MediaScrapingTvItemAdapter(
             binding: MovieBrowserTvItemBinding,
             override val eventsHandler: IEventsHandler<MediaMetadataWithImages>
     ) : AbstractMediaScrapingItemViewHolder<MovieBrowserTvItemBinding>(binding) {
-        override fun getItem(layoutPosition: Int) = this@MediaScrapingTvItemAdapter.getItem(layoutPosition)
+        override fun getItem(layoutPosition: Int) = if (layoutPosition in 0 until itemCount) this@MediaScrapingTvItemAdapter.getItem(layoutPosition) else null
 
         init {
             binding.holder = this
@@ -278,7 +278,7 @@ class MediaScrapingTvItemAdapter(
             binding: MovieBrowserTvItemListBinding,
             override val eventsHandler: IEventsHandler<MediaMetadataWithImages>
     ) : AbstractMediaScrapingItemViewHolder<MovieBrowserTvItemListBinding>(binding) {
-        override fun getItem(layoutPosition: Int) = this@MediaScrapingTvItemAdapter.getItem(layoutPosition)
+        override fun getItem(layoutPosition: Int) = if (layoutPosition in 0 until itemCount) this@MediaScrapingTvItemAdapter.getItem(layoutPosition) else null
 
         init {
             binding.holder = this
