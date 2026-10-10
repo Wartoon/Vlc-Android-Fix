@@ -81,7 +81,10 @@ object ThumbnailsProvider {
         val cacheBM = if (hasCache) BitmapCache.getBitmapFromMemCache(getMediaCacheKey(true, media, width.toString())) else null
         if (cacheBM != null) return cacheBM
         if (hasCache && media.id > 0L && File(thumbPath).isFile) {
-            readCoverBitmap(thumbPath, width)?.let { return it }
+            readCoverBitmap(thumbPath, width)?.let { cached ->
+                BitmapCache.addBitmapToMemCache(getMediaCacheKey(true, media, width.toString()), cached)
+                return cached
+            }
             // A stale or unreadable cached JPEG must not suppress thumbnail generation.
         }
         if (media.isThumbnailGenerated) return null
