@@ -387,7 +387,8 @@ abstract class BaseBrowserTvFragment<T> : Fragment(), BrowserFragmentInterface, 
         if (view == null) {
             adapter.focusNext = positionForSectionByName
         } else {
-            binding.list.getChildAt(positionForSectionByName).requestFocus()
+            // findViewByPosition returns the visible child; getChildAt expects a viewport-relative index.
+            view.requestFocus()
         }
         binding.list.scrollToPosition(positionForSectionByName)
     }
