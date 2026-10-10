@@ -290,7 +290,7 @@ open class VideoPlayerActivity : AppCompatActivity(), PlaybackService.Callback, 
 
     lateinit var windowLayoutInfo: WindowLayoutInfo
     private var currentConfirmationDialog: AlertDialog? = null
-    val resumeDialogObserver: (t: WaitConfirmation?) -> Unit = {
+    val resumeDialogObserver = Observer<WaitConfirmation?> {
         if (it != null)
             showConfirmResumeDialog(it)
         else
@@ -992,6 +992,7 @@ open class VideoPlayerActivity : AppCompatActivity(), PlaybackService.Callback, 
         saveBrightness()
         service?.playlistManager?.resetResumeStatus()
 
+        service?.playlistManager?.waitForConfirmation?.removeObserver(resumeDialogObserver)
         service?.removeCallback(this)
         service = null
         // Clear Intent to restore playlist on activity restart
