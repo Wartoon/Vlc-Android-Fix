@@ -225,7 +225,7 @@ class MainTvFragment : BrowseSupportFragment(), OnItemViewSelectedListener, OnIt
         if (PinCodeDelegate.pinUnlocked.value == true) otherAdapter.add(lockItem)
         otherAdapter.add(GenericCardItem(ID_SETTINGS, getString(R.string.preferences), "", R.drawable.ic_settings_big, R.color.tv_card_content_dark))
         val remoteAccessCard = GenericCardItem(ID_REMOTE_ACCESS, getString(R.string.remote_access), "", R.drawable.ic_remote_access_big, R.color.tv_card_content_dark)
-        Settings.remoteAccessEnabled.observe(requireActivity()) {
+        Settings.remoteAccessEnabled.observe(viewLifecycleOwner) {
             if (it)
                 otherAdapter.add(otherAdapter.size() - 2, remoteAccessCard)
             else
@@ -239,7 +239,7 @@ class MainTvFragment : BrowseSupportFragment(), OnItemViewSelectedListener, OnIt
 //            manageDonationVisibility(donateCard)
 //        }
 
-        PinCodeDelegate.pinUnlocked.observe(requireActivity()) {
+        PinCodeDelegate.pinUnlocked.observe(viewLifecycleOwner) {
             if (it) {
                 if ((otherAdapter.get(0) as GenericCardItem).id != ID_PIN_LOCK) {
                     otherAdapter.add(0, lockItem)
@@ -277,41 +277,41 @@ class MainTvFragment : BrowseSupportFragment(), OnItemViewSelectedListener, OnIt
     }
 
     private fun registerDatasets() {
-        model.browsers.observe(requireActivity()) {
+        model.browsers.observe(viewLifecycleOwner) {
             browserAdapter.setItems(it, diffCallback)
             addAndCheckLoadedLines(HEADER_NETWORK)
         }
-        model.favoritesList.observe(requireActivity()) {
+        model.favoritesList.observe(viewLifecycleOwner) {
             displayFavorites = it.isNotEmpty()
             favoritesAdapter.setItems(it, diffCallback)
             resetLines()
         }
-        model.audioCategories.observe(requireActivity()) {
+        model.audioCategories.observe(viewLifecycleOwner) {
             categoriesAdapter.setItems(it.toList(), diffCallback)
             addAndCheckLoadedLines(HEADER_CATEGORIES)
         }
-        model.videos.observe(requireActivity()) {
+        model.videos.observe(viewLifecycleOwner) {
             videoAdapter.setItems(it, diffCallback)
             addAndCheckLoadedLines(HEADER_VIDEO)
         }
-        model.nowPlaying.observe(requireActivity()) {
+        model.nowPlaying.observe(viewLifecycleOwner) {
             displayNowPlaying = it.isNotEmpty()
             nowPlayingAdapter.setItems(it, diffCallback)
             addAndCheckLoadedLines(HEADER_NOW_PLAYING)
         }
-        model.recentlyPlayed.observe(requireActivity()) {
+        model.recentlyPlayed.observe(viewLifecycleOwner) {
             displayRecentlyPlayed = it.isNotEmpty()
             recentlyPlayedAdapter.setItems(it, metadataDiffCallback)
             resetLines()
             addAndCheckLoadedLines(HEADER_RECENTLY_PLAYED)
         }
-        model.recentlyAdded.observe(requireActivity()) {
+        model.recentlyAdded.observe(viewLifecycleOwner) {
             displayRecentlyAdded = it.isNotEmpty()
             recentlyAddedAdapter.setItems(it, metadataDiffCallback)
             resetLines()
             addAndCheckLoadedLines(HEADER_RECENTLY_ADDED)
         }
-        model.history.observe(requireActivity()) {
+        model.history.observe(viewLifecycleOwner) {
             displayHistory = it.isNotEmpty()
             if (it.isNotEmpty()) {
                 historyAdapter.setItems(it, diffCallback)
@@ -320,7 +320,7 @@ class MainTvFragment : BrowseSupportFragment(), OnItemViewSelectedListener, OnIt
             addAndCheckLoadedLines(HEADER_HISTORY)
         }
 
-        model.playlist.observe(requireActivity()) {
+        model.playlist.observe(viewLifecycleOwner) {
             displayPlaylist = it.isNotEmpty()
             playlistAdapter.setItems(it, diffCallback)
             resetLines()
