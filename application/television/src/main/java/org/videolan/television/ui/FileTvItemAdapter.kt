@@ -119,7 +119,16 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
             if (AndroidUtil.isMarshMallowOrLater) itemView.setOnContextClickListener { v -> onMoreClick(v); true }
             binding.container.layoutParams.width = itemSize
             binding.container.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
-                binding.container.post { TvAdapterUtils.itemFocusChange(hasFocus, itemSize, binding.container, false) { if (layoutPosition in dataset.indices) { eventsHandler.onItemFocused(binding.root, getItem(layoutPosition)); focusListener?.onFocusChanged(layoutPosition) } } }
+                binding.container.post {
+                if (binding.container.hasFocus() != hasFocus) return@post
+                TvAdapterUtils.itemFocusChange(hasFocus, itemSize, binding.container, false) {
+                    val position = bindingAdapterPosition
+                    if (position in dataset.indices) {
+                        eventsHandler.onItemFocused(binding.root, getItem(position))
+                        focusListener?.onFocusChanged(position)
+                    }
+                }
+            }
             }
             if (VlcMigrationHelper.isLolliPopOrLater) binding.container.clipToOutline = true
             binding.showSeen = seenMediaMarkerVisible
@@ -153,7 +162,18 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
             binding.holder = this; binding.isPresent = true; binding.scaleType = ImageView.ScaleType.CENTER_INSIDE
             defaultCover?.let { binding.cover = it }
             if (AndroidUtil.isMarshMallowOrLater) itemView.setOnContextClickListener { v -> onMoreClick(v); true }
-            binding.container.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus -> binding.container.post { TvAdapterUtils.itemFocusChange(hasFocus, itemSize, binding.container, true) { if (layoutPosition in dataset.indices) { eventsHandler.onItemFocused(binding.root, getItem(layoutPosition)); focusListener?.onFocusChanged(layoutPosition) } } } }
+            binding.container.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
+                binding.container.post {
+                    if (binding.container.hasFocus() != hasFocus) return@post
+                    TvAdapterUtils.itemFocusChange(hasFocus, itemSize, binding.container, true) {
+                        val position = bindingAdapterPosition
+                        if (position in dataset.indices) {
+                            eventsHandler.onItemFocused(binding.root, getItem(position))
+                            focusListener?.onFocusChanged(position)
+                        }
+                    }
+                }
+            }
             binding.container.clipToOutline = true; binding.showSeen = seenMediaMarkerVisible
         }
         override fun recycle() { defaultCover?.let { binding.cover = it }; binding.title.text = ""; binding.subtitle.text = ""; binding.mediaCover.resetFade() }
