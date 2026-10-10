@@ -70,8 +70,12 @@ class MediaBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>() {
         else requireActivity().intent.parcelable<Parcelable>(ITEM) as? MediaLibraryItem
 
         viewModel = getMediaBrowserModel(arguments?.getLong(CATEGORY, CATEGORY_SONGS) ?: CATEGORY_SONGS, currentItem)
+    }
 
-        (viewModel.provider as MedialibraryProvider<*>).pagedList.observe(this) { items ->
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        (viewModel.provider as MedialibraryProvider<*>).pagedList.observe(viewLifecycleOwner) { items ->
             submitList(items)
 
             binding.emptyLoading.state = if (items.isEmpty()) EmptyLoadingState.EMPTY else EmptyLoadingState.NONE
@@ -83,12 +87,12 @@ class MediaBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>() {
             headerAdapter.sortType = (viewModel as MediaBrowserViewModel).sort
         }
 
-        viewModel.provider.liveHeaders.observe(this) {
+        viewModel.provider.liveHeaders.observe(viewLifecycleOwner) {
             updateHeaders(it)
             binding.list.invalidateItemDecorations()
         }
 
-        (viewModel.provider as MedialibraryProvider<*>).loading.observe(this) {
+        (viewModel.provider as MedialibraryProvider<*>).loading.observe(viewLifecycleOwner) {
             binding.emptyLoading.state = when {
                 it -> EmptyLoadingState.LOADING
                 viewModel.isEmpty() && adapter.isEmpty() -> EmptyLoadingState.EMPTY

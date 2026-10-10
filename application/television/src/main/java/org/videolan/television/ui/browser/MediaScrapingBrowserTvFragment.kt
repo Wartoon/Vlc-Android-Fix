@@ -80,27 +80,27 @@ class MediaScrapingBrowserTvFragment : BaseBrowserTvFragment<MediaMetadataWithIm
 
         viewModel = getMoviepediaBrowserModel(arguments?.getLong(CATEGORY, HEADER_MOVIES)
                 ?: HEADER_MOVIES)
+    }
 
-        (viewModel.provider as MediaScrapingProvider).pagedList.observe(this) { items ->
-            binding.emptyLoading.post {
-                submitList(items)
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
 
-                binding.emptyLoading.state = if (items.isEmpty()) EmptyLoadingState.EMPTY else EmptyLoadingState.NONE
+        (viewModel.provider as MediaScrapingProvider).pagedList.observe(viewLifecycleOwner) { items ->
+            submitList(items)
+            binding.emptyLoading.state = if (items.isEmpty()) EmptyLoadingState.EMPTY else EmptyLoadingState.NONE
 
-                //headers
-                val nbColumns = if ((viewModel as MediaScrapingBrowserViewModel).sort == Medialibrary.SORT_ALPHA || (viewModel as MediaScrapingBrowserViewModel).sort == Medialibrary.SORT_DEFAULT) 9 else 1
-
-                binding.headerList.layoutManager = GridLayoutManager(requireActivity(), nbColumns)
-                headerAdapter.sortType = (viewModel as MediaScrapingBrowserViewModel).sort
-            }
+            //headers
+            val nbColumns = if ((viewModel as MediaScrapingBrowserViewModel).sort == Medialibrary.SORT_ALPHA || (viewModel as MediaScrapingBrowserViewModel).sort == Medialibrary.SORT_DEFAULT) 9 else 1
+            binding.headerList.layoutManager = GridLayoutManager(requireActivity(), nbColumns)
+            headerAdapter.sortType = (viewModel as MediaScrapingBrowserViewModel).sort
         }
 
-        viewModel.provider.liveHeaders.observe(this) {
+        viewModel.provider.liveHeaders.observe(viewLifecycleOwner) {
             updateHeaders(it)
             binding.list.invalidateItemDecorations()
         }
 
-        (viewModel.provider as MediaScrapingProvider).loading.observe(this) {
+        (viewModel.provider as MediaScrapingProvider).loading.observe(viewLifecycleOwner) {
             if (it) binding.emptyLoading.state = EmptyLoadingState.LOADING
         }
     }
