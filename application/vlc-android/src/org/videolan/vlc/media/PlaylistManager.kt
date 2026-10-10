@@ -1209,6 +1209,7 @@ class PlaylistManager(val service: PlaybackService) : MediaWrapperList.EventList
 
     private val mediaplayerEventListener = object : MediaPlayerEventListener {
         private var lastTimeMetaSaved = 0L
+        private var lastPositionSavedAt = 0L
 
         override suspend fun onEvent(event: MediaPlayer.Event) {
             when (event.type) {
@@ -1284,7 +1285,11 @@ class PlaylistManager(val service: PlaybackService) : MediaWrapperList.EventList
                             || (!fastSeek && player.getCurrentTime() < it.start))
                             service.setTime(it.start, false)
                     }
-                    if (player.getCurrentTime() % 10 == 0L) savePosition()
+                    val elapsed = android.os.SystemClock.elapsedRealtime()
+                    if (elapsed - lastPositionSavedAt >= 10_000L) {
+                        lastPositionSavedAt = elapsed
+                        savePosition()
+                    }
                     val now = System.currentTimeMillis()
                     if (now - lastTimeMetaSaved > 5000L){
                         lastTimeMetaSaved = now
