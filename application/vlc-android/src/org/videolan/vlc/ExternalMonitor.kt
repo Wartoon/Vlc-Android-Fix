@@ -62,7 +62,8 @@ object ExternalMonitor : BroadcastReceiver(), DefaultLifecycleObserver, Coroutin
     private var registered = false
 
     @OptIn(ObsoleteCoroutinesApi::class)
-    private val actor = actor<DeviceAction>(capacity = Channel.CONFLATED) {
+    // Mount and unmount events must be processed in order; conflation can discard transitions.
+    private val actor = actor<DeviceAction>(capacity = Channel.UNLIMITED) {
         for (action in channel) when (action){
             is MediaMounted -> {
                 if (action.uuid.isEmpty()) return@actor
