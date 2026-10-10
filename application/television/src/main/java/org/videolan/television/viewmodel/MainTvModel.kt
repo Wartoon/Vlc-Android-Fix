@@ -37,6 +37,7 @@ import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.ObsoleteCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.actor
@@ -110,6 +111,12 @@ class MainTvModel(app: Application) : AndroidViewModel(app), Medialibrary.OnMedi
     private val showInternalStorage = AndroidDevices.showInternalStorage()
     private val browserFavRepository = BrowserFavRepository.getInstance(context)
     private val mediaMetadataRepository = MediaMetadataRepository.getInstance(context)
+    private val allVideoMetadata = mediaMetadataRepository.getAllLive()
+    private val recentlyAddedSource = mediaMetadataRepository.getRecentlyAdded()
+    private var recentlyPlayedSource: LiveData<List<MediaMetadataWithImages>>? = null
+    private var recentlyPlayedUpdateJob: Job? = null
+    private var recentlyPlayedIds: Set<Long>? = null
+    private var recentlyPlayedOrder: Map<Long, Int> = emptyMap()
     private var updatedFavoriteList: List<MediaWrapper> = listOf()
     var showHistory = false
         private set
@@ -154,14 +161,14 @@ class MainTvModel(app: Application) : AndroidViewModel(app), Medialibrary.OnMedi
         networkMonitor.connectionFlow.onEach { updateActor.trySend(Unit) }.launchIn(viewModelScope)
         ExternalMonitor.storageEvents.onEach { updateActor.trySend(Unit) }.launchIn(viewModelScope)
         PlaylistManager.showAudioPlayer.observeForever(playerObserver)
-        mediaMetadataRepository.getAllLive().observeForever(videoObserver)
+        allVideoMetadata.observeForever(videoObserver)
+        recentlyAdded.addSource(recentlyAddedSource) { recentlyAdded.value = it }
     }
 
     fun refresh() = viewModelScope.launch {
         updateNowPlaying()
         updateVideos()
         updateRecentlyPlayed()
-        updateRecentlyAdded()
         updateAudioCategories()
         historyActor.trySend(Unit)
         updateActor.trySend(Unit)
@@ -206,19 +213,29 @@ class MainTvModel(app: Application) : AndroidViewModel(app), Medialibrary.OnMedi
         }
     }
 
-    private fun updateRecentlyPlayed() = viewModelScope.launch {
-        val history = context.getFromMl { history(Medialibrary.HISTORY_TYPE_LOCAL).toMutableList() }
-        recentlyPlayed.addSource(withContext(Dispatchers.IO) { mediaMetadataRepository.getByIds(history.map { it.id }) }) {
-            recentlyPlayed.value = it.sortedBy { history.indexOf(history.find { media -> media.id == it.metadata.mlId }) }
-        }
+    private fun updateRecentlyPlayed() {
+        recentlyPlayedUpdateJob?.cancel()
+        recentlyPlayedUpdateJob = viewModelScope.launch {
+            val history = context.getFromMl { history(Medialibrary.HISTORY_TYPE_LOCAL).toMutableList() }
+            val ids = history.map { it.id }.distinct()
+            recentlyPlayedOrder = ids.withIndex().associate { it.value to it.index }
+            val idSet = ids.toSet()
 
+            if (recentlyPlayedSource != null && recentlyPlayedIds == idSet) {
+                recentlyPlayedSource?.value?.let { updateRecentlyPlayedItems(it) }
+                return@launch
+            }
+
+            val source = withContext(Dispatchers.IO) { mediaMetadataRepository.getByIds(ids) }
+            recentlyPlayedSource?.let { recentlyPlayed.removeSource(it) }
+            recentlyPlayedSource = source
+            recentlyPlayedIds = idSet
+            recentlyPlayed.addSource(source) { updateRecentlyPlayedItems(it) }
+        }
     }
 
-    private fun updateRecentlyAdded() = viewModelScope.launch {
-        recentlyAdded.addSource(withContext(Dispatchers.IO) { mediaMetadataRepository.getRecentlyAdded() }) {
-            recentlyAdded.value = it
-        }
-
+    private fun updateRecentlyPlayedItems(items: List<MediaMetadataWithImages>) {
+        recentlyPlayed.value = items.sortedBy { recentlyPlayedOrder[it.metadata.mlId] ?: Int.MAX_VALUE }
     }
 
     fun updateNowPlaying() = viewModelScope.launch {
@@ -307,6 +324,9 @@ class MainTvModel(app: Application) : AndroidViewModel(app), Medialibrary.OnMedi
         medialibrary.removeOnDeviceChangeListener(this)
         favorites.removeObserver(favObserver)
         PlaylistManager.showAudioPlayer.removeObserver(playerObserver)
+        allVideoMetadata.removeObserver(videoObserver)
+        recentlyPlayedSource?.let { recentlyPlayed.removeSource(it) }
+        recentlyAdded.removeSource(recentlyAddedSource)
         nowPlayingDelegate.onClear()
     }
 
