@@ -195,7 +195,7 @@ abstract class BaseBrowserTvFragment<T> : Fragment(), BrowserFragmentInterface, 
                     if (previouslySelectedItem != -1 && binding.list.adapter?.itemCount ?: 0 > previouslySelectedItem) {
                         scrollToPosition(previouslySelectedItem)
                         binding.list.findViewHolderForLayoutPosition(previouslySelectedItem)?.let { holder ->
-                            (holder as MediaTvItemAdapter.AbstractMediaItemViewHolder<*>).getView().requestFocus()
+                            holder.itemView.requestFocus()
                             previouslySelectedItem = -1
                         }
                     }
@@ -227,7 +227,7 @@ abstract class BaseBrowserTvFragment<T> : Fragment(), BrowserFragmentInterface, 
                     if (previouslySelectedItem != -1 && binding.list.adapter?.itemCount ?: 0 > previouslySelectedItem) {
                         scrollToPosition(previouslySelectedItem)
                         binding.list.findViewHolderForLayoutPosition(previouslySelectedItem)?.let { holder ->
-                            (holder as MediaTvItemAdapter.AbstractMediaItemViewHolder<*>).getView().requestFocus()
+                            holder.itemView.requestFocus()
                             previouslySelectedItem = -1
                         }
                     }
