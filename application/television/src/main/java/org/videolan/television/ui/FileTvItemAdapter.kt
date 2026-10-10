@@ -124,8 +124,10 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
                 TvAdapterUtils.itemFocusChange(hasFocus, itemSize, binding.container, false) {
                     val position = bindingAdapterPosition
                     if (position in dataset.indices) {
-                        eventsHandler.onItemFocused(binding.root, getItem(position))
-                        focusListener?.onFocusChanged(position)
+                        getItem(position)?.let { item ->
+                            eventsHandler.onItemFocused(binding.root, item)
+                            focusListener?.onFocusChanged(position)
+                        }
                     }
                 }
             }
@@ -168,8 +170,10 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
                     TvAdapterUtils.itemFocusChange(hasFocus, itemSize, binding.container, true) {
                         val position = bindingAdapterPosition
                         if (position in dataset.indices) {
-                            eventsHandler.onItemFocused(binding.root, getItem(position))
-                            focusListener?.onFocusChanged(position)
+                            getItem(position)?.let { item ->
+                                eventsHandler.onItemFocused(binding.root, item)
+                                focusListener?.onFocusChanged(position)
+                            }
                         }
                     }
                 }
