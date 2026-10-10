@@ -157,7 +157,7 @@ class MainTvFragment : BrowseSupportFragment(), OnItemViewSelectedListener, OnIt
             .onCompletion {
                 service?.removeCallback(this@MainTvFragment)
             }
-            .launchIn(AppScope)
+            .launchIn(lifecycleScope)
     }
 
     /**
