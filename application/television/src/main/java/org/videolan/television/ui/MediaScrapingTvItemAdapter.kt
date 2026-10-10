@@ -211,9 +211,12 @@ class MediaScrapingTvItemAdapter(
             binding.container.layoutParams.width = itemSize
             binding.container.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
                 TvAdapterUtils.itemFocusChange(hasFocus, itemSize, binding.container, false) {
-                    eventsHandler.onItemFocused(binding.root, getItem(layoutPosition)!!)
-                    if (focusListener != null) {
-                        focusListener!!.onFocusChanged(layoutPosition)
+                    val position = bindingAdapterPosition
+                    if (position != androidx.recyclerview.widget.RecyclerView.NO_POSITION && position < itemCount) {
+                        getItem(position)?.let { item ->
+                            eventsHandler.onItemFocused(binding.root, item)
+                            focusListener?.onFocusChanged(position)
+                        }
                     }
                 }
             }
@@ -285,9 +288,12 @@ class MediaScrapingTvItemAdapter(
                 }
             binding.container.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
                 TvAdapterUtils.itemFocusChange(hasFocus, itemSize, binding.container, true) {
-                    eventsHandler.onItemFocused(binding.root, getItem(layoutPosition)!!)
-                    if (focusListener != null) {
-                        focusListener!!.onFocusChanged(layoutPosition)
+                    val position = bindingAdapterPosition
+                    if (position != androidx.recyclerview.widget.RecyclerView.NO_POSITION && position < itemCount) {
+                        getItem(position)?.let { item ->
+                            eventsHandler.onItemFocused(binding.root, item)
+                            focusListener?.onFocusChanged(position)
+                        }
                     }
                 }
             }
