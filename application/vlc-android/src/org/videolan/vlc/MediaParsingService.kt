@@ -390,31 +390,31 @@ class MediaParsingService : LifecycleService(), DevicesDiscoveryCb {
     private suspend fun updateStorages() {
         serviceLock = true
         try {
-        val (devices, knownDevices) = withContext(Dispatchers.IO) {
-            val devices = AndroidDevices.externalStorageDirectories
-            Pair(devices, medialibrary.devices)
-        }
-        val missingDevices = knownDevices.toMutableList()
-        missingDevices.remove("file://${AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY}")
-        for (device in devices) {
-            val uuid = FileUtils.getFileNameFromPath(device)
-            if (device.isEmpty() || uuid.isEmpty() || !device.scanAllowed()) continue
-            if (containsDevice(knownDevices, device)) {
-                missingDevices.remove("file://$device")
-                continue
+            val (devices, knownDevices) = withContext(Dispatchers.IO) {
+                val devices = AndroidDevices.externalStorageDirectories
+                Pair(devices, medialibrary.devices)
             }
-             val isNew = withContext(Dispatchers.IO) {
-                 val isNewForML = !medialibrary.isDeviceKnown(uuid, device, true)
-                 medialibrary.addDevice(uuid, device, true)
-                 isNewForML
-             }
-            if (isNew) showStorageNotification(device)
-        }
-        withContext(Dispatchers.IO) { for (device in missingDevices) {
-            val uri = device.toUri()
-            Log.i("MediaParsingService", "Storage management: storage missing: ${uri.path}")
-            medialibrary.removeDevice(uri.lastPathSegment, uri.path)
-        } }
+            val missingDevices = knownDevices.toMutableList()
+            missingDevices.remove("file://${AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY}")
+            for (device in devices) {
+                val uuid = FileUtils.getFileNameFromPath(device)
+                if (device.isEmpty() || uuid.isEmpty() || !device.scanAllowed()) continue
+                if (containsDevice(knownDevices, device)) {
+                    missingDevices.remove("file://$device")
+                    continue
+                }
+                 val isNew = withContext(Dispatchers.IO) {
+                     val isNewForML = !medialibrary.isDeviceKnown(uuid, device, true)
+                     medialibrary.addDevice(uuid, device, true)
+                     isNewForML
+                 }
+                if (isNew) showStorageNotification(device)
+            }
+            withContext(Dispatchers.IO) { for (device in missingDevices) {
+                val uri = device.toUri()
+                Log.i("MediaParsingService", "Storage management: storage missing: ${uri.path}")
+                medialibrary.removeDevice(uri.lastPathSegment, uri.path)
+            } }
         } finally {
             // Do not leave the service locked if storage enumeration or medialibrary I/O fails.
             serviceLock = false
