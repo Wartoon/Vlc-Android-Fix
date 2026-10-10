@@ -109,22 +109,17 @@ class VerticalGridActivity : BaseTvActivity(), BrowserActivityInterface {
     }
 
     override fun refresh() {
-        fragment.refresh()
+        (supportFragmentManager.findFragmentById(R.id.tv_fragment_placeholder) as? BrowserFragmentInterface)?.refresh()
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (::fragment.isInitialized) {
-            if (fragment is DetailsFragment && (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == KeyEvent.KEYCODE_BUTTON_Y || keyCode == KeyEvent.KEYCODE_Y)) {
-                (fragment as DetailsFragment).showDetails()
-                return true
-            }
-            try {
-                if ((supportFragmentManager.fragments[0] as? OnKeyPressedListener)?.onKeyPressed(keyCode) == true) {
-                    return true
-                }
-            } catch (e: IndexOutOfBoundsException) {
-            }
+        val currentFragment = supportFragmentManager.findFragmentById(R.id.tv_fragment_placeholder)
+        if (currentFragment is DetailsFragment &&
+            (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == KeyEvent.KEYCODE_BUTTON_Y || keyCode == KeyEvent.KEYCODE_Y)) {
+            currentFragment.showDetails()
+            return true
         }
+        if ((currentFragment as? OnKeyPressedListener)?.onKeyPressed(keyCode) == true) return true
         return super.onKeyDown(keyCode, event)
     }
 
