@@ -113,7 +113,7 @@ object ThumbnailsProvider {
 
     suspend fun getPlaylistOrGenreImage(key: String, mediaList: List<MediaWrapper>, width: Int, iconAddition: Bitmap? = null): Bitmap? {
         // to force the thumbnail regeneration on change, we append the ids of the media that will be used to the cache key
-        val saltedKey = key + getArtworkListForPlaylistOrGenre(mediaList).joinToString("_", ":") { it.id.toString() }
+        val saltedKey = key + ":" + width + getArtworkListForPlaylistOrGenre(mediaList).joinToString("_", ":") { "${it.id}:${it.artworkURL.orEmpty()}" }
         if (BuildConfig.DEBUG) Log.d(this::class.java.simpleName, "Salted key from $key is $saltedKey")
         return (BitmapCache.getBitmapFromMemCache(saltedKey) ?: composePlaylistOrGenreImage(mediaList, width, iconAddition))?.also {
             BitmapCache.addBitmapToMemCache(saltedKey, it)
