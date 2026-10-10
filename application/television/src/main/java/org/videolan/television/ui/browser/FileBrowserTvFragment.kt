@@ -89,11 +89,12 @@ class FileBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>(), PathAda
             } else null
             if (selectedIndex != null) {
                 val lm = binding.list.layoutManager as LinearLayoutManager
+                // Adapter positions are not indices into the currently attached child views.
+                val visibleItem = lm.findViewByPosition(selectedIndex)
+                if (visibleItem != null) visibleItem.requestFocus()
+                else fileTvItemAdapter.focusNext = selectedIndex
                 lm.scrollToPosition(selectedIndex)
-                lm.getChildAt(selectedIndex)?.let {
-                    it.requestFocus()
-                    (viewModel as IPathOperationDelegate).consumeSource()
-                }
+                (viewModel as IPathOperationDelegate).consumeSource()
             }
         }
         return fileTvItemAdapter
