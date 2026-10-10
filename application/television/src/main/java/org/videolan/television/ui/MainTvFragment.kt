@@ -79,7 +79,6 @@ import org.videolan.television.ui.browser.VerticalGridActivity
 import org.videolan.television.ui.preferences.PreferencesActivity
 import org.videolan.television.viewmodel.MainTvModel
 import org.videolan.television.viewmodel.MainTvModel.Companion.getMainTvModel
-import org.videolan.tools.AppScope
 import org.videolan.tools.Settings
 import org.videolan.vlc.BuildConfig
 import org.videolan.vlc.PlaybackService
