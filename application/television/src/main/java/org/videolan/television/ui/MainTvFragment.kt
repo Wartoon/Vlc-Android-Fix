@@ -165,13 +165,10 @@ class MainTvFragment : BrowseSupportFragment(), OnItemViewSelectedListener, OnIt
      * @param service the service to listen
      */
     private fun onServiceChanged(service: PlaybackService?) {
-        if (service !== null) {
-            this.service = service
-            service.addCallback(this)
-        } else this.service?.let {
-            it.removeCallback(this)
-            this.service = null
-        }
+        if (this.service === service) return
+        this.service?.removeCallback(this)
+        this.service = service
+        service?.addCallback(this)
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
