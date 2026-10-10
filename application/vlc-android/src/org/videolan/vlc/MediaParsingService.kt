@@ -223,6 +223,8 @@ class MediaParsingService : LifecycleService(), DevicesDiscoveryCb {
             exitCommand()
             return START_NOT_STICKY
         }
+        // Acquire before dispatch: synchronous exits and fast actor jobs may release it.
+        if (!wakeLock.isHeld) wakeLock.acquire()
         when (intent.action) {
             ACTION_INIT -> {
                 val upgrade = intent.getBooleanExtra(EXTRA_UPGRADE, false)
@@ -232,8 +234,8 @@ class MediaParsingService : LifecycleService(), DevicesDiscoveryCb {
             }
             ACTION_RELOAD -> actions.trySend(Reload(intent.getStringExtra(EXTRA_PATH)))
             ACTION_FORCE_RELOAD -> actions.trySend(ForceReload)
-            ACTION_DISCOVER -> intent.getStringExtra(EXTRA_PATH)?.let { discover(it) }
-            ACTION_DISCOVER_DEVICE -> intent.getStringExtra(EXTRA_PATH)?.let { discoverStorage(it) }
+            ACTION_DISCOVER -> intent.getStringExtra(EXTRA_PATH)?.let { discover(it) } ?: exitCommand()
+            ACTION_DISCOVER_DEVICE -> intent.getStringExtra(EXTRA_PATH)?.let { discoverStorage(it) } ?: exitCommand()
             ACTION_CHECK_STORAGES -> if (settings.getInt(KEY_MEDIALIBRARY_SCAN, -1) != ML_SCAN_OFF) actions.trySend(UpdateStorages) else {
                 exitCommand()
                 return START_NOT_STICKY
@@ -243,7 +245,6 @@ class MediaParsingService : LifecycleService(), DevicesDiscoveryCb {
                 return START_NOT_STICKY
             }
         }
-        if (!wakeLock.isHeld) wakeLock.acquire()
         return START_NOT_STICKY
     }
 
