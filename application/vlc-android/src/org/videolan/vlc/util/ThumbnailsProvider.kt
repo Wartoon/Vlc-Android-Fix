@@ -222,10 +222,12 @@ object ThumbnailsProvider {
 
     @WorkerThread
     fun getComposedImage(key: String, mediaList: List<MediaWrapper>, width: Int): Bitmap? {
-        var composedImage = BitmapCache.getBitmapFromMemCache(key)
+        // Invalidate folder/group covers when their source thumbnails or requested size change.
+        val cacheKey = "$key:$width:" + mediaList.take(MAX_IMAGES).joinToString("_") { "${it.id}:${it.artworkURL.orEmpty()}" }
+        var composedImage = BitmapCache.getBitmapFromMemCache(cacheKey)
         if (composedImage == null) {
             composedImage = composeImage(mediaList, width)
-            if (composedImage != null) BitmapCache.addBitmapToMemCache(key, composedImage)
+            if (composedImage != null) BitmapCache.addBitmapToMemCache(cacheKey, composedImage)
         }
         return composedImage
     }
