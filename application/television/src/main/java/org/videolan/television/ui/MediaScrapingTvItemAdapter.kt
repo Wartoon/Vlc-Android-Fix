@@ -109,6 +109,9 @@ class MediaScrapingTvItemAdapter(
                 val isSelected = payload.hasStateFlags(MediaLibraryItem.FLAG_SELECTED)
                 holder.setCoverlay(isSelected)
                 holder.selectView(isSelected)
+            } else {
+                // Metadata diff payloads must also refresh title, progress and artwork.
+                onBindViewHolder(holder, position)
             }
         }
     }
