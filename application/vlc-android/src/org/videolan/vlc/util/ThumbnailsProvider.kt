@@ -78,7 +78,8 @@ object ThumbnailsProvider {
         if (appDir == null) appDir = AppContextProvider.appContext.getExternalFilesDir(null)
         val hasCache = appDir?.exists() == true
         val thumbPath = getMediaThumbnailPath(true, media) ?: return null
-        val cacheBM = if (hasCache) BitmapCache.getBitmapFromMemCache(getMediaCacheKey(true, media, width.toString())) else null
+        // Memory-cached thumbnails remain usable even when external disk storage is unavailable.
+        val cacheBM = BitmapCache.getBitmapFromMemCache(getMediaCacheKey(true, media, width.toString()))
         if (cacheBM != null) return cacheBM
         if (hasCache && media.id > 0L && File(thumbPath).isFile) {
             readCoverBitmap(thumbPath, width)?.let { cached ->
