@@ -101,12 +101,10 @@ object ThumbnailsProvider {
         }
         if (bitmap != null) {
             BitmapCache.addBitmapToMemCache(getMediaCacheKey(true, media, width.toString()), bitmap)
-            if (hasCache) {
+            if (hasCache && media.id > 0L) {
+                BitmapUtil.saveOnDisk(bitmap!!, thumbPath)
                 media.setThumbnail(thumbPath)
-                if (media.id > 0) {
-                    BitmapUtil.saveOnDisk(bitmap!!, thumbPath)
-                    media.artworkURL = thumbPath
-                }
+                media.artworkURL = thumbPath
             }
         } else if (media.id != 0L) {
             media.requestThumbnail(width, 0.4f)
