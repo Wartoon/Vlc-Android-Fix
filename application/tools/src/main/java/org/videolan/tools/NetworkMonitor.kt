@@ -69,7 +69,8 @@ class NetworkMonitor(private val context: Context) : DefaultLifecycleObserver {
     private fun updateVPNStatus(): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             for (network in cm.allNetworks) {
-                val nc = cm.getNetworkCapabilities(network) ?: return false
+                // A network without capabilities must not hide a VPN on another network.
+                val nc = cm.getNetworkCapabilities(network) ?: continue
                 if (nc.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) return true
             }
             return false
