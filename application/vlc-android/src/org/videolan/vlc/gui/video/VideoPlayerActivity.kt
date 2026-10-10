@@ -789,7 +789,7 @@ open class VideoPlayerActivity : AppCompatActivity(), PlaybackService.Callback, 
             lastTime = -1
             forcedTime = lastTime
             enableSubs()
-            if (this.isPlaying) loadMedia(forceUsingNew = true)
+            loadMedia(forceUsingNew = true)
         }
     }
 
