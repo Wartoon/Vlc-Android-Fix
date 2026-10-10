@@ -150,7 +150,7 @@ class MediaScrapingTvItemAdapter(
         private val DIFF_CALLBACK = object : DiffUtil.ItemCallback<MediaMetadataWithImages>() {
             override fun areItemsTheSame(
                     oldMedia: MediaMetadataWithImages, newMedia: MediaMetadataWithImages) = if (preventNextAnim) true
-            else oldMedia === newMedia
+            else oldMedia.metadata.moviepediaId == newMedia.metadata.moviepediaId
 
             override fun areContentsTheSame(oldMedia: MediaMetadataWithImages, newMedia: MediaMetadataWithImages) = false
 
