@@ -389,6 +389,7 @@ class MediaParsingService : LifecycleService(), DevicesDiscoveryCb {
 
     private suspend fun updateStorages() {
         serviceLock = true
+        try {
         val (devices, knownDevices) = withContext(Dispatchers.IO) {
             val devices = AndroidDevices.externalStorageDirectories
             Pair(devices, medialibrary.devices)
@@ -414,8 +415,11 @@ class MediaParsingService : LifecycleService(), DevicesDiscoveryCb {
             Log.i("MediaParsingService", "Storage management: storage missing: ${uri.path}")
             medialibrary.removeDevice(uri.lastPathSegment, uri.path)
         } }
-        serviceLock = false
-        exitCommand()
+        } finally {
+            // Do not leave the service locked if storage enumeration or medialibrary I/O fails.
+            serviceLock = false
+            exitCommand()
+        }
     }
 
     private suspend fun showNotification(done:Int, scheduled: Int) {
