@@ -91,4 +91,5 @@ class NetworkMonitor(private val context: Context) : DefaultLifecycleObserver {
     companion object : SingletonHolder<NetworkMonitor, Context>({ NetworkMonitor(it.applicationContext) })
 }
 
-class Connection(val connected: Boolean, val mobile: Boolean, val vpn: Boolean)
+// StateFlow suppresses unchanged connectivity states only when values compare equal.
+data class Connection(val connected: Boolean, val mobile: Boolean, val vpn: Boolean)
