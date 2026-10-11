@@ -2,6 +2,9 @@ package org.videolan.vlc.util
 
 
 import android.graphics.Bitmap
+import android.graphics.Color
+import android.media.MediaMetadataRetriever
+import android.os.Build
 import android.graphics.Canvas
 import android.graphics.Rect
 import android.media.ThumbnailUtils
@@ -36,6 +39,89 @@ object ThumbnailsProvider {
     private var cacheDir: String? = null
     private const val MAX_IMAGES = 4
     private val lock = Any()
+    // One extra frame-selection attempt per dark local video, bounded in memory and work.
+    private val checkedDarkVideos = LinkedHashSet<String>()
+    private const val MAX_DARK_CHECKS = 256
+
+    private fun blackFraction(bitmap: Bitmap): Float {
+        if (bitmap.width <= 0 || bitmap.height <= 0) return 0f
+        var dark = 0
+        try {
+            for (y in 1..7) for (x in 1..7) {
+                val pixel = bitmap.getPixel(bitmap.width * x / 8, bitmap.height * y / 8)
+                val brightness = (Color.red(pixel) * 3 + Color.green(pixel) * 6 + Color.blue(pixel)) / 10
+                if (brightness < 28) dark++
+            }
+        } catch (_: IllegalStateException) {
+            return 0f // Do not attempt CPU sampling of hardware bitmaps.
+        }
+        return dark / 49f
+    }
+
+    /** Retry only substantially black frames, preserving good existing thumbnails. */
+    private fun betterLocalVideoFrame(media: MediaWrapper, original: Bitmap): Bitmap? {
+        if (!media.uri.scheme.isSchemeFile() || Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) return null
+        val initialBlack = blackFraction(original)
+        if (initialBlack < 0.8f) return null
+        synchronized(lock) {
+            val key = media.uri.toString()
+            if (key in checkedDarkVideos || checkedDarkVideos.size >= MAX_DARK_CHECKS) return null
+            checkedDarkVideos.add(key)
+        }
+        val sourcePath = media.uri.path ?: return null
+        val retriever = MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(sourcePath)
+            val durationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+                    ?: return null
+            if (durationMs <= 0L) return null
+            val originalMax = maxOf(original.width, original.height)
+            if (originalMax <= 0) return null
+            val scale = minOf(1f, 384f / originalMax)
+            val targetWidth = (original.width * scale).toInt().coerceAtLeast(1)
+            val targetHeight = (original.height * scale).toInt().coerceAtLeast(1)
+            var best: Bitmap? = null
+            var bestBlack = initialBlack
+            for (position in floatArrayOf(0.22f, 0.52f, 0.76f)) {
+                val frame = try {
+                    retriever.getScaledFrameAtTime((durationMs * 1000 * position).toLong(),
+                            MediaMetadataRetriever.OPTION_CLOSEST_SYNC, targetWidth, targetHeight)
+                } catch (_: RuntimeException) {
+                    null
+                } ?: continue
+                val fraction = blackFraction(frame)
+                if (fraction < bestBlack) {
+                    best = frame
+                    bestBlack = fraction
+                }
+                if (bestBlack < 0.35f) break
+            }
+            // Never overwrite a valid dark scene for a merely marginal improvement.
+            return best?.takeIf { bestBlack <= initialBlack - 0.2f }
+        } catch (_: RuntimeException) {
+            return null
+        } finally {
+            try { retriever.release() } catch (_: RuntimeException) {}
+        }
+    }
+
+    private fun isOurLocalVideoThumbnail(media: MediaWrapper): Boolean {
+        if (media.type != MediaWrapper.TYPE_VIDEO || !media.uri.scheme.isSchemeFile() || media.id <= 0L) return false
+        val folder = AppContextProvider.appContext.getExternalFilesDir(null) ?: return false
+        val artwork = Uri.decode(media.artworkMrl ?: return false).removePrefix("file://")
+        return artwork == "${folder.absolutePath}$MEDIALIB_FOLDER_NAME/${media.id}.jpg"
+    }
+
+    private fun improveCachedVideoThumbnail(media: MediaWrapper, original: Bitmap, path: String, width: Int): Bitmap {
+        val better = betterLocalVideoFrame(media, original) ?: return original
+        if (media.id > 0L && File(path).isFile && BitmapUtil.saveOnDisk(better, path)) {
+            media.setThumbnail(path)
+            media.artworkURL = path
+        }
+        BitmapCache.replaceBitmapInMemCache(getMediaCacheKey(true, media, width.toString()), better)
+        BitmapCache.replaceBitmapInMemCache(path + "_$width", better)
+        return better
+    }
 
     @WorkerThread
     fun getFolderThumbnail(folder: Folder, width: Int): Bitmap? {
@@ -51,7 +137,7 @@ object ThumbnailsProvider {
 
     @WorkerThread
     fun getMediaThumbnail(item: MediaWrapper, width: Int): Bitmap? {
-        return if (isMediaVideo(item))
+        return if (isMediaVideo(item) || isOurLocalVideoThumbnail(item))
             getVideoThumbnail(item, width)
         else
             readCoverBitmap(Uri.decode(item.artworkMrl), width)
@@ -79,12 +165,14 @@ object ThumbnailsProvider {
         val hasCache = appDir?.exists() == true
         val thumbPath = getMediaThumbnailPath(true, media) ?: return null
         // Memory-cached thumbnails remain usable even when external disk storage is unavailable.
-        val cacheBM = BitmapCache.getBitmapFromMemCache(getMediaCacheKey(true, media, width.toString()))
-        if (cacheBM != null) return cacheBM
+        val cacheKey = getMediaCacheKey(true, media, width.toString())
+        val cacheBM = BitmapCache.getBitmapFromMemCache(cacheKey)
+        if (cacheBM != null) return improveCachedVideoThumbnail(media, cacheBM, thumbPath, width)
         if (hasCache && media.id > 0L && File(thumbPath).isFile) {
             readCoverBitmap(thumbPath, width)?.let { cached ->
-                BitmapCache.addBitmapToMemCache(getMediaCacheKey(true, media, width.toString()), cached)
-                return cached
+                val selected = improveCachedVideoThumbnail(media, cached, thumbPath, width)
+                BitmapCache.addBitmapToMemCache(cacheKey, selected)
+                return selected
             }
             // A stale or unreadable cached JPEG must not suppress thumbnail generation.
         }
@@ -101,7 +189,8 @@ object ThumbnailsProvider {
             }
         }
         if (bitmap != null) {
-            BitmapCache.addBitmapToMemCache(getMediaCacheKey(true, media, width.toString()), bitmap)
+            bitmap = betterLocalVideoFrame(media, bitmap!!) ?: bitmap
+            BitmapCache.addBitmapToMemCache(cacheKey, bitmap)
             if (hasCache && media.id > 0L) {
                 BitmapUtil.saveOnDisk(bitmap!!, thumbPath)
                 media.setThumbnail(thumbPath)

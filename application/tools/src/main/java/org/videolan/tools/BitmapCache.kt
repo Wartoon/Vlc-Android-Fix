@@ -88,6 +88,11 @@ object BitmapCache {
     }
 
     @Synchronized
+    fun replaceBitmapInMemCache(key: String?, bitmap: Bitmap?) {
+        if (key != null && bitmap != null) memCache.put(key, bitmap)
+    }
+
+    @Synchronized
     fun clear() {
         memCache.evictAll()
     }
