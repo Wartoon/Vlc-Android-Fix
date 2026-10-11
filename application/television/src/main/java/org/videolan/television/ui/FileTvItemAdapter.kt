@@ -31,6 +31,28 @@ import org.videolan.vlc.gui.view.FastScroller
 import org.videolan.vlc.interfaces.IEventsHandler
 import org.videolan.vlc.util.generateResolutionClass
 
+internal data class FileTvItemContentSignature(
+    val description: String?,
+    val title: String?,
+    val time: Long,
+    val displayTime: Long,
+    val length: Long,
+    val seen: Long,
+    val width: Int,
+    val height: Int
+)
+
+internal fun MediaWrapper.toFileTvItemContentSignature() = FileTvItemContentSignature(
+    description = description,
+    title = title,
+    time = time,
+    displayTime = displayTime,
+    length = length,
+    seen = seen,
+    width = width,
+    height = height
+)
+
 class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryItem>, var itemSize: Int, private val showProtocol: Boolean, private var inGrid: Boolean = true) : DiffUtilAdapter<MediaWrapper, MediaTvItemAdapter.AbstractMediaItemViewHolder<ViewDataBinding>>(), FastScroller.SeparatedAdapter, TvItemAdapter {
 
     override fun submitList(pagedList: Any?) {
@@ -96,12 +118,7 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
         override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
             val oldItem = oldList[oldItemPosition]
             val newItem = newList[newItemPosition]
-            return oldItem.description == newItem.description
-                    && oldItem.title == newItem.title
-                    && oldItem.time == newItem.time
-                    && oldItem.displayTime == newItem.displayTime
-                    && oldItem.length == newItem.length
-                    && oldItem.seen == newItem.seen
+            return oldItem.toFileTvItemContentSignature() == newItem.toFileTvItemContentSignature()
         }
 
         override fun getChangePayload(oldItemPosition: Int, newItemPosition: Int) = arrayListOf(UPDATE_PAYLOAD)
