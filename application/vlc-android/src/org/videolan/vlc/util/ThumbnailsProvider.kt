@@ -48,26 +48,46 @@ object ThumbnailsProvider {
     private val checkedDarkVideos = LinkedHashSet<String>()
     private const val MAX_DARK_CHECKS = 256
 
-    private fun blackFraction(bitmap: Bitmap): Float {
-        if (bitmap.width <= 0 || bitmap.height <= 0) return 0f
+    private data class FrameQuality(val dark: Float, val colored: Float) {
+        // Colorful scene content is preferable to black fades and white intro text.
+        val score: Float get() = (1f - dark) * 0.45f + colored * 0.55f
+        val likelyIntroOrBlank: Boolean get() =
+            dark >= 0.75f || (dark >= 0.35f && colored < 0.12f)
+    }
+
+    private fun frameQuality(bitmap: Bitmap): FrameQuality {
+        if (bitmap.width <= 0 || bitmap.height <= 0) return FrameQuality(0f, 0f)
         var dark = 0
+        var colored = 0
         try {
             for (y in 1..7) for (x in 1..7) {
                 val pixel = bitmap.getPixel(bitmap.width * x / 8, bitmap.height * y / 8)
-                val brightness = (Color.red(pixel) * 3 + Color.green(pixel) * 6 + Color.blue(pixel)) / 10
+                val red = Color.red(pixel)
+                val green = Color.green(pixel)
+                val blue = Color.blue(pixel)
+                val brightness = (red * 3 + green * 6 + blue) / 10
                 if (brightness < 28) dark++
+                if (maxOf(red, green, blue) - minOf(red, green, blue) > 40 && brightness > 50)
+                    colored++
             }
         } catch (_: IllegalStateException) {
-            return 0f // Do not attempt CPU sampling of hardware bitmaps.
+            // Unsupported (e.g. hardware) bitmap: do not classify it as a bad frame.
+            return FrameQuality(0f, 0f)
         }
-        return dark / 49f
+        return FrameQuality(dark / 49f, colored / 49f)
     }
 
-    /** Retry only substantially black frames, preserving good existing thumbnails. */
-    private fun betterLocalVideoFrame(media: MediaWrapper, original: Bitmap, manual: Boolean = false): Bitmap? {
-        if (!media.uri.scheme.isSchemeFile() || Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) return null
-        val initialBlack = blackFraction(original)
-        if (initialBlack < 0.8f) return null
+    /**
+     * Select real episode content rather than warning cards, fades and intros.
+     * For episodes of >=20 min the earliest candidate is at minute five;
+     * shorter clips start after 25% of their runtime instead.
+     * Automatic requests only inspect extra frames if the original looks poor.
+     */
+    private fun betterLocalVideoFrame(media: MediaWrapper, original: Bitmap?, manual: Boolean = false): Bitmap? {
+        if (!media.uri.scheme.isSchemeFile() || Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1)
+            return null
+        val initialQuality = original?.let(::frameQuality)
+        if (!manual && initialQuality?.likelyIntroOrBlank != true) return null
         if (!manual) synchronized(lock) {
             val key = media.uri.toString()
             if (key in checkedDarkVideos || checkedDarkVideos.size >= MAX_DARK_CHECKS) return null
@@ -78,31 +98,35 @@ object ThumbnailsProvider {
         try {
             retriever.setDataSource(sourcePath)
             val durationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
-                    ?: return null
+                ?: return null
             if (durationMs <= 0L) return null
-            val originalMax = maxOf(original.width, original.height)
-            if (originalMax <= 0) return null
-            val scale = minOf(1f, 384f / originalMax)
-            val targetWidth = (original.width * scale).toInt().coerceAtLeast(1)
-            val targetHeight = (original.height * scale).toInt().coerceAtLeast(1)
+            val earliestMs = minOf(300_000L, durationMs / 4).coerceAtLeast(1L)
+            val referenceWidth = original?.width ?: 320
+            val referenceHeight = original?.height ?: 180
+            val scale = minOf(1f, 384f / maxOf(referenceWidth, referenceHeight))
+            val targetWidth = (referenceWidth * scale).toInt().coerceAtLeast(1)
+            val targetHeight = (referenceHeight * scale).toInt().coerceAtLeast(1)
             var best: Bitmap? = null
-            var bestBlack = initialBlack
-            for (position in floatArrayOf(0.22f, 0.52f, 0.76f)) {
+            var bestScore = if (manual) -1f else initialQuality?.score ?: 0f
+            val times = longArrayOf(earliestMs, durationMs / 2, durationMs * 7 / 10).distinct()
+            for (timeMs in times) {
                 val frame = try {
-                    retriever.getScaledFrameAtTime((durationMs * 1000 * position).toLong(),
-                            MediaMetadataRetriever.OPTION_CLOSEST_SYNC, targetWidth, targetHeight)
+                    retriever.getScaledFrameAtTime(timeMs * 1000,
+                        MediaMetadataRetriever.OPTION_CLOSEST_SYNC, targetWidth, targetHeight)
                 } catch (_: RuntimeException) {
                     null
                 } ?: continue
-                val fraction = blackFraction(frame)
-                if (fraction < bestBlack) {
+                val quality = frameQuality(frame)
+                if (quality.score > bestScore) {
                     best = frame
-                    bestBlack = fraction
+                    bestScore = quality.score
                 }
-                if (bestBlack < 0.35f) break
+                // One good scene suffices; avoid expensive extra decoding.
+                if (quality.score >= 0.72f && !quality.likelyIntroOrBlank) break
             }
-            // Never overwrite a valid dark scene for a merely marginal improvement.
-            return best?.takeIf { bestBlack <= initialBlack - 0.2f }
+            return best?.takeIf {
+                bestScore >= 0.30f && (manual || bestScore >= (initialQuality?.score ?: 0f) + 0.08f)
+            }
         } catch (_: RuntimeException) {
             return null
         } finally {
@@ -248,18 +272,17 @@ object ThumbnailsProvider {
             return ThumbnailRefreshChange.UNCHANGED
         }
         val existing = localArtworkForInspection(media, width)
-        val oldDarkness = existing?.let { blackFraction(it) } ?: 1f
-        if (onlyBad && existing != null && oldDarkness < 0.8f)
+        val existingQuality = existing?.let(::frameQuality)
+        if (onlyBad && existingQuality != null && !existingQuality.likelyIntroOrBlank)
             return ThumbnailRefreshChange.UNCHANGED
 
         if (media.uri.scheme.isSchemeFile()) {
-            val path = media.uri.path ?: return ThumbnailRefreshChange.UNCHANGED
-            val original = synchronized(lock) {
-                ThumbnailUtils.createVideoThumbnail(path, MediaStore.Video.Thumbnails.MINI_KIND)
-            } ?: return ThumbnailRefreshChange.UNCHANGED
-            val selected = betterLocalVideoFrame(media, original, manual = true) ?: original
-            // Never exchange an existing frame for an equally black or worse one.
-            if (existing != null && blackFraction(selected) >= oldDarkness - 0.1f)
+            val selected = betterLocalVideoFrame(media, existing, manual = true)
+                ?: return ThumbnailRefreshChange.UNCHANGED
+            val selectedQuality = frameQuality(selected)
+            // Preserve genuinely better existing frames and do not install blank replacements.
+            if (existingQuality != null &&
+                selectedQuality.score < existingQuality.score + if (onlyBad) 0.06f else -0.04f)
                 return ThumbnailRefreshChange.UNCHANGED
             val oldKey = getMediaThumbnailPath(true, media)
             if (media.id > 0L) {
