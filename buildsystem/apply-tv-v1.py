@@ -68,15 +68,20 @@ replace_if_needed(
     "TV folder refresh"
 )
 
-# The progress bar is rendered from displayTime, but upstream DiffUtil compared only title and
-# description. Include every playback field that changes the rendered progress/seen state.
-replace_if_needed(
-    "application/television/src/main/java/org/videolan/television/ui/FileTvItemAdapter.kt",
-    '''        override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+# The progress bar is rendered from displayTime. The source may already carry a
+# stronger content signature that includes resolution dimensions; preserve it.
+tv_item_adapter_path = Path("application/television/src/main/java/org/videolan/television/ui/FileTvItemAdapter.kt")
+tv_item_adapter = tv_item_adapter_path.read_text()
+if "toFileTvItemContentSignature()" in tv_item_adapter:
+    print("TV progress DiffUtil content signature already present")
+else:
+    replace_if_needed(
+        "application/television/src/main/java/org/videolan/television/ui/FileTvItemAdapter.kt",
+        '''        override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
             return oldList[oldItemPosition].description == newList[newItemPosition].description
                     && oldList[oldItemPosition].title == newList[newItemPosition].title
         }''',
-    '''        override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+        '''        override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
             val oldItem = oldList[oldItemPosition]
             val newItem = newList[newItemPosition]
             return oldItem.description == newItem.description
@@ -86,8 +91,8 @@ replace_if_needed(
                     && oldItem.length == newItem.length
                     && oldItem.seen == newItem.seen
         }''',
-    "TV progress DiffUtil"
-)
+        "TV progress DiffUtil"
+    )
 
 # SMB "go to containing folder": preserve the original encoded MRL exactly.
 replace("application/television/src/main/java/org/videolan/television/ui/MediaItemDetailsFragment.kt", '''                ID_NAVIGATE_PARENT -> {
