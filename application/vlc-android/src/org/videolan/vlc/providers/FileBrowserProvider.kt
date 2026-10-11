@@ -112,7 +112,7 @@ open class FileBrowserProvider(
     override suspend fun requestBrowsing(url: String?, eventListener: MediaBrowser.EventListener, interact : Boolean) = withContext(coroutineContextProvider.IO) {
         initBrowser()
         mediabrowser?.let {
-            it.changeEventListener(eventListener)
+            changeEventListener(eventListener)
             if (url != null) it.browse(url.toUri(), getFlags(interact))
         }
     }

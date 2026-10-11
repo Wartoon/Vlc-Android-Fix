@@ -62,7 +62,7 @@ class NetworkProvider(context: Context, dataset: LiveDataset<MediaLibraryItem>, 
         }
         initBrowser()
         mediabrowser?.let {
-            it.changeEventListener(eventListener)
+            changeEventListener(eventListener)
             if (url != null) it.browse(url.toUri(), getFlags(interact))
             else it.discoverNetworkShares()
         }

@@ -90,6 +90,7 @@ abstract class BrowserProvider(val context: Context, val dataset: LiveDataset<Me
     val loading = MutableLiveData<Boolean>().apply { value = false }
 
     var mediabrowser: MediaBrowser? = null
+    private val eventListenerOwner = BrowserEventListenerOwner<MediaBrowser.EventListener>()
 
     val coroutineContextProvider: CoroutineContextProvider
     private var parsingJob : Job? = null
@@ -125,12 +126,14 @@ abstract class BrowserProvider(val context: Context, val dataset: LiveDataset<Me
 
     private val completionHandler : CompletionHandler = object : CompletionHandler {
         override fun invoke(cause: Throwable?) {
-            if (mediabrowser != null) AppScope.launch(coroutineContextProvider.IO) { // use global scope because current is cancelled
+            val browser = mediabrowser ?: return
+            AppScope.launch(coroutineContextProvider.IO) { // use global scope because current is cancelled
+                eventListenerOwner.clear { browser.changeEventListener(null) }
                 try {
-                    mediabrowser?.release()
+                    browser.release()
                 } catch (e: IllegalStateException) {
                 }
-                mediabrowser = null
+                if (mediabrowser === browser) mediabrowser = null
             }
         }
     }
@@ -146,8 +149,11 @@ abstract class BrowserProvider(val context: Context, val dataset: LiveDataset<Me
                     else browseImpl()
                 }
                 is ParseSubDirectories -> parseSubDirectoriesImpl(action.list)
-                ClearListener -> withContext(coroutineContextProvider.IO) { mediabrowser?.changeEventListener(null) }
+                ClearListener -> withContext(coroutineContextProvider.IO) {
+                    eventListenerOwner.clear { mediabrowser?.changeEventListener(null) }
+                }
                 Release -> withContext(coroutineContextProvider.IO) {
+                    eventListenerOwner.clear { mediabrowser?.changeEventListener(null) }
                     try {
                         mediabrowser?.release()
                     } catch (e: Exception) {
@@ -165,6 +171,11 @@ abstract class BrowserProvider(val context: Context, val dataset: LiveDataset<Me
             mediabrowser = get(this)
             if (!showOnlyMultimedia) mediabrowser?.setIgnoreFileTypes(".")
         }
+    }
+
+    protected fun changeEventListener(eventListener: MediaBrowser.EventListener) {
+        val browser = mediabrowser ?: return
+        eventListenerOwner.replace(eventListener) { browser.changeEventListener(it) }
     }
 
     protected abstract suspend fun requestBrowsing(url: String?, eventListener: EventListener, interact : Boolean) : Unit?
@@ -259,9 +270,10 @@ abstract class BrowserProvider(val context: Context, val dataset: LiveDataset<Me
             override fun onMediaRemoved(index: Int, media: IMedia) {}
         }
         requestBrowsing(url, listener, interact)
-        awaitClose { if (url != null) AppScope.launch(coroutineContextProvider.IO) {
-            mediabrowser?.changeEventListener(null) }
-        }
+        val browser = mediabrowser
+        awaitClose { if (url != null && browser != null) AppScope.launch(coroutineContextProvider.IO) {
+            eventListenerOwner.clearIfCurrent(listener) { browser.changeEventListener(null) }
+        } }
     }.buffer(Channel.UNLIMITED)
 
     open fun addMedia(media: MediaLibraryItem) {
@@ -461,3 +473,28 @@ private class ParseSubDirectories(val list : List<MediaLibraryItem>? = null) : B
 private object ClearListener : BrowserAction()
 private object Release : BrowserAction()
 private class BrowseUrl(val url: String, val deferred: CompletableDeferred<List<MediaLibraryItem>>) : BrowserAction()
+
+
+internal class BrowserEventListenerOwner<T : Any> {
+    private var current: T? = null
+
+    @Synchronized
+    fun replace(listener: T, attach: (T) -> Unit) {
+        attach(listener)
+        current = listener
+    }
+
+    @Synchronized
+    fun clearIfCurrent(listener: T, detach: () -> Unit): Boolean {
+        if (current !== listener) return false
+        detach()
+        current = null
+        return true
+    }
+
+    @Synchronized
+    fun clear(detach: () -> Unit) {
+        detach()
+        current = null
+    }
+}
