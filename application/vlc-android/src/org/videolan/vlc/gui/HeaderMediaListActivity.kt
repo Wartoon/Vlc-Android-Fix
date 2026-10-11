@@ -107,7 +107,6 @@ import org.videolan.vlc.interfaces.IEventsHandler
 import org.videolan.vlc.interfaces.IListEventsHandler
 import org.videolan.vlc.media.MediaUtils
 import org.videolan.vlc.media.PlaylistManager
-import org.videolan.vlc.util.ThumbnailsProvider
 import org.videolan.vlc.util.ContextOption
 import org.videolan.vlc.util.ContextOption.CTX_ADD_SHORTCUT
 import org.videolan.vlc.util.ContextOption.CTX_ADD_TO_PLAYLIST
