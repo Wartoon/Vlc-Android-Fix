@@ -53,6 +53,20 @@ internal fun MediaWrapper.toFileTvItemContentSignature() = FileTvItemContentSign
     height = height
 )
 
+internal fun areFileTvItemContentsTheSame(
+    oldItem: FileTvItemContentSignature,
+    newItem: FileTvItemContentSignature
+): Boolean {
+    return oldItem.description == newItem.description
+            && oldItem.title == newItem.title
+            && oldItem.time == newItem.time
+            && oldItem.displayTime == newItem.displayTime
+            && oldItem.length == newItem.length
+            && oldItem.seen == newItem.seen
+            && oldItem.width == newItem.width
+            && oldItem.height == newItem.height
+}
+
 class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryItem>, var itemSize: Int, private val showProtocol: Boolean, private var inGrid: Boolean = true) : DiffUtilAdapter<MediaWrapper, MediaTvItemAdapter.AbstractMediaItemViewHolder<ViewDataBinding>>(), FastScroller.SeparatedAdapter, TvItemAdapter {
 
     override fun submitList(pagedList: Any?) {
@@ -118,7 +132,7 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
         override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
             val oldItem = oldList[oldItemPosition]
             val newItem = newList[newItemPosition]
-            return oldItem.toFileTvItemContentSignature() == newItem.toFileTvItemContentSignature()
+            return areFileTvItemContentsTheSame(oldItem.toFileTvItemContentSignature(), newItem.toFileTvItemContentSignature())
         }
 
         override fun getChangePayload(oldItemPosition: Int, newItemPosition: Int) = arrayListOf(UPDATE_PAYLOAD)

@@ -1,6 +1,6 @@
 package org.videolan.television.ui
 
-import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class FileTvItemAdapterTest {
@@ -17,11 +17,11 @@ class FileTvItemAdapterTest {
 
     @Test
     fun widthChangeIsAContentChange() {
-        assertNotEquals(original, original.copy(width = 1920))
+        assertFalse(areFileTvItemContentsTheSame(original, original.copy(width = 1920)))
     }
 
     @Test
     fun heightChangeIsAContentChange() {
-        assertNotEquals(original, original.copy(height = 1080))
+        assertFalse(areFileTvItemContentsTheSame(original, original.copy(height = 1080)))
     }
 }
