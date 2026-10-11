@@ -80,9 +80,23 @@ class FileBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>(), PathAda
             val selectedIndex = if (source != null) {
                 if (fileTvItemAdapter.dataset.contains(source)) fileTvItemAdapter.dataset.indexOf(source)
                 else {
+                    val sourceUri = (source as? MediaWrapper)?.uri
+                    val sourcePath = sourceUri?.encodedPath.orEmpty().trimEnd('/')
+                    var bestMatchLength = -1
                     var index: Int? = null
-                    fileTvItemAdapter.dataset.forEach {
-                        if ((source as? MediaWrapper)?.uri?.toString()?.startsWith(it.uri.toString()) == true) index = fileTvItemAdapter.dataset.indexOf(it)
+                    if (sourceUri != null) {
+                        fileTvItemAdapter.dataset.forEachIndexed { candidateIndex, candidate ->
+                            val candidateUri = candidate.uri
+                            val candidatePath = candidateUri.encodedPath.orEmpty().trimEnd('/')
+                            val sameLocation = sourceUri.scheme == candidateUri.scheme &&
+                                    sourceUri.authority == candidateUri.authority
+                            val withinFolder = if (candidatePath.isEmpty()) sourcePath.startsWith("/")
+                            else sourcePath == candidatePath || sourcePath.startsWith("$candidatePath/")
+                            if (sameLocation && withinFolder && candidatePath.length > bestMatchLength) {
+                                bestMatchLength = candidatePath.length
+                                index = candidateIndex
+                            }
+                        }
                     }
                     index
                 }
