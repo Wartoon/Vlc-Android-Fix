@@ -192,13 +192,7 @@ abstract class BaseBrowserTvFragment<T> : Fragment(), BrowserFragmentInterface, 
                 override fun requestChildRectangleOnScreen(parent: RecyclerView, child: View, rect: Rect, immediate: Boolean, focusedChildVisible: Boolean) = false
                 override fun onLayoutChildren(recycler: RecyclerView.Recycler?, state: RecyclerView.State?) {
                     super.onLayoutChildren(recycler, state)
-                    if (previouslySelectedItem != -1 && binding.list.adapter?.itemCount ?: 0 > previouslySelectedItem) {
-                        scrollToPosition(previouslySelectedItem)
-                        binding.list.findViewHolderForLayoutPosition(previouslySelectedItem)?.let { holder ->
-                            holder.itemView.requestFocus()
-                            previouslySelectedItem = -1
-                        }
-                    }
+                    restorePreviouslySelectedItem(this)
                 }
             }
             (gridLayoutManager as? GridLayoutManager)?.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
@@ -224,13 +218,7 @@ abstract class BaseBrowserTvFragment<T> : Fragment(), BrowserFragmentInterface, 
             gridLayoutManager = object : LinearLayoutManager(requireActivity()) {
                 override fun onLayoutChildren(recycler: RecyclerView.Recycler?, state: RecyclerView.State?) {
                     super.onLayoutChildren(recycler, state)
-                    if (previouslySelectedItem != -1 && binding.list.adapter?.itemCount ?: 0 > previouslySelectedItem) {
-                        scrollToPosition(previouslySelectedItem)
-                        binding.list.findViewHolderForLayoutPosition(previouslySelectedItem)?.let { holder ->
-                            holder.itemView.requestFocus()
-                            previouslySelectedItem = -1
-                        }
-                    }
+                    restorePreviouslySelectedItem(this)
                 }
             }
         }
@@ -242,6 +230,17 @@ abstract class BaseBrowserTvFragment<T> : Fragment(), BrowserFragmentInterface, 
         val lm = binding.list.layoutManager as LinearLayoutManager
         previouslySelectedItem = lm.focusedChild?.let { lm.getPosition(it) } ?: 0
         super.onPause()
+    }
+
+    private fun restorePreviouslySelectedItem(layoutManager: LinearLayoutManager) {
+        val position = restoredFocusPosition(previouslySelectedItem, binding.list.adapter?.itemCount ?: 0)
+                ?: return
+        previouslySelectedItem = position
+        layoutManager.scrollToPosition(position)
+        binding.list.findViewHolderForLayoutPosition(position)?.let { holder ->
+            holder.itemView.requestFocus()
+            previouslySelectedItem = -1
+        }
     }
 
 
@@ -461,4 +460,10 @@ abstract class BaseBrowserTvFragment<T> : Fragment(), BrowserFragmentInterface, 
         animationDelegate.setVisibility(binding.headerButton, if (viewModel.provider.headers.isEmpty) View.GONE else View.VISIBLE)
         animationDelegate.setVisibility(binding.headerDescription, if (viewModel.provider.headers.isEmpty) View.GONE else View.VISIBLE)
     }
+}
+
+
+internal fun restoredFocusPosition(savedPosition: Int, itemCount: Int): Int? {
+    if (savedPosition < 0 || itemCount <= 0) return null
+    return savedPosition.coerceAtMost(itemCount - 1)
 }
