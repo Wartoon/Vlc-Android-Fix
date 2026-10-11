@@ -216,7 +216,7 @@ class FileBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>(), PathAda
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             animationDelegate.setVisibility(binding.favoriteButton, View.VISIBLE)
             animationDelegate.setVisibility(binding.imageButtonFavorite, View.VISIBLE)
             animationDelegate.setVisibility(binding.favoriteDescription, View.VISIBLE)
@@ -278,7 +278,7 @@ class FileBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>(), PathAda
 
     private fun togglefavorite() {
         currentItem?.let { item ->
-            lifecycleScope.launch {
+            viewLifecycleOwner.lifecycleScope.launch {
                 val mw = item as MediaWrapper
                 withContext(Dispatchers.IO) {
                     when {

@@ -257,11 +257,22 @@ abstract class BaseBrowserTvFragment<T> : Fragment(), BrowserFragmentInterface, 
     }
 
     private fun changeDisplayMode() {
+        val previousLayoutManager = binding.list.layoutManager as? LinearLayoutManager
+        val firstVisiblePosition = previousLayoutManager?.findFirstVisibleItemPosition() ?: RecyclerView.NO_POSITION
+        val firstVisibleOffset = if (firstVisiblePosition != RecyclerView.NO_POSITION) {
+            (previousLayoutManager?.findViewByPosition(firstVisiblePosition)?.top ?: binding.list.paddingTop) - binding.list.paddingTop
+        } else 0
+
+        // The new layout manager must not reset the viewport to an old focus position.
+        if (firstVisiblePosition != RecyclerView.NO_POSITION) previouslySelectedItem = -1
         inGrid = !inGrid
         Settings.getInstance(requireActivity()).putSingle(getDisplayPrefId(), inGrid)
         adapter.displaySwitch(inGrid)
         setupDisplayIcon()
         setupLayoutManager()
+        if (firstVisiblePosition != RecyclerView.NO_POSITION) {
+            (binding.list.layoutManager as LinearLayoutManager).scrollToPositionWithOffset(firstVisiblePosition, firstVisibleOffset)
+        }
     }
 
     private fun setupDisplayIcon() {
