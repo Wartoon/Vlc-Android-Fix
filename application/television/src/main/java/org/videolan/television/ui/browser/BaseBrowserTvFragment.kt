@@ -428,7 +428,7 @@ abstract class BaseBrowserTvFragment<T> : Fragment(), BrowserFragmentInterface, 
          */
         KEYCODE_DPAD_DOWN, KEYCODE_DPAD_UP -> {
             val now = System.currentTimeMillis()
-            if (now - lastDpadEventTime > 100) {
+            if (now - lastDpadEventTime > 50) {
                 lastDpadEventTime = now
                 if (BuildConfig.DEBUG) Log.d("keydown", "Keydown propagated")
                 false
