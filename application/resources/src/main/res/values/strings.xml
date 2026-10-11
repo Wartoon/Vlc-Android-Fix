@@ -190,6 +190,8 @@
     <string name="resize_tip">Long tap for more options</string>
     <string name="unseekable_stream">Unseekable stream</string>
     <string name="refresh_thumbnails">Refresh thumbnails</string>
+    <string name="refresh_thumbnails_running">Checking thumbnails…</string>
+    <string name="refresh_thumbnails_result">%1$d videos checked, %2$d thumbnails improved, %3$d SMB thumbnails requested</string>
     <string name="refresh">Refresh</string>
     <string name="track_audio">Audio track</string>
     <string name="track_video">Video track</string>

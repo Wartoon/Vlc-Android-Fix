@@ -49,6 +49,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.onEach
@@ -147,6 +148,7 @@ open class HeaderMediaListActivity : AudioPlayerContainerActivity(), IEventsHand
     private val mediaLibrary = Medialibrary.getInstance()
     private lateinit var binding: HeaderMediaListActivityBinding
     private var actionMode: ActionMode? = null
+    private var thumbnailRefreshJob: Job? = null
     private var isPlaylist: Boolean = false
     private lateinit var viewModel: PlaylistViewModel
     private var itemTouchHelper: ItemTouchHelper? = null
@@ -353,6 +355,38 @@ open class HeaderMediaListActivity : AudioPlayerContainerActivity(), IEventsHand
         super.onSaveInstanceState(outState)
     }
 
+    private fun refreshPlaylistThumbnails(playlist: Playlist) {
+        if (thumbnailRefreshJob?.isActive == true) return
+        thumbnailRefreshJob = lifecycleScope.launch {
+            val progress = Snackbar.make(binding.root, R.string.refresh_thumbnails_running, Snackbar.LENGTH_INDEFINITE)
+            progress.show()
+            val width = binding.backgroundView.width.takeIf { it > 0 } ?: getScreenWidth()
+            val outcome = try {
+                withContext(Dispatchers.IO) {
+                    val result = ThumbnailsProvider.refreshSelectedThumbnails(playlist)
+                    val cover = if (playlist.artworkMrl.isNullOrEmpty()) {
+                        ThumbnailsProvider.getPlaylistOrGenreImage("playlist:${playlist.id}_$width",
+                            playlist.tracks.toList(), width)
+                    } else {
+                        AudioUtil.fetchCoverBitmap(Uri.decode(playlist.artworkMrl), width)
+                    }
+                    result to cover
+                }
+            } finally {
+                progress.dismiss()
+            }
+            val (result, cover) = outcome
+            if (cover != null) {
+                binding.cover = BitmapDrawable(resources, cover)
+                UiTools.blurView(binding.backgroundView, cover, 25f,
+                    UiTools.getColorFromAttribute(this@HeaderMediaListActivity, R.attr.audio_player_background_tint))
+            }
+            audioBrowserAdapter.notifyDataSetChanged()
+            Snackbar.make(binding.root, getString(R.string.refresh_thumbnails_result,
+                result.scanned, result.replaced, result.requested), Snackbar.LENGTH_LONG).show()
+        }
+    }
+
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         super.onCreateOptionsMenu(menu)
         menuInflater.inflate(R.menu.playlist_option, menu)
@@ -380,24 +414,7 @@ open class HeaderMediaListActivity : AudioPlayerContainerActivity(), IEventsHand
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.ml_menu_refresh_thumbnails -> {
-                val playlist = viewModel.playlist as? Playlist ?: return true
-                val width = binding.backgroundView.width.takeIf { it > 0 } ?: getScreenWidth()
-                lifecycleScope.launch {
-                    val cover = withContext(Dispatchers.IO) {
-                        ThumbnailsProvider.refreshSelectedThumbnails(playlist)
-                        if (playlist.artworkMrl.isNullOrEmpty()) {
-                            ThumbnailsProvider.getPlaylistOrGenreImage("playlist:${playlist.id}_$width", playlist.tracks.toList(), width)
-                        } else {
-                            AudioUtil.fetchCoverBitmap(Uri.decode(playlist.artworkMrl), width)
-                        }
-                    }
-                    if (cover != null) {
-                        binding.cover = BitmapDrawable(resources, cover)
-                        UiTools.blurView(binding.backgroundView, cover, 25f,
-                            UiTools.getColorFromAttribute(this@HeaderMediaListActivity, R.attr.audio_player_background_tint))
-                    }
-                    audioBrowserAdapter.notifyDataSetChanged()
-                }
+                (viewModel.playlist as? Playlist)?.let { refreshPlaylistThumbnails(it) }
                 return true
             }
             R.id.ml_menu_display_options -> {
@@ -599,8 +616,10 @@ open class HeaderMediaListActivity : AudioPlayerContainerActivity(), IEventsHand
         val media = audioBrowserAdapter.getItem(position) as MediaWrapper? ?: return
         when (option) {
             CTX_REFRESH_THUMBNAILS -> lifecycleScope.launch {
-                withContext(Dispatchers.IO) { ThumbnailsProvider.refreshSelectedThumbnails(media) }
+                val result = withContext(Dispatchers.IO) { ThumbnailsProvider.refreshSelectedThumbnails(media) }
                 if (position < audioBrowserAdapter.itemCount) audioBrowserAdapter.notifyItemChanged(position)
+                Snackbar.make(binding.root, getString(R.string.refresh_thumbnails_result,
+                    result.scanned, result.replaced, result.requested), Snackbar.LENGTH_LONG).show()
             }
             CTX_INFORMATION -> showInfoDialog(media)
             CTX_DELETE -> lifecycleScope.launch { removeItem(position, media) }

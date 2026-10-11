@@ -13,6 +13,9 @@ import android.provider.MediaStore
 import android.util.Log
 import androidx.annotation.WorkerThread
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import org.videolan.medialibrary.interfaces.Medialibrary
 import org.videolan.medialibrary.interfaces.Medialibrary.MEDIALIB_FOLDER_NAME
@@ -28,6 +31,7 @@ import org.videolan.vlc.gui.helpers.AudioUtil.readCoverBitmap
 import org.videolan.vlc.gui.helpers.BitmapUtil
 import org.videolan.vlc.gui.helpers.UiTools
 import java.io.File
+import java.util.ArrayDeque
 import kotlin.math.min
 
 object ThumbnailsProvider {
@@ -38,6 +42,7 @@ object ThumbnailsProvider {
     private var appDir: File? = null
     private var cacheDir: String? = null
     private const val MAX_IMAGES = 4
+    private const val REFRESH_BATCH_SIZE = 64
     private val lock = Any()
     // One extra frame-selection attempt per dark local video, bounded in memory and work.
     private val checkedDarkVideos = LinkedHashSet<String>()
@@ -59,11 +64,11 @@ object ThumbnailsProvider {
     }
 
     /** Retry only substantially black frames, preserving good existing thumbnails. */
-    private fun betterLocalVideoFrame(media: MediaWrapper, original: Bitmap): Bitmap? {
+    private fun betterLocalVideoFrame(media: MediaWrapper, original: Bitmap, manual: Boolean = false): Bitmap? {
         if (!media.uri.scheme.isSchemeFile() || Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) return null
         val initialBlack = blackFraction(original)
         if (initialBlack < 0.8f) return null
-        synchronized(lock) {
+        if (!manual) synchronized(lock) {
             val key = media.uri.toString()
             if (key in checkedDarkVideos || checkedDarkVideos.size >= MAX_DARK_CHECKS) return null
             checkedDarkVideos.add(key)
@@ -124,59 +129,147 @@ object ThumbnailsProvider {
     }
 
 
+    data class ThumbnailRefreshResult(val scanned: Int, val replaced: Int, val requested: Int)
+    private enum class ThumbnailRefreshChange { UNCHANGED, REPLACED, REQUESTED }
+
     /**
-     * Manual refresh: at most four source frames for one folder, group or playlist.
-     * No background scanning or unbounded SMB network activity.
+     * Explicit bulk refresh checks all videos in the selected folder (including
+     * subfolders), group or playlist, without replacing good thumbnails.
+     * Paged queries and coroutine cancellation keep the work manageable.
      */
-    @WorkerThread
-    fun refreshSelectedThumbnails(item: MediaLibraryItem, width: Int = 320): Boolean {
+    suspend fun refreshSelectedThumbnails(item: MediaLibraryItem, width: Int = 320): ThumbnailRefreshResult {
         val requestedWidth = width.coerceIn(96, 512)
-        return when (item) {
-            is MediaWrapper -> refreshSingleVideoThumbnail(item, requestedWidth)
-            is Folder -> {
-                val videos = item.media(Folder.TYPE_FOLDER_VIDEO, Medialibrary.SORT_DEFAULT, true, true, false, MAX_IMAGES, 0)
-                var refreshed = false
-                videos.filterNotNull().take(MAX_IMAGES).forEach {
-                    refreshed = refreshSingleVideoThumbnail(it, requestedWidth) || refreshed
+        var scanned = 0
+        var replaced = 0
+        var requested = 0
+
+        suspend fun process(media: MediaWrapper?, onlyBad: Boolean) {
+            if (media == null || media.type != MediaWrapper.TYPE_VIDEO) return
+            currentCoroutineContext().ensureActive()
+            scanned++
+            when (refreshSingleVideoThumbnail(media, requestedWidth, onlyBad)) {
+                ThumbnailRefreshChange.REPLACED -> replaced++
+                ThumbnailRefreshChange.REQUESTED -> {
+                    requested++
+                    // Native network extraction is asynchronous: avoid flooding its queue.
+                    delay(150L)
                 }
-                BitmapCache.removeBitmapKeysStartingWith("folder:${item.mMrl.sanitizePath()}:")
-                refreshed || videos.isNotEmpty()
+                ThumbnailRefreshChange.UNCHANGED -> Unit
+            }
+        }
+
+        when (item) {
+            is MediaWrapper -> process(item, false)
+            is Folder -> {
+                val pending = ArrayDeque<Folder>()
+                val visited = HashSet<String>()
+                pending.add(item)
+                while (pending.isNotEmpty()) {
+                    currentCoroutineContext().ensureActive()
+                    val folder = pending.removeFirst()
+                    if (!visited.add(folder.id.toString() + ":" + folder.mMrl)) continue
+                    var offset = 0
+                    while (true) {
+                        currentCoroutineContext().ensureActive()
+                        val page = folder.media(Folder.TYPE_FOLDER_VIDEO,
+                            Medialibrary.SORT_DEFAULT, true, false, false, REFRESH_BATCH_SIZE, offset)
+                        if (page.isEmpty()) break
+                        for (media in page) process(media, true)
+                        offset += page.size
+                        if (page.size < REFRESH_BATCH_SIZE) break
+                    }
+                    offset = 0
+                    while (true) {
+                        currentCoroutineContext().ensureActive()
+                        val page = folder.subfolders(Medialibrary.SORT_DEFAULT, true,
+                            false, false, REFRESH_BATCH_SIZE, offset)
+                        if (page.isEmpty()) break
+                        for (child in page) if (child != null) pending.add(child)
+                        offset += page.size
+                        if (page.size < REFRESH_BATCH_SIZE) break
+                    }
+                    BitmapCache.removeBitmapKeysStartingWith("folder:${folder.mMrl.sanitizePath()}:")
+                }
             }
             is VideoGroup -> {
-                val videos = item.media(Medialibrary.SORT_DEFAULT, true, true, false, MAX_IMAGES, 0)
-                var refreshed = false
-                videos.filterNotNull().take(MAX_IMAGES).forEach {
-                    refreshed = refreshSingleVideoThumbnail(it, requestedWidth) || refreshed
+                var offset = 0
+                while (true) {
+                    currentCoroutineContext().ensureActive()
+                    val page = item.media(Medialibrary.SORT_DEFAULT, true, false, false,
+                        REFRESH_BATCH_SIZE, offset)
+                    if (page.isEmpty()) break
+                    for (media in page) process(media, true)
+                    offset += page.size
+                    if (page.size < REFRESH_BATCH_SIZE) break
                 }
                 BitmapCache.removeBitmapKeysStartingWith("videogroup:${item.title}:")
-                refreshed || videos.isNotEmpty()
             }
-            else -> if (item.itemType == MediaLibraryItem.TYPE_PLAYLIST) {
-                item.tracks.asSequence().filter { it.type == MediaWrapper.TYPE_VIDEO }.take(MAX_IMAGES).forEach {
-                    refreshSingleVideoThumbnail(it, requestedWidth)
+            is org.videolan.medialibrary.interfaces.media.Playlist -> {
+                var offset = 0
+                while (true) {
+                    currentCoroutineContext().ensureActive()
+                    val page = item.getPagedTracks(REFRESH_BATCH_SIZE, offset, false, false)
+                    if (page.isEmpty()) break
+                    for (media in page) process(media, true)
+                    offset += page.size
+                    if (page.size < REFRESH_BATCH_SIZE) break
                 }
                 BitmapCache.removeBitmapKeysStartingWith("playlist:${item.id}_")
-                true
-            } else false
+            }
         }
+        return ThumbnailRefreshResult(scanned, replaced, requested)
+    }
+
+    /**
+     * Never download remote artwork just to decide if a refresh is necessary.
+     * The indexed medialibrary JPEG path also handles media without artworkMrl.
+     */
+    private fun localArtworkForInspection(media: MediaWrapper, width: Int): Bitmap? {
+        val artwork = media.artworkMrl
+        val path = if (!artwork.isNullOrBlank()) {
+            if (!artwork.startsWith("/") && !artwork.startsWith("file:")) return null
+            Uri.decode(artwork).removePrefix("file://")
+        } else {
+            if (media.id <= 0L) return null
+            val dir = AppContextProvider.appContext.getExternalFilesDir(null) ?: return null
+            File(dir.absolutePath + MEDIALIB_FOLDER_NAME, "${media.id}.jpg").absolutePath
+        }
+        if (!File(path).isFile) return null
+        return readCoverBitmap(path, width)
     }
 
     @WorkerThread
-    private fun refreshSingleVideoThumbnail(media: MediaWrapper, width: Int): Boolean {
-        if (media.type != MediaWrapper.TYPE_VIDEO) return false
+    private fun refreshSingleVideoThumbnail(media: MediaWrapper, width: Int, onlyBad: Boolean): ThumbnailRefreshChange {
+        if (media.type != MediaWrapper.TYPE_VIDEO) return ThumbnailRefreshChange.UNCHANGED
         val oldArtwork = media.artworkMrl
+        // Preserve externally supplied artwork URLs.
+        if (!oldArtwork.isNullOrBlank() &&
+            !oldArtwork.startsWith("/") && !oldArtwork.startsWith("file:")) {
+            return ThumbnailRefreshChange.UNCHANGED
+        }
+        val existing = localArtworkForInspection(media, width)
+        val oldDarkness = existing?.let { blackFraction(it) } ?: 1f
+        if (onlyBad && existing != null && oldDarkness < 0.8f)
+            return ThumbnailRefreshChange.UNCHANGED
+
         if (media.uri.scheme.isSchemeFile()) {
-            val path = media.uri.path ?: return false
+            val path = media.uri.path ?: return ThumbnailRefreshChange.UNCHANGED
             val original = synchronized(lock) {
                 ThumbnailUtils.createVideoThumbnail(path, MediaStore.Video.Thumbnails.MINI_KIND)
-            } ?: return false
-            synchronized(lock) { checkedDarkVideos.remove(media.uri.toString()) }
-            val selected = betterLocalVideoFrame(media, original) ?: original
+            } ?: return ThumbnailRefreshChange.UNCHANGED
+            val selected = betterLocalVideoFrame(media, original, manual = true) ?: original
+            // Never exchange an existing frame for an equally black or worse one.
+            if (existing != null && blackFraction(selected) >= oldDarkness - 0.1f)
+                return ThumbnailRefreshChange.UNCHANGED
             val oldKey = getMediaThumbnailPath(true, media)
             if (media.id > 0L) {
-                val dir = AppContextProvider.appContext.getExternalFilesDir(null) ?: return false
+                val dir = AppContextProvider.appContext.getExternalFilesDir(null)
+                    ?: return ThumbnailRefreshChange.UNCHANGED
                 val target = File(dir.absolutePath + MEDIALIB_FOLDER_NAME, "${media.id}.jpg")
-                if (!BitmapUtil.saveOnDisk(selected, target.absolutePath)) return false
+                if (target.parentFile?.isDirectory != true &&
+                    target.parentFile?.mkdirs() != true) return ThumbnailRefreshChange.UNCHANGED
+                if (!BitmapUtil.saveOnDisk(selected, target.absolutePath))
+                    return ThumbnailRefreshChange.UNCHANGED
                 media.setThumbnail(target.absolutePath)
                 media.artworkURL = target.absolutePath
             }
@@ -193,13 +286,19 @@ object ThumbnailsProvider {
                 BitmapCache.removeBitmapKeysStartingWith(it + "_")
             }
             BitmapCache.addBitmapToMemCache(getMediaCacheKey(true, media, width.toString()), selected)
-            return true
+            return ThumbnailRefreshChange.REPLACED
         }
-        // Network frames are requested only by an explicit button press.
-        if (media.id <= 0L) return false
-        media.requestThumbnail(width, 0.4f)
-        oldArtwork?.let { BitmapCache.removeBitmapKeysStartingWith(it + "_") }
-        return true
+
+        // Only an explicit refresh may start a native SMB extraction.
+        if (media.id <= 0L) return ThumbnailRefreshChange.UNCHANGED
+        media.removeThumbnail()
+        media.artworkURL = null
+        oldArtwork?.let {
+            BitmapCache.removeBitmapFromMemCache(it)
+            BitmapCache.removeBitmapKeysStartingWith(it + "_")
+        }
+        media.requestThumbnail(width, 0.52f)
+        return ThumbnailRefreshChange.REQUESTED
     }
 
     @WorkerThread

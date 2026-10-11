@@ -41,7 +41,9 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -171,6 +173,7 @@ class VideoGridFragment : MediaBrowserFragment<VideosViewModel>(), SwipeRefreshL
     private lateinit var videoListAdapter: VideoListAdapter
     private lateinit var multiSelectHelper: MultiSelectHelper<MediaLibraryItem>
     private lateinit var binding: VideoGridBinding
+    private var thumbnailRefreshJob: Job? = null
     private var gridItemDecoration: RecyclerView.ItemDecoration? = null
     private lateinit var settings: SharedPreferences
     //in case of fragment being hosted by other fragments, it's useful to prevent the
@@ -267,13 +270,7 @@ class VideoGridFragment : MediaBrowserFragment<VideosViewModel>(), SwipeRefreshL
                 MediaUtils.loadlastPlaylist(activity, PLAYLIST_TYPE_VIDEO)
             }
             R.id.ml_menu_refresh_thumbnails -> {
-                val selected: MediaLibraryItem? = viewModel.group ?: viewModel.folder
-                selected?.let { source ->
-                    viewLifecycleOwner.lifecycleScope.launch {
-                        withContext(Dispatchers.IO) { ThumbnailsProvider.refreshSelectedThumbnails(source) }
-                        if (::videoListAdapter.isInitialized) videoListAdapter.notifyDataSetChanged()
-                    }
-                }
+                (viewModel.group ?: viewModel.folder)?.let { refreshSelectedThumbnails(it) }
             }
             R.id.rename_group -> {
                 viewModel.group?.let { renameGroup(it) }
@@ -622,15 +619,32 @@ class VideoGridFragment : MediaBrowserFragment<VideosViewModel>(), SwipeRefreshL
         videoListAdapter.notifyItemRangeChanged(0, videoListAdapter.itemCount - 1, UPDATE_SEEN)
     }
 
+    private fun refreshSelectedThumbnails(item: MediaLibraryItem, position: Int? = null) {
+        if (thumbnailRefreshJob?.isActive == true) return
+        thumbnailRefreshJob = viewLifecycleOwner.lifecycleScope.launch {
+            val progress = Snackbar.make(binding.root, R.string.refresh_thumbnails_running, Snackbar.LENGTH_INDEFINITE)
+            progress.show()
+            val result = try {
+                withContext(Dispatchers.IO) { ThumbnailsProvider.refreshSelectedThumbnails(item) }
+            } finally {
+                progress.dismiss()
+            }
+            if (::videoListAdapter.isInitialized) {
+                if (position != null && position in 0 until videoListAdapter.itemCount)
+                    videoListAdapter.notifyItemChanged(position)
+                else videoListAdapter.notifyDataSetChanged()
+            }
+            Snackbar.make(binding.root, getString(R.string.refresh_thumbnails_result,
+                result.scanned, result.replaced, result.requested), Snackbar.LENGTH_LONG).show()
+        }
+    }
+
     override fun onCtxAction(position: Int, option: ContextOption) {
         if (position >= videoListAdapter.itemCount) return
         val activity = activity ?: return
         val selected = videoListAdapter.getItem(position) ?: return
         if (option == CTX_REFRESH_THUMBNAILS) {
-            viewLifecycleOwner.lifecycleScope.launch {
-                withContext(Dispatchers.IO) { ThumbnailsProvider.refreshSelectedThumbnails(selected) }
-                if (position < videoListAdapter.itemCount) videoListAdapter.notifyItemChanged(position)
-            }
+            refreshSelectedThumbnails(selected, position)
             return
         }
         when (val media = selected) {

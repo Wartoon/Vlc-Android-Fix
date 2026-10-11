@@ -189,6 +189,8 @@
     <string name="resize_tip">Für weitere Optionen lange tippen</string>
     <string name="unseekable_stream">Nicht durchsuchbarer Stream</string>
     <string name="refresh_thumbnails">Thumbnails aktualisieren</string>
+    <string name="refresh_thumbnails_running">Thumbnails werden überprüft…</string>
+    <string name="refresh_thumbnails_result">%1$d Videos geprüft, %2$d Thumbnails verbessert, %3$d SMB-Thumbnails angefordert</string>
     <string name="refresh">Aktualisieren</string>
     <string name="track_audio">Audiospur</string>
     <string name="track_video">Videospur</string>

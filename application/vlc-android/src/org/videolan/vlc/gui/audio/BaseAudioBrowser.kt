@@ -42,6 +42,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager.widget.ViewPager
 import com.google.android.material.tabs.TabLayout
+import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -520,8 +521,17 @@ abstract class BaseAudioBrowser<T : MedialibraryViewModel> : MediaBrowserFragmen
         val media = getCurrentAdapter()?.getItem(position) ?: return
         when (option) {
             CTX_REFRESH_THUMBNAILS -> viewLifecycleOwner.lifecycleScope.launch {
-                withContext(Dispatchers.IO) { ThumbnailsProvider.refreshSelectedThumbnails(media) }
-                getCurrentAdapter()?.notifyItemChanged(position)
+                val target = requireView()
+                val progress = Snackbar.make(target, R.string.refresh_thumbnails_running, Snackbar.LENGTH_INDEFINITE)
+                progress.show()
+                val result = try {
+                    withContext(Dispatchers.IO) { ThumbnailsProvider.refreshSelectedThumbnails(media) }
+                } finally {
+                    progress.dismiss()
+                }
+                getCurrentAdapter()?.let { if (position < it.itemCount) it.notifyItemChanged(position) }
+                Snackbar.make(target, getString(R.string.refresh_thumbnails_result,
+                    result.scanned, result.replaced, result.requested), Snackbar.LENGTH_LONG).show()
             }
             CTX_PLAY -> MediaUtils.playTracks(requireActivity(), media, 0)
             CTX_PLAY_SHUFFLE -> MediaUtils.playTracks(requireActivity(), media, SecureRandom().nextInt(min(media.tracksCount, MEDIALIBRARY_PAGE_SIZE)), true)
