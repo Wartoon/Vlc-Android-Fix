@@ -228,7 +228,10 @@ abstract class BaseBrowserTvFragment<T> : Fragment(), BrowserFragmentInterface, 
 
     override fun onPause() {
         val lm = binding.list.layoutManager as LinearLayoutManager
-        previouslySelectedItem = lm.focusedChild?.let { lm.getPosition(it) } ?: 0
+        previouslySelectedItem = focusPositionAfterPause(
+                previouslySelectedItem,
+                lm.focusedChild?.let { lm.getPosition(it) }
+        )
         super.onPause()
     }
 
@@ -467,3 +470,6 @@ internal fun restoredFocusPosition(savedPosition: Int, itemCount: Int): Int? {
     if (savedPosition < 0 || itemCount <= 0) return null
     return savedPosition.coerceAtMost(itemCount - 1)
 }
+
+internal fun focusPositionAfterPause(previousPosition: Int, focusedPosition: Int?): Int =
+        focusedPosition?.takeIf { it >= 0 } ?: previousPosition
