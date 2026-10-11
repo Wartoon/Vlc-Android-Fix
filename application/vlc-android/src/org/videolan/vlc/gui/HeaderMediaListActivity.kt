@@ -356,6 +356,7 @@ open class HeaderMediaListActivity : AudioPlayerContainerActivity(), IEventsHand
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         super.onCreateOptionsMenu(menu)
         menuInflater.inflate(R.menu.playlist_option, menu)
+        menu.findItem(R.id.ml_menu_refresh_thumbnails).isVisible = isPlaylist
         if (!isPlaylist) {
             menu.findItem(R.id.ml_menu_display_options).isVisible = true
         }
@@ -378,6 +379,27 @@ open class HeaderMediaListActivity : AudioPlayerContainerActivity(), IEventsHand
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
+            R.id.ml_menu_refresh_thumbnails -> {
+                val playlist = viewModel.playlist as? Playlist ?: return true
+                val width = binding.backgroundView.width.takeIf { it > 0 } ?: getScreenWidth()
+                lifecycleScope.launch {
+                    val cover = withContext(Dispatchers.IO) {
+                        ThumbnailsProvider.refreshSelectedThumbnails(playlist)
+                        if (playlist.artworkMrl.isNullOrEmpty()) {
+                            ThumbnailsProvider.getPlaylistOrGenreImage("playlist:${playlist.id}_$width", playlist.tracks.toList(), width)
+                        } else {
+                            AudioUtil.fetchCoverBitmap(Uri.decode(playlist.artworkMrl), width)
+                        }
+                    }
+                    if (cover != null) {
+                        binding.cover = BitmapDrawable(resources, cover)
+                        UiTools.blurView(binding.backgroundView, cover, 25f,
+                            UiTools.getColorFromAttribute(this@HeaderMediaListActivity, R.attr.audio_player_background_tint))
+                    }
+                    audioBrowserAdapter.notifyDataSetChanged()
+                }
+                return true
+            }
             R.id.ml_menu_display_options -> {
                 //filter all sorts and keep only applicable ones
                 val sorts = arrayListOf(Medialibrary.TrackId, Medialibrary.SORT_ALPHA, Medialibrary.SORT_FILENAME, Medialibrary.SORT_ARTIST, Medialibrary.SORT_ALBUM, Medialibrary.SORT_DURATION, Medialibrary.SORT_RELEASEDATE, Medialibrary.SORT_LASTMODIFICATIONDATE, Medialibrary.SORT_FILESIZE, Medialibrary.NbMedia).filter {

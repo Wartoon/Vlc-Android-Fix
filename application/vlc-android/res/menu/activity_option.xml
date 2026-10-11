@@ -190,6 +190,13 @@
             android:title="@string/refresh"
             vlc:showAsAction="never" />
     <item
+            android:id="@+id/ml_menu_refresh_thumbnails"
+            android:icon="@drawable/ic_refresh"
+            android:orderInCategory="4"
+            android:title="@string/refresh_thumbnails"
+            android:visible="false"
+            vlc:showAsAction="never" />
+    <item
             android:id="@+id/ml_menu_custom_dir"
             android:contentDescription="@string/add_custom_path_description"
             android:orderInCategory="3"

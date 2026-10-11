@@ -255,6 +255,7 @@ class VideoGridFragment : MediaBrowserFragment<VideosViewModel>(), SwipeRefreshL
         menu.findItem(R.id.ml_menu_last_playlist).isVisible = settings.contains(KEY_MEDIA_LAST_PLAYLIST)
         menu.findItem(R.id.rename_group).isVisible = viewModel.group != null
         menu.findItem(R.id.ungroup).isVisible = viewModel.group != null
+        menu.findItem(R.id.ml_menu_refresh_thumbnails).isVisible = viewModel.group != null || viewModel.folder != null
         menu.findItem(R.id.ml_menu_sortby).isVisible = false
         menu.findItem(R.id.ml_menu_display_options).isVisible = true
         if (requireActivity().isTalkbackIsEnabled()) menu.findItem(R.id.play_all).isVisible = true
@@ -264,6 +265,15 @@ class VideoGridFragment : MediaBrowserFragment<VideosViewModel>(), SwipeRefreshL
         when (item.itemId) {
             R.id.ml_menu_last_playlist -> {
                 MediaUtils.loadlastPlaylist(activity, PLAYLIST_TYPE_VIDEO)
+            }
+            R.id.ml_menu_refresh_thumbnails -> {
+                val selected: MediaLibraryItem? = viewModel.group ?: viewModel.folder
+                selected?.let { source ->
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        withContext(Dispatchers.IO) { ThumbnailsProvider.refreshSelectedThumbnails(source) }
+                        if (::videoListAdapter.isInitialized) videoListAdapter.notifyDataSetChanged()
+                    }
+                }
             }
             R.id.rename_group -> {
                 viewModel.group?.let { renameGroup(it) }

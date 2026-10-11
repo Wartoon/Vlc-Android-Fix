@@ -46,4 +46,10 @@
             android:title="@string/display_settings"
             android:visible="false"
             app:showAsAction="ifRoom|collapseActionView" />
+    <item
+            android:id="@+id/ml_menu_refresh_thumbnails"
+            android:icon="@drawable/ic_refresh"
+            android:title="@string/refresh_thumbnails"
+            android:visible="false"
+            app:showAsAction="never" />
 </menu>
