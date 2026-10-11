@@ -851,8 +851,9 @@ class PlaylistManager(val service: PlaybackService) : MediaWrapperList.EventList
         if (currentMedia.uri.scheme.isSchemeFD()) return
         val locations = StringBuilder()
         val isAudio = isAudioList() || forceVideo || isVideoPlayedAsAudio()
+        // Snapshot before switching dispatchers; stop() clears the shared list immediately after scheduling persistence.
+        val list = mediaList.copy.takeIf { it.isNotEmpty() } ?: return
         withContext(Dispatchers.Default) {
-            val list = mediaList.copy.takeIf { it.isNotEmpty() } ?: return@withContext
             for (mw in list) locations.append(" ").append(mw.uri.toString())
             //We save a concatenated String because putStringSet is APIv11.
             if (isAudio) {
