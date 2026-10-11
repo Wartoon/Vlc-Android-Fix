@@ -119,6 +119,7 @@ import org.videolan.vlc.media.PlaylistManager
 import org.videolan.vlc.media.getAll
 import org.videolan.vlc.providers.medialibrary.VideosProvider
 import org.videolan.vlc.reloadLibrary
+import org.videolan.vlc.util.ThumbnailsProvider
 import org.videolan.vlc.util.ContextOption
 import org.videolan.vlc.util.ContextOption.CTX_ADD_GROUP
 import org.videolan.vlc.util.ContextOption.CTX_ADD_SHORTCUT
@@ -142,6 +143,7 @@ import org.videolan.vlc.util.ContextOption.CTX_PLAY_ALL
 import org.videolan.vlc.util.ContextOption.CTX_PLAY_AS_AUDIO
 import org.videolan.vlc.util.ContextOption.CTX_PLAY_FROM_START
 import org.videolan.vlc.util.ContextOption.CTX_PLAY_NEXT
+import org.videolan.vlc.util.ContextOption.CTX_REFRESH_THUMBNAILS
 import org.videolan.vlc.util.ContextOption.CTX_REMOVE_GROUP
 import org.videolan.vlc.util.ContextOption.CTX_RENAME_GROUP
 import org.videolan.vlc.util.ContextOption.CTX_SET_RINGTONE
@@ -613,7 +615,15 @@ class VideoGridFragment : MediaBrowserFragment<VideosViewModel>(), SwipeRefreshL
     override fun onCtxAction(position: Int, option: ContextOption) {
         if (position >= videoListAdapter.itemCount) return
         val activity = activity ?: return
-        when (val media = videoListAdapter.getItem(position)) {
+        val selected = videoListAdapter.getItem(position) ?: return
+        if (option == CTX_REFRESH_THUMBNAILS) {
+            viewLifecycleOwner.lifecycleScope.launch {
+                withContext(Dispatchers.IO) { ThumbnailsProvider.refreshSelectedThumbnails(selected) }
+                if (position < videoListAdapter.itemCount) videoListAdapter.notifyItemChanged(position)
+            }
+            return
+        }
+        when (val media = selected) {
             is MediaWrapper -> when (option) {
                 CTX_PLAY_FROM_START -> viewModel.playVideo(activity, media, position, fromStart = true)
                 CTX_PLAY_AS_AUDIO -> viewModel.playAudio(activity, media)

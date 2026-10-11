@@ -123,6 +123,85 @@ object ThumbnailsProvider {
         return better
     }
 
+
+    /**
+     * Manual refresh: at most four source frames for one folder, group or playlist.
+     * No background scanning or unbounded SMB network activity.
+     */
+    @WorkerThread
+    fun refreshSelectedThumbnails(item: MediaLibraryItem, width: Int = 320): Boolean {
+        val requestedWidth = width.coerceIn(96, 512)
+        return when (item) {
+            is MediaWrapper -> refreshSingleVideoThumbnail(item, requestedWidth)
+            is Folder -> {
+                val videos = item.media(Folder.TYPE_FOLDER_VIDEO, Medialibrary.SORT_DEFAULT, true, true, false, MAX_IMAGES, 0)
+                var refreshed = false
+                videos.filterNotNull().take(MAX_IMAGES).forEach {
+                    refreshed = refreshSingleVideoThumbnail(it, requestedWidth) || refreshed
+                }
+                BitmapCache.removeBitmapKeysStartingWith("folder:${item.mMrl.sanitizePath()}:")
+                refreshed || videos.isNotEmpty()
+            }
+            is VideoGroup -> {
+                val videos = item.media(Medialibrary.SORT_DEFAULT, true, true, false, MAX_IMAGES, 0)
+                var refreshed = false
+                videos.filterNotNull().take(MAX_IMAGES).forEach {
+                    refreshed = refreshSingleVideoThumbnail(it, requestedWidth) || refreshed
+                }
+                BitmapCache.removeBitmapKeysStartingWith("videogroup:${item.title}:")
+                refreshed || videos.isNotEmpty()
+            }
+            else -> if (item.itemType == MediaLibraryItem.TYPE_PLAYLIST) {
+                item.tracks.asSequence().filter { it.type == MediaWrapper.TYPE_VIDEO }.take(MAX_IMAGES).forEach {
+                    refreshSingleVideoThumbnail(it, requestedWidth)
+                }
+                BitmapCache.removeBitmapKeysStartingWith("playlist:${item.id}_")
+                true
+            } else false
+        }
+    }
+
+    @WorkerThread
+    private fun refreshSingleVideoThumbnail(media: MediaWrapper, width: Int): Boolean {
+        if (media.type != MediaWrapper.TYPE_VIDEO) return false
+        val oldArtwork = media.artworkMrl
+        if (media.uri.scheme.isSchemeFile()) {
+            val path = media.uri.path ?: return false
+            val original = synchronized(lock) {
+                ThumbnailUtils.createVideoThumbnail(path, MediaStore.Video.Thumbnails.MINI_KIND)
+            } ?: return false
+            synchronized(lock) { checkedDarkVideos.remove(media.uri.toString()) }
+            val selected = betterLocalVideoFrame(media, original) ?: original
+            val oldKey = getMediaThumbnailPath(true, media)
+            if (media.id > 0L) {
+                val dir = AppContextProvider.appContext.getExternalFilesDir(null) ?: return false
+                val target = File(dir.absolutePath + MEDIALIB_FOLDER_NAME, "${media.id}.jpg")
+                if (!BitmapUtil.saveOnDisk(selected, target.absolutePath)) return false
+                media.setThumbnail(target.absolutePath)
+                media.artworkURL = target.absolutePath
+            }
+            oldArtwork?.let {
+                BitmapCache.removeBitmapFromMemCache(it)
+                BitmapCache.removeBitmapKeysStartingWith(it + "_")
+            }
+            oldKey?.let {
+                BitmapCache.removeBitmapFromMemCache(it)
+                BitmapCache.removeBitmapKeysStartingWith(it + "_")
+            }
+            getMediaThumbnailPath(true, media)?.let {
+                BitmapCache.removeBitmapFromMemCache(it)
+                BitmapCache.removeBitmapKeysStartingWith(it + "_")
+            }
+            BitmapCache.addBitmapToMemCache(getMediaCacheKey(true, media, width.toString()), selected)
+            return true
+        }
+        // Network frames are requested only by an explicit button press.
+        if (media.id <= 0L) return false
+        media.requestThumbnail(width, 0.4f)
+        oldArtwork?.let { BitmapCache.removeBitmapKeysStartingWith(it + "_") }
+        return true
+    }
+
     @WorkerThread
     fun getFolderThumbnail(folder: Folder, width: Int): Bitmap? {
         val media = folder.media(Folder.TYPE_FOLDER_VIDEO, Medialibrary.SORT_DEFAULT, true, true, false,4, 0).filterNotNull()

@@ -88,6 +88,7 @@ import org.videolan.vlc.interfaces.IEventsHandler
 import org.videolan.vlc.media.MediaUtils
 import org.videolan.vlc.media.PlaylistManager
 import org.videolan.vlc.providers.medialibrary.MedialibraryProvider
+import org.videolan.vlc.util.ThumbnailsProvider
 import org.videolan.vlc.util.ContextOption
 import org.videolan.vlc.util.ContextOption.CTX_ADD_SHORTCUT
 import org.videolan.vlc.util.ContextOption.CTX_ADD_TO_PLAYLIST
@@ -104,6 +105,7 @@ import org.videolan.vlc.util.ContextOption.CTX_PLAY
 import org.videolan.vlc.util.ContextOption.CTX_PLAY_AS_AUDIO
 import org.videolan.vlc.util.ContextOption.CTX_PLAY_NEXT
 import org.videolan.vlc.util.ContextOption.CTX_PLAY_SHUFFLE
+import org.videolan.vlc.util.ContextOption.CTX_REFRESH_THUMBNAILS
 import org.videolan.vlc.util.ContextOption.CTX_RENAME
 import org.videolan.vlc.util.ContextOption.CTX_SET_RINGTONE
 import org.videolan.vlc.util.ContextOption.CTX_SHARE
@@ -480,6 +482,7 @@ abstract class BaseAudioBrowser<T : MedialibraryViewModel> : MediaBrowserFragmen
             }
             MediaLibraryItem.TYPE_PLAYLIST -> {
                 createCtxPlaylistAlbumFlags().apply {
+                    add(CTX_REFRESH_THUMBNAILS)
                     add(CTX_PLAY_AS_AUDIO)
                     remove(CTX_GO_TO_ALBUM_ARTIST)
                     remove(CTX_GO_TO_ARTIST)
@@ -516,6 +519,10 @@ abstract class BaseAudioBrowser<T : MedialibraryViewModel> : MediaBrowserFragmen
         if (position >= getCurrentAdapter()?.itemCount ?: 0) return
         val media = getCurrentAdapter()?.getItem(position) ?: return
         when (option) {
+            CTX_REFRESH_THUMBNAILS -> viewLifecycleOwner.lifecycleScope.launch {
+                withContext(Dispatchers.IO) { ThumbnailsProvider.refreshSelectedThumbnails(media) }
+                getCurrentAdapter()?.notifyItemChanged(position)
+            }
             CTX_PLAY -> MediaUtils.playTracks(requireActivity(), media, 0)
             CTX_PLAY_SHUFFLE -> MediaUtils.playTracks(requireActivity(), media, SecureRandom().nextInt(min(media.tracksCount, MEDIALIBRARY_PAGE_SIZE)), true)
             CTX_PLAY_AS_AUDIO -> lifecycleScope.launch(Dispatchers.IO) {

@@ -74,6 +74,7 @@ import org.videolan.vlc.util.ContextOption.CTX_PLAY_FROM_START
 import org.videolan.vlc.util.ContextOption.CTX_PLAY_NEXT
 import org.videolan.vlc.util.ContextOption.CTX_PLAY_SHUFFLE
 import org.videolan.vlc.util.ContextOption.CTX_QUICK_PLAY
+import org.videolan.vlc.util.ContextOption.CTX_REFRESH_THUMBNAILS
 import org.videolan.vlc.util.ContextOption.CTX_REMOVE_FROM_PLAYLIST
 import org.videolan.vlc.util.ContextOption.CTX_REMOVE_GROUP
 import org.videolan.vlc.util.ContextOption.CTX_RENAME
@@ -162,6 +163,7 @@ class ContextSheet : VLCBottomSheetDialogFragment() {
         if (flags.contains(CTX_PLAY_NEXT)) add(Simple(CTX_PLAY_NEXT, getString(R.string.insert_next), R.drawable.ic_play_next))
         if (flags.contains(CTX_DOWNLOAD_SUBTITLES) && VlcMigrationHelper.isLolliPopOrLater) add(Simple(CTX_DOWNLOAD_SUBTITLES, getString(R.string.download_subtitles), R.drawable.ic_download_subtitles))
         if (flags.contains(CTX_INFORMATION)) add(Simple(CTX_INFORMATION, getString(R.string.info), R.drawable.ic_information))
+        if (flags.contains(CTX_REFRESH_THUMBNAILS)) add(Simple(CTX_REFRESH_THUMBNAILS, getString(R.string.refresh_thumbnails), R.drawable.ic_refresh))
         if (flags.contains(CTX_GO_TO_ALBUM)) add(Simple(CTX_GO_TO_ALBUM, getString(R.string.go_to_album), R.drawable.ic_album))
         if (flags.contains(CTX_GO_TO_ARTIST)) add(Simple(CTX_GO_TO_ARTIST, getString(R.string.go_to_artist), R.drawable.ic_no_artist))
         if (flags.contains(CTX_GO_TO_ALBUM_ARTIST)) add(Simple(CTX_GO_TO_ALBUM_ARTIST, getString(R.string.go_to_album_artist), R.drawable.ic_no_artist))

@@ -107,6 +107,7 @@ import org.videolan.vlc.interfaces.IEventsHandler
 import org.videolan.vlc.interfaces.IListEventsHandler
 import org.videolan.vlc.media.MediaUtils
 import org.videolan.vlc.media.PlaylistManager
+import org.videolan.vlc.util.ThumbnailsProvider
 import org.videolan.vlc.util.ContextOption
 import org.videolan.vlc.util.ContextOption.CTX_ADD_SHORTCUT
 import org.videolan.vlc.util.ContextOption.CTX_ADD_TO_PLAYLIST
@@ -120,6 +121,7 @@ import org.videolan.vlc.util.ContextOption.CTX_GO_TO_ARTIST
 import org.videolan.vlc.util.ContextOption.CTX_INFORMATION
 import org.videolan.vlc.util.ContextOption.CTX_PLAY_ALL
 import org.videolan.vlc.util.ContextOption.CTX_PLAY_NEXT
+import org.videolan.vlc.util.ContextOption.CTX_REFRESH_THUMBNAILS
 import org.videolan.vlc.util.ContextOption.CTX_RENAME
 import org.videolan.vlc.util.ContextOption.CTX_SET_RINGTONE
 import org.videolan.vlc.util.ContextOption.CTX_SHARE
@@ -460,6 +462,7 @@ open class HeaderMediaListActivity : AudioPlayerContainerActivity(), IEventsHand
                     if (item.isFavorite) add(CTX_FAV_REMOVE) else add(CTX_FAV_ADD)
                     if (media.type == MediaWrapper.TYPE_STREAM || (media.type == MediaWrapper.TYPE_ALL && isSchemeHttpOrHttps(media.uri.scheme)))
                         addAll(CTX_COPY, CTX_RENAME)
+                    if (media.type == MediaWrapper.TYPE_VIDEO) add(CTX_REFRESH_THUMBNAILS)
                     if (media.type == MediaWrapper.TYPE_AUDIO) {
                         add(CTX_GO_TO_ARTIST)
                         if (BuildConfig.DEBUG) Log.d("CtxPrep", "Artist id is: ${media.artistId}, album artist is: ${media.albumArtistId}")
@@ -574,6 +577,10 @@ open class HeaderMediaListActivity : AudioPlayerContainerActivity(), IEventsHand
         if (position >= audioBrowserAdapter.itemCount) return
         val media = audioBrowserAdapter.getItem(position) as MediaWrapper? ?: return
         when (option) {
+            CTX_REFRESH_THUMBNAILS -> lifecycleScope.launch {
+                withContext(Dispatchers.IO) { ThumbnailsProvider.refreshSelectedThumbnails(media) }
+                if (position < audioBrowserAdapter.itemCount) audioBrowserAdapter.notifyItemChanged(position)
+            }
             CTX_INFORMATION -> showInfoDialog(media)
             CTX_DELETE -> lifecycleScope.launch { removeItem(position, media) }
             CTX_APPEND -> MediaUtils.appendMedia(this, media.tracks)

@@ -92,6 +92,17 @@ object BitmapCache {
         if (key != null && bitmap != null) memCache.put(key, bitmap)
     }
 
+    /** Invalidate only artwork belonging to the manually selected entry. */
+    @Synchronized
+    fun removeBitmapKeysStartingWith(prefix: String) {
+        memCache.snapshot().keys.filter { it.startsWith(prefix) }.forEach { memCache.remove(it) }
+    }
+
+    @Synchronized
+    fun removeBitmapFromMemCache(key: String?) {
+        if (key != null) memCache.remove(key)
+    }
+
     @Synchronized
     fun clear() {
         memCache.evictAll()

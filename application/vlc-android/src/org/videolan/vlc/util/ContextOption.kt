@@ -62,7 +62,8 @@ enum class ContextOption : Flag {
     CTX_GO_TO_ALBUM,
     CTX_GO_TO_ARTIST,
     CTX_GO_TO_ALBUM_ARTIST,
-    CTX_QUICK_PLAY;
+    CTX_QUICK_PLAY,
+    CTX_REFRESH_THUMBNAILS;
 
     override fun toLong() = 1L shl this.ordinal
 
@@ -72,7 +73,7 @@ enum class ContextOption : Flag {
         }
 
         fun createCtxVideoFlags() = createBaseFlags().apply {
-            addAll(CTX_DELETE, CTX_DOWNLOAD_SUBTITLES, CTX_INFORMATION)
+            addAll(CTX_DELETE, CTX_DOWNLOAD_SUBTITLES, CTX_INFORMATION, CTX_REFRESH_THUMBNAILS)
             addAll(CTX_PLAY, CTX_PLAY_ALL, CTX_PLAY_AS_AUDIO, CTX_PLAY_NEXT)
             addAll(CTX_SET_RINGTONE, CTX_SHARE)
         }
@@ -96,12 +97,12 @@ enum class ContextOption : Flag {
 
         fun createCtxVideoGroupFlags() = createBaseFlags().apply {
             remove(CTX_ADD_SHORTCUT)
-            addAll(CTX_ADD_GROUP, CTX_MARK_ALL_AS_PLAYED, CTX_MARK_ALL_AS_UNPLAYED, CTX_PLAY_ALL, CTX_RENAME_GROUP, CTX_UNGROUP)
+            addAll(CTX_ADD_GROUP, CTX_MARK_ALL_AS_PLAYED, CTX_MARK_ALL_AS_UNPLAYED, CTX_PLAY_ALL, CTX_RENAME_GROUP, CTX_UNGROUP, CTX_REFRESH_THUMBNAILS)
         }
 
         fun createCtxFolderFlags() = createBaseFlags().apply {
             remove(CTX_ADD_SHORTCUT)
-            addAll(CTX_BAN_FOLDER, CTX_MARK_ALL_AS_PLAYED, CTX_MARK_ALL_AS_UNPLAYED, CTX_PLAY_ALL)
+            addAll(CTX_BAN_FOLDER, CTX_MARK_ALL_AS_PLAYED, CTX_MARK_ALL_AS_UNPLAYED, CTX_PLAY_ALL, CTX_REFRESH_THUMBNAILS)
         }
     }
 }
