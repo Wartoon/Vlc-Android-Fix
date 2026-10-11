@@ -38,11 +38,22 @@ object NetworkConnectionManager {
     val isMetered = MutableLiveData(true)
     val hasConnection = MutableLiveData(false)
 
+    private val activeNetworks = mutableSetOf<Network>()
+    private var connectivityManager: ConnectivityManager? = null
+
+    private fun updateConnection(network: Network, available: Boolean) {
+        val connected = synchronized(activeNetworks) {
+            if (available) activeNetworks.add(network) else activeNetworks.remove(network)
+            activeNetworks.isNotEmpty()
+        }
+        hasConnection.postValue(connected)
+    }
+
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
             super.onAvailable(network)
-            if (hasConnection.value == false) hasConnection.postValue(true)
-
+            updateConnection(network, true)
+            connectivityManager?.let { isMetered.postValue(it.isActiveNetworkMetered) }
         }
 
         // Network capabilities have changed for the network
@@ -51,13 +62,18 @@ object NetworkConnectionManager {
                 networkCapabilities: NetworkCapabilities
         ) {
             super.onCapabilitiesChanged(network, networkCapabilities)
-            val metered = !networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+            val metered = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                !networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+            } else {
+                connectivityManager?.isActiveNetworkMetered ?: isMetered.value ?: true
+            }
             if (metered != isMetered.value) isMetered.postValue(metered)
         }
 
         override fun onLost(network: Network) {
             super.onLost(network)
-            if (hasConnection.value == true) hasConnection.postValue(false)
+            updateConnection(network, false)
+            connectivityManager?.let { isMetered.postValue(it.isActiveNetworkMetered) }
         }
     }
     @Volatile private var started = false
@@ -68,13 +84,14 @@ object NetworkConnectionManager {
         val networkRequest = NetworkRequest.Builder()
                 .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                 .build()
-        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        connectivityManager = manager
         try {
             // Observe connectivity instead of requesting that Android maintain a network.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                connectivityManager.registerDefaultNetworkCallback(networkCallback)
+                manager.registerDefaultNetworkCallback(networkCallback)
             } else {
-                connectivityManager.registerNetworkCallback(networkRequest, networkCallback)
+                manager.registerNetworkCallback(networkRequest, networkCallback)
             }
             started = true
         } catch (e: SecurityException) {
