@@ -22,16 +22,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     outputs:
-      branch: ${steps.target.outputs.branch }
-      base_sha: ${steps.base.outputs.sha }
-      changed: ${steps.patch.outputs.changed }
+      branch: ${{ steps.target.outputs.branch }}
+      base_sha: ${{ steps.base.outputs.sha }}
+      changed: ${{ steps.patch.outputs.changed }}
     steps:
       - name: Select branch
         id: target
         shell: bash
         env:
-          REQUESTED: ${inputs.target }
-          EVENT_NAME: ${github.event_name }
+          REQUESTED: ${{ inputs.target }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
           branch="$REQUESTED"
@@ -49,7 +49,7 @@ jobs:
       - name: Check AI API access
         id: key
         env:
-          API_KEY: ${secrets.OPENAI_API_KEY }
+          API_KEY: ${{ secrets.OPENAI_API_KEY }}
         shell: bash
         run: |
           if [[ -z "$API_KEY" ]]; then
@@ -63,7 +63,7 @@ jobs:
         if: steps.key.outputs.enabled == 'true'
         uses: actions/checkout@v4
         with:
-          ref: ${steps.target.outputs.branch }
+          ref: ${{ steps.target.outputs.branch }}
           persist-credentials: false
           fetch-depth: 1
 
@@ -77,7 +77,7 @@ jobs:
         if: steps.key.outputs.enabled == 'true'
         uses: openai/codex-action@v1
         with:
-          openai-api-key: ${secrets.OPENAI_API_KEY }
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           permission-profile: ':workspace'
           safety-strategy: drop-sudo
           prompt: |
@@ -85,7 +85,7 @@ jobs:
             Inspect actual source and call paths. Correct at most ONE demonstrable,
             low-risk bug. If no proven safe correction exists, leave Git clean.
             Do not make speculative changes, refactorings or cosmetic improvements.
-            Branch: ${steps.target.outputs.branch }.
+            Branch: ${{ steps.target.outputs.branch }}.
 
             TV priorities: remote-control D-pad focus, returning from playback,
             directory focus restoration, grid/list, scrolling, resume and SMB.
@@ -109,7 +109,7 @@ jobs:
         if: steps.key.outputs.enabled == 'true'
         shell: bash
         env:
-          TARGET: ${steps.target.outputs.branch }
+          TARGET: ${{ steps.target.outputs.branch }}
         run: |
           set -euo pipefail
           git diff --check
@@ -143,7 +143,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: vlc-autofix-patch
-          path: ${runner.temp }/vlc-fix.patch
+          path: ${{ runner.temp }}/vlc-fix.patch
           if-no-files-found: error
           retention-days: 2
 
@@ -160,21 +160,21 @@ jobs:
       - name: Clean checkout
         uses: actions/checkout@v4
         with:
-          ref: ${needs.propose.outputs.branch }
+          ref: ${{ needs.propose.outputs.branch }}
           fetch-depth: 1
 
       - name: Download generated patch
         uses: actions/download-artifact@v4
         with:
           name: vlc-autofix-patch
-          path: ${runner.temp }/vlc-fix
+          path: ${{ runner.temp }}/vlc-fix
 
       - name: Check patch and publish commit
         id: commit
         shell: bash
         env:
-          TARGET: ${needs.propose.outputs.branch }
-          BASE_SHA: ${needs.propose.outputs.base_sha }
+          TARGET: ${{ needs.propose.outputs.branch }}
+          BASE_SHA: ${{ needs.propose.outputs.base_sha }}
         run: |
           set -euo pipefail
           echo 'pushed=false' >> "$GITHUB_OUTPUT"
@@ -217,8 +217,8 @@ jobs:
         if: steps.commit.outputs.pushed == 'true'
         shell: bash
         env:
-          GH_TOKEN: ${github.token }
-          TARGET: ${needs.propose.outputs.branch }
+          GH_TOKEN: ${{ github.token }}
+          TARGET: ${{ needs.propose.outputs.branch }}
         run: |
           set -euo pipefail
           gh api --method POST \
