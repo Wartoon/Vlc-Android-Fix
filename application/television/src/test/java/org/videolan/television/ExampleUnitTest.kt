@@ -3,6 +3,7 @@ package org.videolan.television
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import org.videolan.television.ui.browser.focusPositionAfterPause
 import org.videolan.television.ui.browser.restoredFocusPosition
 
 class ExampleUnitTest {
@@ -20,5 +21,16 @@ class ExampleUnitTest {
     fun noPositionIsRestoredForEmptyListOrMissingSelection() {
         assertNull(restoredFocusPosition(savedPosition = 2, itemCount = 0))
         assertNull(restoredFocusPosition(savedPosition = -1, itemCount = 5))
+    }
+
+    @Test
+    fun pauseWithoutFocusedChildKeepsPreviousSelection() {
+        assertEquals(4, focusPositionAfterPause(previousPosition = 4, focusedPosition = null))
+        assertEquals(4, focusPositionAfterPause(previousPosition = 4, focusedPosition = -1))
+    }
+
+    @Test
+    fun pauseWithFocusedChildUpdatesSelection() {
+        assertEquals(2, focusPositionAfterPause(previousPosition = 4, focusedPosition = 2))
     }
 }
