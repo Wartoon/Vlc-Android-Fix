@@ -40,6 +40,19 @@ import org.videolan.vlc.util.isOTG
 import org.videolan.vlc.util.isSD
 import org.videolan.vlc.util.isSchemeFile
 
+internal fun <T : Any> dispatchMediaTvItemPayloads(
+    hasThumbnailPayload: Boolean,
+    selectionPayload: T?,
+    hasUnknownPayload: Boolean,
+    applySelection: (T) -> Unit,
+    applyThumbnail: () -> Unit
+): Boolean {
+    if (hasUnknownPayload || (!hasThumbnailPayload && selectionPayload == null)) return false
+    selectionPayload?.let(applySelection)
+    if (hasThumbnailPayload) applyThumbnail()
+    return true
+}
+
 class MediaTvItemAdapter(type: Int, private val eventsHandler: IEventsHandler<MediaLibraryItem>, var itemSize: Int, private var inGrid: Boolean = true, private val allowNetworkThumbnailGeneration: Boolean = false) : PagedListAdapter<MediaLibraryItem, MediaTvItemAdapter.AbstractMediaItemViewHolder<ViewDataBinding>>(DIFF_CALLBACK), FastScroller.SeparatedAdapter, TvItemAdapter {
     override var focusNext = -1
     override fun displaySwitch(inGrid: Boolean) {
@@ -85,14 +98,23 @@ class MediaTvItemAdapter(type: Int, private val eventsHandler: IEventsHandler<Me
     }
 
     override fun onBindViewHolder(holder: AbstractMediaItemViewHolder<ViewDataBinding>, position: Int, payloads: List<Any>) {
-        val thumbnail = payloads.filterIsInstance<ThumbnailRefreshPayload>().lastOrNull()
-        if (thumbnail != null) {
-            refreshThumbnail(holder, thumbnail.media)
-        } else if (!payloads.isNullOrEmpty() && payloads[0] is MediaLibraryItem)  {
-            val isSelected = (payloads[0] as MediaLibraryItem).hasStateFlags(MediaLibraryItem.FLAG_SELECTED)
-            holder.setCoverlay(isSelected)
-            holder.selectView(isSelected)
-        } else onBindViewHolder(holder, position)
+        val thumbnails = payloads.filterIsInstance<ThumbnailRefreshPayload>()
+        val selection = payloads.filterIsInstance<MediaLibraryItem>().lastOrNull()
+        val hasUnknownPayload = payloads.any { it !is ThumbnailRefreshPayload && it !is MediaLibraryItem }
+        val handled = dispatchMediaTvItemPayloads(
+            hasThumbnailPayload = thumbnails.isNotEmpty(),
+            selectionPayload = selection,
+            hasUnknownPayload = hasUnknownPayload,
+            applySelection = { item ->
+                val isSelected = item.hasStateFlags(MediaLibraryItem.FLAG_SELECTED)
+                holder.setCoverlay(isSelected)
+                holder.selectView(isSelected)
+            },
+            applyThumbnail = {
+                thumbnails.lastOrNull()?.let { refreshThumbnail(holder, it.media) }
+            }
+        )
+        if (!handled) onBindViewHolder(holder, position)
     }
 
     override fun onViewRecycled(holder: AbstractMediaItemViewHolder<ViewDataBinding>) {

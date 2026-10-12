@@ -867,7 +867,6 @@ class PlaybackService : MediaBrowserServiceCompat(), LifecycleOwner, CoroutineSc
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         forceForeground(intent?.extras?.getBoolean("foreground", false) == true)
         dispatcher.onServicePreSuperOnStart()
-        setupScope()
         when (intent?.action) {
             Intent.ACTION_MEDIA_BUTTON -> {
                 if (AndroidDevices.hasTsp || AndroidDevices.hasPlayServices) MediaButtonReceiver.handleIntent(mediaSession, intent)

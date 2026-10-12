@@ -24,6 +24,9 @@ import org.videolan.vlc.gui.view.EmptyLoadingState
 import org.videolan.vlc.interfaces.IEventsHandler
 import org.videolan.vlc.providers.medialibrary.MedialibraryProvider
 
+internal fun <T> resolveMediaBrowserItem(savedItem: T?, argumentItem: T?, intentItem: T?): T? =
+    savedItem ?: argumentItem ?: intentItem
+
 class MediaBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>() {
     override fun provideAdapter(eventsHandler: IEventsHandler<MediaLibraryItem>, itemSize: Int): TvItemAdapter {
         return MediaTvItemAdapter(when ((viewModel as MediaBrowserViewModel).category) {
@@ -66,8 +69,10 @@ class MediaBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val currentItem = if (savedInstanceState != null) savedInstanceState.parcelable<Parcelable>(ITEM) as? MediaLibraryItem
-        else requireActivity().intent.parcelable<Parcelable>(ITEM) as? MediaLibraryItem
+        val savedItem = savedInstanceState?.parcelable<Parcelable>(ITEM) as? MediaLibraryItem
+        val argumentItem = arguments?.parcelable<Parcelable>(ITEM) as? MediaLibraryItem
+        val intentItem = requireActivity().intent.parcelable<Parcelable>(ITEM) as? MediaLibraryItem
+        val currentItem = resolveMediaBrowserItem(savedItem, argumentItem, intentItem)
 
         viewModel = getMediaBrowserModel(arguments?.getLong(CATEGORY, CATEGORY_SONGS) ?: CATEGORY_SONGS, currentItem)
     }

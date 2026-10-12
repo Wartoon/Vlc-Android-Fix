@@ -42,7 +42,6 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.vectordrawable.graphics.drawable.AnimatedVectorDrawableCompat
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -176,21 +175,24 @@ class AudioPlayerActivity : BaseTvActivity(),KeycodeListener, PlaybackService.Ca
             val name = bundle.getString(RENAME_DIALOG_NEW_NAME) ?: return@setFragmentResultListener
             bookmarkListDelegate.renameBookmark(media as Bookmark, name)
         }
-        PlaybackService.serviceFlow.onEach { onServiceChanged(it) }.launchIn(MainScope())
+        PlaybackService.serviceFlow.onEach { onServiceChanged(it) }.launchIn(lifecycleScope)
         PlaylistManager.showAudioPlayer.observe(this) { showPlayer ->
             if (!showPlayer && playbackStarted) finish()
         }
     }
 
     private fun onServiceChanged(it: PlaybackService?) {
-        it?.addCallback(this)
+        if (service === it) return
+        service?.removeCallback(this)
         service = it
+        it?.addCallback(this)
     }
 
     override fun onDestroy() {
-        super.onDestroy()
-        optionsDelegate = null
         service?.removeCallback(this)
+        service = null
+        optionsDelegate = null
+        super.onDestroy()
     }
 
     private var timelineListener: SeekBar.OnSeekBarChangeListener = object : SeekBar.OnSeekBarChangeListener {
