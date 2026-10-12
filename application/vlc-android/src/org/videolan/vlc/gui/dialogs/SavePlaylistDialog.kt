@@ -76,9 +76,9 @@ internal fun <T> nonDuplicateItems(
     existingItems: Array<T>,
     incomingItems: Array<T>,
     areEqual: (T, T) -> Boolean
-): Array<T> = incomingItems.filter { candidate ->
+): List<T> = incomingItems.filter { candidate ->
     existingItems.none { existing -> areEqual(existing, candidate) }
-}.toTypedArray()
+}
 
 internal fun <T> selectedItemIndices(items: List<T>, selectedItems: List<T>): List<Int> =
     selectedItems.mapNotNull { selected -> items.indexOf(selected).takeIf { it >= 0 } }
@@ -415,7 +415,7 @@ class SavePlaylistDialog : VLCBottomSheetDialogFragment(), View.OnClickListener,
     private fun getNonDuplicateTracks(currentTracks: Array<MediaWrapper>, newTracks: Array<MediaWrapper>): Array<MediaWrapper> {
         return nonDuplicateItems(currentTracks, newTracks) { currentItem, newItem ->
             currentItem.equals(newItem)
-        }
+        }.toTypedArray()
     }
 
     companion object : DependencyProvider<Any>() {

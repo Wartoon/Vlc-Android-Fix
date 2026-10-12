@@ -1,6 +1,5 @@
 package org.videolan.vlc.gui.dialogs
 
-import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -12,8 +11,8 @@ class SavePlaylistDialogRegressionTest {
         val firstPlaylist = nonDuplicateItems(arrayOf("one"), incoming) { a, b -> a == b }
         val secondPlaylist = nonDuplicateItems(arrayOf("two"), incoming) { a, b -> a == b }
 
-        assertArrayEquals(arrayOf("two", "three"), firstPlaylist)
-        assertArrayEquals(arrayOf("one", "three"), secondPlaylist)
+        assertEquals(listOf("two", "three"), firstPlaylist)
+        assertEquals(listOf("one", "three"), secondPlaylist)
     }
 
     @Test
@@ -22,7 +21,7 @@ class SavePlaylistDialogRegressionTest {
 
         val newItems = nonDuplicateItems(arrayOf("one", "two"), incoming) { a, b -> a == b }
 
-        assertArrayEquals(emptyArray<String>(), newItems)
+        assertEquals(emptyList<String>(), newItems)
     }
 
     @Test
