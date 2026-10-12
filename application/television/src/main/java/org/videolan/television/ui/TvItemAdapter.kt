@@ -12,5 +12,5 @@ interface TvItemAdapter : TvFocusableAdapter {
     fun isEmpty() : Boolean
     var focusNext: Int
     fun displaySwitch(inGrid: Boolean)
-    fun thumbnailReady(media: MediaWrapper)
+    fun thumbnailReady(media: MediaWrapper) {}
 }
