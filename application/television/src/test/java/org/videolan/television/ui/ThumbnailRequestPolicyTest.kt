@@ -31,6 +31,34 @@ class ThumbnailRequestPolicyTest {
     }
 
     @Test
+    fun indexesUnindexedRemoteVideoOnlyWhenItsFolderIsExplicitlyOpened() {
+        assertTrue(ThumbnailGenerationPolicy.shouldIndexNetworkThumbnailMedia(
+            isLocalFile = false,
+            mediaId = 0L,
+            isVideo = true,
+            explicitlyOpenedFolder = true
+        ))
+        assertFalse(ThumbnailGenerationPolicy.shouldIndexNetworkThumbnailMedia(
+            isLocalFile = false,
+            mediaId = 0L,
+            isVideo = true,
+            explicitlyOpenedFolder = false
+        ))
+        assertFalse(ThumbnailGenerationPolicy.shouldIndexNetworkThumbnailMedia(
+            isLocalFile = false,
+            mediaId = 0L,
+            isVideo = false,
+            explicitlyOpenedFolder = true
+        ))
+        assertFalse(ThumbnailGenerationPolicy.shouldIndexNetworkThumbnailMedia(
+            isLocalFile = true,
+            mediaId = 0L,
+            isVideo = true,
+            explicitlyOpenedFolder = true
+        ))
+    }
+
+    @Test
     fun aggregateCoversDoNotReceivePermissionToRequestRemoteThumbnails() {
         assertFalse(ThumbnailGenerationPolicy.shouldRequestNetworkThumbnail(
             isLocalFile = false,
