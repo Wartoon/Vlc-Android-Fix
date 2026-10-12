@@ -72,6 +72,17 @@ import org.videolan.vlc.viewmodels.browser.getBrowserModel
 import java.util.LinkedList
 import java.util.concurrent.atomic.AtomicBoolean
 
+internal fun <T> nonDuplicateItems(
+    existingItems: Array<T>,
+    incomingItems: Array<T>,
+    areEqual: (T, T) -> Boolean
+): Array<T> = incomingItems.filter { candidate ->
+    existingItems.none { existing -> areEqual(existing, candidate) }
+}.toTypedArray()
+
+internal fun <T> selectedItemIndices(items: List<T>, selectedItems: List<T>): List<Int> =
+    selectedItems.mapNotNull { selected -> items.indexOf(selected).takeIf { it >= 0 } }
+
 class SavePlaylistDialog : VLCBottomSheetDialogFragment(), View.OnClickListener,
         TextView.OnEditorActionListener, SimpleAdapter.ClickHandler {
     override fun getDefaultState(): Int = STATE_EXPANDED
@@ -79,7 +90,6 @@ class SavePlaylistDialog : VLCBottomSheetDialogFragment(), View.OnClickListener,
     override fun needToManageOrientation(): Boolean = false
 
     var selectedPlaylist: ArrayList<Playlist>? = null
-    var nonDuplicateTracks: Array<MediaWrapper>? = null
     private lateinit var currentPlaylist: Playlist
     private lateinit var currentTracks: Array<MediaWrapper>
     private var lastAddedPlaylist: MediaLibraryItem? = null
@@ -102,6 +112,7 @@ class SavePlaylistDialog : VLCBottomSheetDialogFragment(), View.OnClickListener,
 
     private var playlistIterator: Iterator<MediaLibraryItem>? = null
     private var currentItem: MediaLibraryItem? = null
+    private var addOnlyNonDuplicateTracks = false
 
     private val coroutineContextProvider: CoroutineContextProvider
     private val alreadyAdding = AtomicBoolean(false)
@@ -194,7 +205,16 @@ class SavePlaylistDialog : VLCBottomSheetDialogFragment(), View.OnClickListener,
         }
         binding.list.layoutManager = LinearLayoutManager(view.context)
         binding.list.adapter = adapter
-        adapter.submitList(listOf<MediaLibraryItem>(*medialibrary.getPlaylists(Playlist.Type.All, false).apply { forEach { it.description = resources.getQuantityString(R.plurals.media_quantity, it.tracksCount, it.tracksCount) } }))
+        val playlists = listOf<MediaLibraryItem>(*medialibrary.getPlaylists(Playlist.Type.All, false).apply { forEach { it.description = resources.getQuantityString(R.plurals.media_quantity, it.tracksCount, it.tracksCount) } })
+        adapter.submitList(playlists) {
+            if (view != null) selectedPlaylist?.let { savedPlaylists ->
+                val restoredIndices = selectedItemIndices(adapter.currentList, savedPlaylists)
+                restoredIndices.forEach(adapter.multiSelectHelper::toggleSelection)
+                if (restoredIndices.isNotEmpty()) {
+                    binding.selectedPlaylistCount.text = resources.getString(R.string.selection_count, restoredIndices.size)
+                }
+            }
+        }
         if (!Tools.isArrayEmpty(newTracks)) binding.dialogPlaylistSave.setText(R.string.save)
         updateEmptyView()
         parentFragmentManager.setFragmentResultListener(
@@ -202,27 +222,21 @@ class SavePlaylistDialog : VLCBottomSheetDialogFragment(), View.OnClickListener,
                 viewLifecycleOwner) { _: String, bundle: Bundle ->
             when (bundle.getInt(OPTION_KEY)) {
                 ADD_ALL -> {
+                    addOnlyNonDuplicateTracks = false
                     processNextItem(newTracks)
                 }
                 ADD_NEW -> {
-                    processNextItem(nonDuplicateTracks!!)
+                    addOnlyNonDuplicateTracks = true
+                    processNextItem(newTracks)
                 }
                 CANCEL, NO_OPTION -> {
-                    // do nothing
+                    addOnlyNonDuplicateTracks = false
                 }
             }
         }
         binding.replaceSwitch.isChecked = Settings.getInstance(requireActivity()).getBoolean(PLAYLIST_REPLACE, false)
         binding.replaceSwitch.setOnCheckedChangeListener { _, isChecked ->
             Settings.getInstance(requireActivity()).putSingle(PLAYLIST_REPLACE, isChecked)
-        }
-        selectedPlaylist?.let {
-            it.forEachIndexed { index, playlist ->
-                adapter.multiSelectHelper.toggleSelection(index)
-            }
-            if (it.size > 0){
-                binding.selectedPlaylistCount.text = resources.getString(R.string.selection_count, it.size)
-            }
         }
     }
 
@@ -301,9 +315,17 @@ class SavePlaylistDialog : VLCBottomSheetDialogFragment(), View.OnClickListener,
 
     private fun savePlaylist(playlist: Playlist, tracks: Array<MediaWrapper>, confirmed:Boolean = false) {
         AppScope.launch(coroutineContextProvider.IO) {
-            if (tracks.isEmpty()) return@launch
+            val playlistTracks = if (addOnlyNonDuplicateTracks) {
+                getNonDuplicateTracks(playlist.tracks, tracks)
+            } else tracks
+            if (playlistTracks.isEmpty()) {
+                if (addOnlyNonDuplicateTracks && playlistIterator != null) {
+                    withContext(coroutineContextProvider.Main) { processNextItem(tracks) }
+                }
+                return@launch
+            }
             val ids = LinkedList<Long>()
-            for (mw in tracks) {
+            for (mw in playlistTracks) {
                 val id = mw.id
                 if (id == 0L) {
                     var media = medialibrary.getMedia(mw.uri)
@@ -336,7 +358,7 @@ class SavePlaylistDialog : VLCBottomSheetDialogFragment(), View.OnClickListener,
                         binding.dialogListContainer.setGone()
                         binding.replaceSwitch.setGone()
                         currentPlaylist = playlist
-                        currentTracks = tracks
+                        currentTracks = playlistTracks
                     }
                 }
             } else playlist.append(ids)
@@ -348,16 +370,17 @@ class SavePlaylistDialog : VLCBottomSheetDialogFragment(), View.OnClickListener,
     }
 
     private fun saveToExistingPlaylists(items: List<MediaLibraryItem>) {
+        addOnlyNonDuplicateTracks = false
         val highlightedItemsCounts = newTracks.size
         var shouldShowThreeOptions = false
         val titles : ArrayList<String> = ArrayList()
         val duplicationMessages = items.filter { playlist ->
-            nonDuplicateTracks = getNonDuplicateTracks(playlist.tracks, newTracks)
-            val duplicateItemsCount = newTracks.size - nonDuplicateTracks!!.size
+            val playlistNewTracks = getNonDuplicateTracks(playlist.tracks, newTracks)
+            val duplicateItemsCount = newTracks.size - playlistNewTracks.size
             duplicateItemsCount != 0
-        }.mapIndexed { index, playlist ->
-            nonDuplicateTracks = getNonDuplicateTracks(playlist.tracks, newTracks)
-            val duplicateItemsCount = newTracks.size - nonDuplicateTracks!!.size
+        }.map { playlist ->
+            val playlistNewTracks = getNonDuplicateTracks(playlist.tracks, newTracks)
+            val duplicateItemsCount = newTracks.size - playlistNewTracks.size
             val pluralSecondary: Int
             val secondaryMessage: String
             titles.add(playlist.title)
@@ -390,11 +413,9 @@ class SavePlaylistDialog : VLCBottomSheetDialogFragment(), View.OnClickListener,
     }
 
     private fun getNonDuplicateTracks(currentTracks: Array<MediaWrapper>, newTracks: Array<MediaWrapper>): Array<MediaWrapper> {
-        return newTracks.filter { newItem ->
-            currentTracks.all { currentItem ->
-                !currentItem.equals(newItem)
-            }
-        }.toTypedArray()
+        return nonDuplicateItems(currentTracks, newTracks) { currentItem, newItem ->
+            currentItem.equals(newItem)
+        }
     }
 
     companion object : DependencyProvider<Any>() {

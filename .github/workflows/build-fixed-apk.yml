@@ -113,6 +113,10 @@ jobs:
           git diff --check
           echo "All required Gradle project directories exist."
 
+      - name: Run Dual playlist regression tests
+        shell: bash
+        run: gradle :application:vlc-android:testDebugUnitTest --no-daemon
+
       - name: Restore permanent signing keystore
         shell: bash
         env:
