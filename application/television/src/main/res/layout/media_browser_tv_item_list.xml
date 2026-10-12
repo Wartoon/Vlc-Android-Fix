@@ -144,7 +144,8 @@
                 vlc:layout_constraintStart_toStartOf="parent"
                 vlc:layout_constraintTop_toTopOf="parent"
                 vlc:media="@{item}"
-                vlc:allowNetworkThumbnailGeneration="@{allowNetworkThumbnailGeneration}" />
+                vlc:allowNetworkThumbnailGeneration="@{allowNetworkThumbnailGeneration}"
+                vlc:tv="@{true}" />
         <View
                 android:id="@+id/network_off_overlay"
                 android:layout_width="0dp"
