@@ -37,6 +37,15 @@ import kotlin.math.min
 object ThumbnailGenerationPolicy {
     fun shouldRequestNetworkThumbnail(isLocalFile: Boolean, explicitlyOpenedFolder: Boolean, isAggregateCover: Boolean = false): Boolean =
         !isLocalFile && explicitlyOpenedFolder && !isAggregateCover
+
+    fun shouldIndexNetworkThumbnailMedia(
+        isLocalFile: Boolean,
+        mediaId: Long,
+        isVideo: Boolean,
+        explicitlyOpenedFolder: Boolean,
+        isAggregateCover: Boolean = false
+    ): Boolean = mediaId <= 0L && isVideo &&
+            shouldRequestNetworkThumbnail(isLocalFile, explicitlyOpenedFolder, isAggregateCover)
 }
 
 object ThumbnailsProvider {
@@ -158,6 +167,20 @@ object ThumbnailsProvider {
     }
 
 
+    @WorkerThread
+    private fun resolveMediaForThumbnail(media: MediaWrapper, explicitlyOpenedFolder: Boolean): MediaWrapper {
+        if (!ThumbnailGenerationPolicy.shouldIndexNetworkThumbnailMedia(
+                isLocalFile = media.uri.scheme.isSchemeFile(),
+                mediaId = media.id,
+                isVideo = media.type == MediaWrapper.TYPE_VIDEO,
+                explicitlyOpenedFolder = explicitlyOpenedFolder
+            )) return media
+        val medialibrary = Medialibrary.getInstance()
+        return medialibrary.getMedia(media.uri)?.takeIf { it.id > 0L }
+            ?: medialibrary.addMedia(media.uri.toString(), media.length)?.takeIf { it.id > 0L }
+            ?: media
+    }
+
     data class ThumbnailRefreshResult(val scanned: Int, val replaced: Int, val requested: Int)
     private enum class ThumbnailRefreshChange { UNCHANGED, REPLACED, REQUESTED }
 
@@ -175,8 +198,9 @@ object ThumbnailsProvider {
         suspend fun process(media: MediaWrapper?, onlyBad: Boolean) {
             if (media == null || media.type != MediaWrapper.TYPE_VIDEO) return
             currentCoroutineContext().ensureActive()
+            val refreshMedia = resolveMediaForThumbnail(media, explicitlyOpenedFolder = true)
             scanned++
-            when (refreshSingleVideoThumbnail(media, requestedWidth, onlyBad)) {
+            when (refreshSingleVideoThumbnail(refreshMedia, requestedWidth, onlyBad)) {
                 ThumbnailRefreshChange.REPLACED -> replaced++
                 ThumbnailRefreshChange.REQUESTED -> {
                     requested++
@@ -257,8 +281,9 @@ object ThumbnailsProvider {
         for (media in mediaItems) {
             if (media.type != MediaWrapper.TYPE_VIDEO) continue
             currentCoroutineContext().ensureActive()
+            val refreshMedia = resolveMediaForThumbnail(media, explicitlyOpenedFolder = true)
             scanned++
-            when (refreshSingleVideoThumbnail(media, requestedWidth, onlyBad = true)) {
+            when (refreshSingleVideoThumbnail(refreshMedia, requestedWidth, onlyBad = true)) {
                 ThumbnailRefreshChange.REPLACED -> replaced++
                 ThumbnailRefreshChange.REQUESTED -> {
                     requested++
@@ -364,10 +389,11 @@ object ThumbnailsProvider {
 
     @WorkerThread
     fun getMediaThumbnail(item: MediaWrapper, width: Int, allowNetworkRequests: Boolean = true): Bitmap? {
-        return if (isMediaVideo(item) || isOurLocalVideoThumbnail(item))
-            getVideoThumbnail(item, width, allowNetworkRequests)
+        val thumbnailMedia = resolveMediaForThumbnail(item, explicitlyOpenedFolder = allowNetworkRequests)
+        return if (isMediaVideo(thumbnailMedia) || isOurLocalVideoThumbnail(thumbnailMedia))
+            getVideoThumbnail(thumbnailMedia, width, allowNetworkRequests)
         else
-            readCoverBitmap(Uri.decode(item.artworkMrl), width)
+            readCoverBitmap(Uri.decode(thumbnailMedia.artworkMrl), width)
     }
 
     fun isMediaVideo(item: MediaWrapper) = item.type == MediaWrapper.TYPE_VIDEO && item.artworkMrl.isNullOrEmpty()
