@@ -48,6 +48,7 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.yield
+import org.videolan.medialibrary.EventTools
 import org.videolan.medialibrary.interfaces.Medialibrary
 import org.videolan.medialibrary.interfaces.media.MediaWrapper
 import org.videolan.medialibrary.interfaces.media.Folder
@@ -187,6 +188,9 @@ abstract class BaseBrowserTvFragment<T> : Fragment(), BrowserFragmentInterface, 
         setAnimator(view as ConstraintLayout)
         setupThumbnailRefresh()
         binding.list.adapter = adapter as RecyclerView.Adapter<*>
+        EventTools.getInstance().lastThumb.observe(viewLifecycleOwner) { media ->
+            adapter.thumbnailReady(media)
+        }
         if (!backgroundManager.isAttached) {
             backgroundManager.attachToView(view)
         }

@@ -76,6 +76,14 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
         }
     }
 
+    override fun thumbnailReady(media: MediaWrapper) {
+        dataset.forEachIndexed { index, listedMedia ->
+            if (isThumbnailEventForMedia(listedMedia.id, listedMedia.uri.toString(), media.id, media.uri.toString())) {
+                notifyItemChanged(index)
+            }
+        }
+    }
+
     override var focusNext = -1
     override fun displaySwitch(inGrid: Boolean) { this.inGrid = inGrid }
 

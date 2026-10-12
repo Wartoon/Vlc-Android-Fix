@@ -100,6 +100,15 @@ class MediaTvItemAdapter(type: Int, private val eventsHandler: IEventsHandler<Me
 
     override fun isEmpty() = currentList.isNullOrEmpty()
 
+    override fun thumbnailReady(media: MediaWrapper) {
+        currentList?.forEachIndexed { index, item ->
+            val listedMedia = item as? MediaWrapper ?: return@forEachIndexed
+            if (isThumbnailEventForMedia(listedMedia.id, listedMedia.uri.toString(), media.id, media.uri.toString())) {
+                notifyItemChanged(index)
+            }
+        }
+    }
+
     override fun submitList(pagedList: Any?) {
         if (pagedList == null) {
             this.submitList(null)

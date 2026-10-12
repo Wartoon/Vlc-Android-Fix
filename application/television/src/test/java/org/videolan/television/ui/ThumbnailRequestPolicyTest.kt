@@ -59,6 +59,14 @@ class ThumbnailRequestPolicyTest {
     }
 
     @Test
+    fun thumbnailReadyMatchesOnlyTheReturnedMedia() {
+        val smbUri = "smb://server/Family Guy/episode.mkv"
+        assertTrue(isThumbnailEventForMedia(73L, smbUri, 73L, smbUri))
+        assertTrue(isThumbnailEventForMedia(0L, smbUri, 73L, smbUri))
+        assertFalse(isThumbnailEventForMedia(72L, "smb://server/other.mkv", 73L, smbUri))
+    }
+
+    @Test
     fun aggregateCoversDoNotReceivePermissionToRequestRemoteThumbnails() {
         assertFalse(ThumbnailGenerationPolicy.shouldRequestNetworkThumbnail(
             isLocalFile = false,

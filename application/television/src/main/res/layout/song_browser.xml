@@ -111,7 +111,7 @@
             android:background="@color/transparent"
             android:elevation="6dp"
             android:contentDescription="@string/refresh_thumbnails"
-            app:srcCompat="@drawable/ic_refresh"
+            app:srcCompat="@drawable/ic_tv_browser_refresh"
             app:layout_constraintEnd_toStartOf="@+id/headerButton"
             app:layout_constraintTop_toTopOf="parent" />
 
