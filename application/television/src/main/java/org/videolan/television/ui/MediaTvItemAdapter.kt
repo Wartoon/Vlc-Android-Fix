@@ -32,6 +32,7 @@ import org.videolan.vlc.BuildConfig
 import org.videolan.vlc.VlcMigrationHelper
 import org.videolan.vlc.gui.helpers.SelectorViewHolder
 import org.videolan.vlc.gui.helpers.getMediaIconDrawable
+import org.videolan.vlc.gui.helpers.loadImage
 import org.videolan.vlc.gui.view.FastScroller
 import org.videolan.vlc.interfaces.IEventsHandler
 import org.videolan.vlc.util.generateResolutionClass
@@ -84,10 +85,13 @@ class MediaTvItemAdapter(type: Int, private val eventsHandler: IEventsHandler<Me
     }
 
     override fun onBindViewHolder(holder: AbstractMediaItemViewHolder<ViewDataBinding>, position: Int, payloads: List<Any>) {
-        if (!payloads.isNullOrEmpty() && payloads[0] is MediaLibraryItem)  {
+        if (!payloads.isNullOrEmpty() && payloads.all { it === ThumbnailRefreshPayload }) {
+            val item = getItem(position) as? MediaWrapper ?: return
+            refreshThumbnail(holder, item)
+        } else if (!payloads.isNullOrEmpty() && payloads[0] is MediaLibraryItem)  {
             val isSelected = (payloads[0] as MediaLibraryItem).hasStateFlags(MediaLibraryItem.FLAG_SELECTED)
-                holder.setCoverlay(isSelected)
-                holder.selectView(isSelected)
+            holder.setCoverlay(isSelected)
+            holder.selectView(isSelected)
         } else onBindViewHolder(holder, position)
     }
 
@@ -104,8 +108,17 @@ class MediaTvItemAdapter(type: Int, private val eventsHandler: IEventsHandler<Me
         currentList?.forEachIndexed { index, item ->
             val listedMedia = item as? MediaWrapper ?: return@forEachIndexed
             if (isThumbnailEventForMedia(listedMedia.id, listedMedia.uri.toString(), media.id, media.uri.toString())) {
-                notifyItemChanged(index)
+                notifyItemChanged(index, ThumbnailRefreshPayload)
             }
+        }
+    }
+
+    private fun refreshThumbnail(holder: AbstractMediaItemViewHolder<ViewDataBinding>, item: MediaWrapper) {
+        when (val binding = holder.binding) {
+            is MediaBrowserTvItemBinding -> loadImage(binding.mediaCover, item, tv = true,
+                allowNetworkThumbnailGeneration = allowNetworkThumbnailGeneration)
+            is MediaBrowserTvItemListBinding -> loadImage(binding.mediaCover, item, tv = true,
+                allowNetworkThumbnailGeneration = allowNetworkThumbnailGeneration)
         }
     }
 

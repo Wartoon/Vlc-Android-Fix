@@ -25,12 +25,50 @@
 package org.videolan.medialibrary;
 
 import androidx.lifecycle.LiveData;
+import androidx.lifecycle.MutableLiveData;
+
+import android.os.Handler;
+import android.os.Looper;
+
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.videolan.medialibrary.interfaces.media.MediaWrapper;
 
 public final class EventTools {
     private static EventTools sInstance;
-    public final LiveData<MediaWrapper> lastThumb = new SingleEvent<>();
+    public final LiveData<MediaWrapper> lastThumb = new QueuedEvent<>();
+
+    /** Keep every native thumbnail completion; MutableLiveData.postValue coalesces pending values. */
+    private static final class QueuedEvent<T> extends MutableLiveData<T> {
+        private final ConcurrentLinkedQueue<T> queue = new ConcurrentLinkedQueue<>();
+        private final AtomicBoolean dispatchScheduled = new AtomicBoolean(false);
+        private final Handler mainHandler = new Handler(Looper.getMainLooper());
+        private final Runnable dispatchNext = new Runnable() {
+            @Override
+            public void run() {
+                T value = queue.poll();
+                if (value != null) setValue(value);
+                if (queue.isEmpty()) {
+                    dispatchScheduled.set(false);
+                    if (!queue.isEmpty()) scheduleDispatch();
+                } else {
+                    mainHandler.post(this);
+                }
+            }
+        };
+
+        @Override
+        public void postValue(T value) {
+            if (value == null) return;
+            queue.add(value);
+            scheduleDispatch();
+        }
+
+        private void scheduleDispatch() {
+            if (dispatchScheduled.compareAndSet(false, true)) mainHandler.post(dispatchNext);
+        }
+    }
 
 
     public static EventTools getInstance() {

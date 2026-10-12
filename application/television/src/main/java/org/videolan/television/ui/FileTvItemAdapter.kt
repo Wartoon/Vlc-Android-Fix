@@ -27,6 +27,7 @@ import org.videolan.vlc.VlcMigrationHelper
 import org.videolan.vlc.gui.DiffUtilAdapter
 import org.videolan.vlc.gui.helpers.getBitmapFromDrawable
 import org.videolan.vlc.gui.helpers.getMediaIconDrawable
+import org.videolan.vlc.gui.helpers.loadImage
 import org.videolan.vlc.gui.view.FastScroller
 import org.videolan.vlc.interfaces.IEventsHandler
 import org.videolan.vlc.util.generateResolutionClass
@@ -79,7 +80,7 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
     override fun thumbnailReady(media: MediaWrapper) {
         dataset.forEachIndexed { index, listedMedia ->
             if (isThumbnailEventForMedia(listedMedia.id, listedMedia.uri.toString(), media.id, media.uri.toString())) {
-                notifyItemChanged(index)
+                notifyItemChanged(index, ThumbnailRefreshPayload)
             }
         }
     }
@@ -123,7 +124,15 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
     override fun onBindViewHolder(holder: MediaTvItemAdapter.AbstractMediaItemViewHolder<ViewDataBinding>, position: Int, payloads: MutableList<Any>) {
         if (payloads.isNullOrEmpty()) onBindViewHolder(holder, position)
         else for (payload in payloads) {
-            when (holder.binding) {
+            if (payload === ThumbnailRefreshPayload) {
+                val item = getItem(position)
+                when (val binding = holder.binding) {
+                    is MediaBrowserTvItemBinding -> loadImage(binding.mediaCover, item, tv = true,
+                        allowNetworkThumbnailGeneration = allowNetworkThumbnailGeneration)
+                    is MediaBrowserTvItemListBinding -> loadImage(binding.mediaCover, item, tv = true,
+                        allowNetworkThumbnailGeneration = allowNetworkThumbnailGeneration)
+                }
+            } else when (holder.binding) {
                 is MediaBrowserTvItemBinding -> if (payload is String) (holder.binding as MediaBrowserTvItemBinding).description = payload else onBindViewHolder(holder, position)
                 is MediaBrowserTvItemListBinding -> if (payload is String) (holder.binding as MediaBrowserTvItemListBinding).description = payload else onBindViewHolder(holder, position)
             }

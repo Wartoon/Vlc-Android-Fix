@@ -7,6 +7,8 @@ internal fun isThumbnailEventForMedia(itemId: Long, itemUri: String, thumbnailId
             (itemUri.isNotBlank() && itemUri == thumbnailUri)
 }
 
+internal object ThumbnailRefreshPayload
+
 interface TvItemAdapter : TvFocusableAdapter {
     fun submitList(pagedList: Any?)
     fun isEmpty() : Boolean
