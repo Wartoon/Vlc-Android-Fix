@@ -57,8 +57,8 @@ private var defaultImageWidthTV = 0
 private const val TAG = "ImageLoader"
 
 @MainThread
-@BindingAdapter(value = ["media", "imageWidth", "tv", "card"], requireAll = false)
-fun loadImage(v: View, item: MediaLibraryItem?, imageWidth: Int = 0, tv: Boolean = false, card: Boolean = false) {
+@BindingAdapter(value = ["media", "imageWidth", "tv", "card", "allowNetworkThumbnailGeneration"], requireAll = false)
+fun loadImage(v: View, item: MediaLibraryItem?, imageWidth: Int = 0, tv: Boolean = false, card: Boolean = false, allowNetworkThumbnailGeneration: Boolean = false) {
     if (item === null) return
     v.tag = item.title
 
@@ -86,7 +86,7 @@ fun loadImage(v: View, item: MediaLibraryItem?, imageWidth: Int = 0, tv: Boolean
     val bitmap = if (cacheKey !== null) BitmapCache.getBitmapFromMemCache(cacheKey) else null
     if (bitmap !== null) updateImageView(bitmap, v, binding, tv = tv, card = card)
     else {
-        v.scope.takeIf { it.isActive }?.launch { getImage(v, findInLibrary(item, isMedia), binding, imageWidth, tv = tv, card = card) }
+        v.scope.takeIf { it.isActive }?.launch { getImage(v, findInLibrary(item, isMedia), binding, imageWidth, tv = tv, card = card, allowNetworkThumbnailGeneration = allowNetworkThumbnailGeneration) }
     }
 }
 
@@ -213,7 +213,7 @@ fun downloadIcon(v: View, imageUrl: String?, tv: Boolean = true) {
 }
 
 
-private suspend fun getImage(v: View, item: MediaLibraryItem, binding: ViewDataBinding?, imageWidth: Int = 0, tv: Boolean = false, card: Boolean = false) {
+private suspend fun getImage(v: View, item: MediaLibraryItem, binding: ViewDataBinding?, imageWidth: Int = 0, tv: Boolean = false, card: Boolean = false, allowNetworkThumbnailGeneration: Boolean = false) {
     var bindChanged = false
     val rebindCallbacks = if (binding !== null) object : OnRebindCallback<ViewDataBinding>() {
         override fun onPreBind(binding: ViewDataBinding): Boolean {
@@ -240,7 +240,7 @@ private suspend fun getImage(v: View, item: MediaLibraryItem, binding: ViewDataB
             defaultImageWidth
         }
     }
-    val image = if (!bindChanged) obtainBitmap(item, width) else null
+    val image = if (!bindChanged) obtainBitmap(item, width, allowNetworkRequests = !tv || allowNetworkThumbnailGeneration) else null
     if (image == null && tv) {
         // binding is set to null to be sure to set the src and not the cover (background)
         if (!bindChanged) updateImageViewTv(getTvIconRes(item), v)

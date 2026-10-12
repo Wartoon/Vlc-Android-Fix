@@ -161,7 +161,7 @@ class TVSearchProvider : ContentProvider() {
 
 private fun MediaWrapper.getThumb(): Uri {
     if (!isThumbnailGenerated) {
-        ThumbnailsProvider.getVideoThumbnail(this@getThumb, 512)
+        ThumbnailsProvider.getVideoThumbnail(this@getThumb, 512, allowNetworkRequests = false)
     }
     val resourceUri = "android.resource://${BuildConfig.APP_ID}/${R.drawable.ic_video_big}".toUri()
     val mrl = artworkMrl ?: return resourceUri

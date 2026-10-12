@@ -67,7 +67,7 @@ internal fun areFileTvItemContentsTheSame(
             && oldItem.height == newItem.height
 }
 
-class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryItem>, var itemSize: Int, private val showProtocol: Boolean, private var inGrid: Boolean = true) : DiffUtilAdapter<MediaWrapper, MediaTvItemAdapter.AbstractMediaItemViewHolder<ViewDataBinding>>(), FastScroller.SeparatedAdapter, TvItemAdapter {
+class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryItem>, var itemSize: Int, private val showProtocol: Boolean, private var inGrid: Boolean = true, private val allowNetworkThumbnailGeneration: Boolean = false) : DiffUtilAdapter<MediaWrapper, MediaTvItemAdapter.AbstractMediaItemViewHolder<ViewDataBinding>>(), FastScroller.SeparatedAdapter, TvItemAdapter {
 
     override fun submitList(pagedList: Any?) {
         if (pagedList is List<*>) {
@@ -168,6 +168,7 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
         }
         override fun recycle() { defaultCover?.let { binding.cover = it }; binding.title.text = ""; binding.subtitle.text = ""; binding.mediaCover.resetFade() }
         override fun setItem(item: MediaLibraryItem?) {
+            binding.allowNetworkThumbnailGeneration = this@FileTvItemAdapter.allowNetworkThumbnailGeneration
             binding.item = item; var progress = 0; var seen = 0L; var description = item?.description; var resolution = ""
             if (item is MediaWrapper && item.type == MediaWrapper.TYPE_VIDEO) {
                 resolution = generateResolutionClass(item.width, item.height) ?: ""
@@ -213,6 +214,7 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
         }
         override fun recycle() { defaultCover?.let { binding.cover = it }; binding.title.text = ""; binding.subtitle.text = ""; binding.mediaCover.resetFade() }
         override fun setItem(item: MediaLibraryItem?) {
+            binding.allowNetworkThumbnailGeneration = this@FileTvItemAdapter.allowNetworkThumbnailGeneration
             binding.item = item; var isSquare = true; var progress = 0; var seen = 0L; var description = item?.description; var resolution = ""
             if (item is MediaWrapper && item.type == MediaWrapper.TYPE_VIDEO) {
                 resolution = generateResolutionClass(item.width, item.height) ?: ""; isSquare = false

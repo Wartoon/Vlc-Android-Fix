@@ -147,6 +147,7 @@
     <androidx.appcompat.widget.AppCompatImageButton
                 android:id="@+id/imageButtonDisplay"
                 android:layout_width="wrap_content"
+                android:nextFocusUp="@id/imageButtonThumbnailRefresh"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:layout_marginBottom="8dp"
@@ -157,6 +158,22 @@
                 app:layout_constraintEnd_toEndOf="@+id/imageButtonSort"
                 app:layout_constraintStart_toStartOf="@+id/imageButtonSort"
                 app:layout_constraintTop_toTopOf="@+id/imageButtonSort" />
+
+    <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/imageButtonThumbnailRefresh"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="8dp"
+                android:contentDescription="@string/refresh_thumbnails"
+                android:nextFocusDown="@id/imageButtonDisplay"
+                android:elevation="6dp"
+                android:visibility="gone"
+                app:srcCompat="@drawable/ic_refresh"
+                app:layout_constraintBottom_toBottomOf="@+id/imageButtonSettings"
+                app:layout_constraintEnd_toEndOf="@+id/imageButtonSettings"
+                app:layout_constraintStart_toStartOf="@+id/imageButtonSettings"
+                app:layout_constraintTop_toTopOf="@+id/imageButtonSettings" />
 
     <androidx.appcompat.widget.AppCompatImageButton
                 android:id="@+id/imageButtonSort"
@@ -235,6 +252,24 @@
                 app:layout_constraintEnd_toEndOf="@+id/favoriteButton"
                 app:layout_constraintStart_toStartOf="@+id/favoriteButton"
                 app:layout_constraintTop_toBottomOf="@+id/favoriteButton" />
+
+        <TextView
+                android:id="@+id/thumbnailRefreshDescription"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:alpha="0"
+                android:background="@drawable/rounded_corners"
+                android:paddingStart="8dp"
+                android:paddingTop="4dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="4dp"
+                android:text="@string/refresh_thumbnails"
+                android:visibility="gone"
+                app:layout_constraintEnd_toEndOf="@+id/imageButtonThumbnailRefresh"
+                app:layout_constraintStart_toStartOf="@+id/imageButtonThumbnailRefresh"
+                app:layout_constraintTop_toBottomOf="@+id/imageButtonThumbnailRefresh" />
 
         <TextView
                 android:id="@+id/sortDescription"

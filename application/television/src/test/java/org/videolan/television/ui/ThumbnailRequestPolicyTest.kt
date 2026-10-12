@@ -34,7 +34,8 @@ class ThumbnailRequestPolicyTest {
     fun aggregateCoversDoNotReceivePermissionToRequestRemoteThumbnails() {
         assertFalse(ThumbnailGenerationPolicy.shouldRequestNetworkThumbnail(
             isLocalFile = false,
-            explicitlyOpenedFolder = false
+            explicitlyOpenedFolder = true,
+            isAggregateCover = true
         ))
     }
 }

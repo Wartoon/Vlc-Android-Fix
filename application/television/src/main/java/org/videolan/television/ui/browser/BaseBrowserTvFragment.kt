@@ -36,16 +36,23 @@ import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.PopupMenu
+import android.widget.Toast
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.fragment.app.Fragment
 import androidx.leanback.app.BackgroundManager
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.yield
 import org.videolan.medialibrary.interfaces.Medialibrary
 import org.videolan.medialibrary.interfaces.media.MediaWrapper
+import org.videolan.medialibrary.interfaces.media.Folder
+import org.videolan.medialibrary.interfaces.media.VideoGroup
+import org.videolan.medialibrary.interfaces.media.Playlist
 import org.videolan.medialibrary.media.MediaLibraryItem
 import org.videolan.resources.util.HeadersIndex
 import org.videolan.television.R
@@ -59,6 +66,7 @@ import org.videolan.vlc.gui.view.RecyclerSectionItemGridDecoration
 import org.videolan.vlc.interfaces.BrowserFragmentInterface
 import org.videolan.vlc.interfaces.IEventsHandler
 import org.videolan.vlc.util.RefreshModel
+import org.videolan.vlc.util.ThumbnailsProvider
 import org.videolan.vlc.util.getScreenWidth
 import org.videolan.vlc.viewmodels.SortableModel
 import org.videolan.vlc.viewmodels.browser.TYPE_FILE
@@ -177,11 +185,50 @@ abstract class BaseBrowserTvFragment<T> : Fragment(), BrowserFragmentInterface, 
             }
         })
         setAnimator(view as ConstraintLayout)
+        setupThumbnailRefresh()
         binding.list.adapter = adapter as RecyclerView.Adapter<*>
         if (!backgroundManager.isAttached) {
             backgroundManager.attachToView(view)
         }
         super.onViewCreated(view, savedInstanceState)
+    }
+
+    private fun setupThumbnailRefresh() {
+        val item = viewModel.currentItem
+        val refreshable = when (item) {
+            is Folder, is VideoGroup, is Playlist -> true
+            is MediaWrapper -> item.type == MediaWrapper.TYPE_VIDEO || item.type == MediaWrapper.TYPE_DIR
+            else -> false
+        }
+        val visibility = if (refreshable) View.VISIBLE else View.GONE
+        animationDelegate.setVisibility(binding.imageButtonThumbnailRefresh, visibility)
+        animationDelegate.setVisibility(binding.thumbnailRefreshDescription, visibility)
+        binding.imageButtonThumbnailRefresh.contentDescription = getString(org.videolan.resources.R.string.refresh_thumbnails)
+        binding.imageButtonThumbnailRefresh.setOnClickListener {
+            val selected = viewModel.currentItem ?: return@setOnClickListener
+            binding.imageButtonThumbnailRefresh.isEnabled = false
+            viewLifecycleOwner.lifecycleScope.launch {
+                try {
+                    val result = withContext(Dispatchers.IO) {
+                        if (selected is MediaWrapper && selected.type == MediaWrapper.TYPE_DIR) {
+                            val directVideos = (adapter as? FileTvItemAdapter)?.dataset
+                                ?.filter { it.type == MediaWrapper.TYPE_VIDEO }.orEmpty()
+                            ThumbnailsProvider.refreshSelectedThumbnails(directVideos)
+                        } else {
+                            ThumbnailsProvider.refreshSelectedThumbnails(selected)
+                        }
+                    }
+                    binding.list.adapter?.notifyDataSetChanged()
+                    Toast.makeText(
+                        requireContext(),
+                        getString(org.videolan.resources.R.string.thumbnail_refresh_result, result.scanned, result.replaced, result.requested),
+                        Toast.LENGTH_LONG
+                    ).show()
+                } finally {
+                    if (isAdded) binding.imageButtonThumbnailRefresh.isEnabled = true
+                }
+            }
+        }
     }
 
     private fun setupLayoutManager() {

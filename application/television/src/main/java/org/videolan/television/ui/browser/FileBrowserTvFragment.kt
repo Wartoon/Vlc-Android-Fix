@@ -74,7 +74,13 @@ class FileBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>(), PathAda
     override fun getColumnNumber() = resources.getInteger(R.integer.tv_songs_col_count)
 
     override fun provideAdapter(eventsHandler: IEventsHandler<MediaLibraryItem>, itemSize: Int): TvItemAdapter {
-        val fileTvItemAdapter = FileTvItemAdapter(this, itemSize, isRootLevel && getCategory() == TYPE_NETWORK)
+        val fileTvItemAdapter = FileTvItemAdapter(
+                this,
+                itemSize,
+                isRootLevel && getCategory() == TYPE_NETWORK,
+                allowNetworkThumbnailGeneration = !isRootLevel &&
+                        (currentItem as? MediaWrapper)?.type == MediaWrapper.TYPE_DIR
+        )
         dataObserver = fileTvItemAdapter.onAnyChange {
             val source = (viewModel as IPathOperationDelegate).getSource()
             val selectedIndex = if (source != null) {

@@ -39,7 +39,7 @@ import org.videolan.vlc.util.isOTG
 import org.videolan.vlc.util.isSD
 import org.videolan.vlc.util.isSchemeFile
 
-class MediaTvItemAdapter(type: Int, private val eventsHandler: IEventsHandler<MediaLibraryItem>, var itemSize: Int, private var inGrid: Boolean = true) : PagedListAdapter<MediaLibraryItem, MediaTvItemAdapter.AbstractMediaItemViewHolder<ViewDataBinding>>(DIFF_CALLBACK), FastScroller.SeparatedAdapter, TvItemAdapter {
+class MediaTvItemAdapter(type: Int, private val eventsHandler: IEventsHandler<MediaLibraryItem>, var itemSize: Int, private var inGrid: Boolean = true, private val allowNetworkThumbnailGeneration: Boolean = false) : PagedListAdapter<MediaLibraryItem, MediaTvItemAdapter.AbstractMediaItemViewHolder<ViewDataBinding>>(DIFF_CALLBACK), FastScroller.SeparatedAdapter, TvItemAdapter {
     override var focusNext = -1
     override fun displaySwitch(inGrid: Boolean) {
         this.inGrid = inGrid
@@ -210,6 +210,7 @@ class MediaTvItemAdapter(type: Int, private val eventsHandler: IEventsHandler<Me
         }
 
         override fun setItem(item: MediaLibraryItem?) {
+            binding.allowNetworkThumbnailGeneration = this@MediaTvItemAdapter.allowNetworkThumbnailGeneration
             binding.item = item
             var isSquare = true
             var progress = 0
@@ -297,6 +298,7 @@ class MediaTvItemAdapter(type: Int, private val eventsHandler: IEventsHandler<Me
         }
 
         override fun setItem(item: MediaLibraryItem?) {
+            binding.allowNetworkThumbnailGeneration = this@MediaTvItemAdapter.allowNetworkThumbnailGeneration
             binding.item = item
             var isSquare = true
             binding.imageWidth = itemSize

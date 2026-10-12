@@ -38,6 +38,10 @@
             type="MediaLibraryItem" />
 
         <variable
+            name="allowNetworkThumbnailGeneration"
+            type="boolean" />
+
+        <variable
             name="cover"
             type="android.graphics.drawable.BitmapDrawable" />
 
@@ -118,6 +122,7 @@
                 vlc:layout_constraintStart_toStartOf="parent"
                 vlc:layout_constraintTop_toTopOf="parent"
                 vlc:media="@{item}"
+                vlc:allowNetworkThumbnailGeneration="@{allowNetworkThumbnailGeneration}"
                 vlc:tv="@{true}" />
 
         <View

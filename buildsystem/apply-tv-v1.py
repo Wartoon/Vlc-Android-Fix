@@ -183,4 +183,9 @@ tv = tv.replace(shared_anchor, helpers + shared_anchor, 1)
 tv_path.write_text(tv)
 print("patched TV full backup/restore handlers")
 
+provider_source = Path("buildsystem/tv-thumbnail-provider.kt")
+provider_target = Path("application/vlc-android/src/org/videolan/vlc/util/ThumbnailsProvider.kt")
+provider_target.write_text(provider_source.read_text())
+print("installed shared dual-quality thumbnail provider with TV SMB request gating")
+
 print("TV V1 patch applied successfully")

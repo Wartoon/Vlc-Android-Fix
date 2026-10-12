@@ -33,7 +33,7 @@ class MediaBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>() {
             CATEGORY_GENRES -> MediaWrapper.TYPE_GENRE
             CATEGORY_PLAYLISTS -> MediaWrapper.TYPE_PLAYLIST
             else -> MediaWrapper.TYPE_VIDEO
-        }, this, itemSize)
+        }, this, itemSize, allowNetworkThumbnailGeneration = false)
     }
 
     override fun getDisplayPrefId() = "display_tv_media_${(viewModel as MediaBrowserViewModel).category}"
