@@ -75,6 +75,7 @@ jobs:
               "application/television/src/main/java/org/videolan/television/ui/MediaBrowserAnimatorDelegate.kt": ['imageButtonThumbnailRefresh', 'thumbnailRefreshDescription'],
               "application/television/src/main/java/org/videolan/television/ui/browser/BaseBrowserTvFragment.kt": ['setupThumbnailRefresh()', 'refreshSelectedThumbnails(directVideos)', 'thumbnail_refresh_result'],
               "application/vlc-android/src/org/videolan/vlc/util/ThumbnailsProvider.kt": ['object ThumbnailGenerationPolicy', 'refreshSelectedThumbnails(mediaItems: List<MediaWrapper>', 'explicitlyOpenedFolder = allowNetworkRequests', 'isAggregateCover = true', 'allowNetworkRequests = false'],
+              "application/tools/src/main/java/org/videolan/tools/BitmapCache.kt": ['fun replaceBitmapInMemCache', 'fun removeBitmapFromMemCache', 'fun removeBitmapKeysStartingWith'],
               "application/vlc-android/src/org/videolan/vlc/gui/helpers/ImageLoader.kt": ['allowNetworkThumbnailGeneration', 'allowNetworkRequests = !tv || allowNetworkThumbnailGeneration'],
               "application/television/src/main/java/org/videolan/television/ui/preferences/PreferencesAdvanced.kt": ['"full_backup" ->', 'createFullBackup()', '"full_restore" ->', 'showFullRestoreSelection()', 'Toast.makeText(activity, getString(R.string.full_backup_success), Toast.LENGTH_LONG).show()', 'replaceDirectoryContentsSafely(savedAppDb, appDbDir)', 'replaceDatabaseFileSafely(src, db)', 'val manifestText = manifest.readText()'],
           }

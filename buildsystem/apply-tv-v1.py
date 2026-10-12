@@ -183,6 +183,26 @@ tv = tv.replace(shared_anchor, helpers + shared_anchor, 1)
 tv_path.write_text(tv)
 print("patched TV full backup/restore handlers")
 
+replace("application/tools/src/main/java/org/videolan/tools/BitmapCache.kt", """    @Synchronized
+    fun clear() {""", """    @Synchronized
+    fun replaceBitmapInMemCache(key: String?, bitmap: Bitmap?) {
+        if (key != null && bitmap != null) memCache.put(key, bitmap)
+    }
+
+    @Synchronized
+    fun removeBitmapFromMemCache(key: String?) {
+        if (key != null) memCache.remove(key)
+    }
+
+    @Synchronized
+    fun removeBitmapKeysStartingWith(prefix: String) {
+        memCache.snapshot().keys.toList().forEach { key ->
+            if (key.startsWith(prefix)) memCache.remove(key)
+        }
+    }
+
+    @Synchronized
+    fun clear() {""")
 provider_source = Path("buildsystem/tv-thumbnail-provider.kt")
 provider_target = Path("application/vlc-android/src/org/videolan/vlc/util/ThumbnailsProvider.kt")
 provider_target.write_text(provider_source.read_text())
