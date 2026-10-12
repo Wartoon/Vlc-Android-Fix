@@ -193,6 +193,7 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
         }
         override fun recycle() {
             resetRecycledMediaItem(binding.item, { binding.item = it }) {
+                resetTvFocusPresentation(binding.container)
                 defaultCover?.let { binding.cover = it }
                 binding.title.text = ""
                 binding.subtitle.text = ""

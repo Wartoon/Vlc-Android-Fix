@@ -51,6 +51,8 @@ import org.videolan.resources.EXTRA_PATH
 import org.videolan.resources.EXTRA_SEARCH_BUNDLE
 import org.videolan.resources.EXTRA_TARGET
 import org.videolan.resources.EXTRA_UPGRADE
+import org.videolan.resources.HEADER_DIRECTORIES
+import org.videolan.resources.HEADER_NETWORK
 import org.videolan.resources.MOBILE_MAIN_ACTIVITY
 import org.videolan.resources.MOBILE_SEARCH_ACTIVITY
 import org.videolan.resources.PREF_FIRST_RUN
@@ -67,6 +69,7 @@ import org.videolan.tools.KEY_CURRENT_SETTINGS_VERSION
 import org.videolan.tools.KEY_FRAGMENT_ID
 import org.videolan.tools.KEY_NAVIGATOR_SCREEN_UNSTABLE
 import org.videolan.tools.KEY_TV_ONBOARDING_DONE
+import org.videolan.tools.putSingle
 import org.videolan.tools.PREF_SHOW_VIDEO_SETTINGS_DISCLAIMER
 import org.videolan.tools.PREF_TV_UI
 import org.videolan.tools.Settings
@@ -87,6 +90,8 @@ import videolan.org.commontools.TV_CHANNEL_PATH_APP
 import videolan.org.commontools.TV_CHANNEL_PATH_VIDEO
 import videolan.org.commontools.TV_CHANNEL_QUERY_VIDEO_ID
 import videolan.org.commontools.TV_CHANNEL_SCHEME
+import org.videolan.vlc.viewmodels.browser.TYPE_FILE
+import org.videolan.vlc.viewmodels.browser.TYPE_NETWORK
 
 private const val SEND_CRASH_RESULT = 0
 private const val PROPAGATE_RESULT = 1
@@ -316,6 +321,18 @@ class StartActivity : FragmentActivity() {
                     .setClassName(applicationContext, if (tv) TV_MAIN_ACTIVITY else MOBILE_MAIN_ACTIVITY)
                     .putExtra(EXTRA_FIRST_RUN, firstRun)
                     .putExtra(EXTRA_UPGRADE, upgrade)
+            if (tv && target == 0 && intent.action == Intent.ACTION_MAIN) {
+                val lastCategory = settings.getLong("tv_last_file_browser_category", -1L)
+                if (lastCategory == TYPE_FILE || lastCategory == TYPE_NETWORK) {
+                    val browserIntent = Intent(Intent.ACTION_VIEW)
+                            .setClassName(applicationContext, "org.videolan.television.ui.browser.VerticalGridActivity")
+                            .putExtra("browser_type", if (lastCategory == TYPE_FILE) HEADER_DIRECTORIES else HEADER_NETWORK)
+                    settings.getString("tv_last_file_browser_uri", null)?.takeIf { it.isNotBlank() }?.let { browserIntent.data = it.toUri() }
+                    startActivity(browserIntent)
+                    finish()
+                    return
+                }
+            }
             if (tv && intent.hasExtra(EXTRA_PATH)) mainIntent.putExtra(EXTRA_PATH, intent.getStringExtra(EXTRA_PATH))
             if (target != 0) mainIntent.putExtra(EXTRA_TARGET, target)
             startActivity(mainIntent)

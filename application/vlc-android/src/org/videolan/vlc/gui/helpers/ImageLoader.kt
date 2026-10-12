@@ -230,7 +230,7 @@ private suspend fun getImage(v: View, item: MediaLibraryItem, binding: ViewDataB
             if (defaultImageWidthTV == 0) {
                 defaultImageWidthTV = v.context.resources.getDimensionPixelSize(R.dimen.tv_grid_card_thumb_width)
             }
-            defaultImageWidthTV
+            if (imageWidth > 0) imageWidth else defaultImageWidthTV
         }
         imageWidth > 0 -> imageWidth
         v.width > 0 -> v.width

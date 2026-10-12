@@ -7,6 +7,7 @@ import android.os.Build
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
+import android.graphics.drawable.TransitionDrawable
 import android.view.ViewGroup
 import android.widget.ImageView
 import androidx.databinding.ViewDataBinding
@@ -47,6 +48,18 @@ internal fun <T : Any> resetRecycledMediaItem(
 ) {
     if (currentItem != null) clearBoundItem(null)
     resetPresentation()
+}
+
+internal fun resetTvFocusPresentation(container: View) {
+    container.animate().cancel()
+    container.scaleX = 1f
+    container.scaleY = 1f
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        container.stateListAnimator?.jumpToCurrentState()
+        container.translationZ = 0f
+    }
+    (container.background as? TransitionDrawable)?.resetTransition()
+    container.jumpDrawablesToCurrentState()
 }
 
 internal fun <T : Any> dispatchMediaTvItemPayloads(
@@ -263,6 +276,7 @@ class MediaTvItemAdapter(type: Int, private val eventsHandler: IEventsHandler<Me
 
         override fun recycle() {
             resetRecycledMediaItem(binding.item, { binding.item = it }) {
+                resetTvFocusPresentation(binding.container)
                 if (defaultCover != null) binding.cover = defaultCover
                 binding.title.text = ""
                 binding.subtitle.text = ""
@@ -353,6 +367,7 @@ class MediaTvItemAdapter(type: Int, private val eventsHandler: IEventsHandler<Me
 
         override fun recycle() {
             resetRecycledMediaItem(binding.item, { binding.item = it }) {
+                resetTvFocusPresentation(binding.container)
                 if (defaultCover != null) binding.cover = defaultCover
                 binding.title.text = ""
                 binding.subtitle.text = ""
@@ -364,7 +379,7 @@ class MediaTvItemAdapter(type: Int, private val eventsHandler: IEventsHandler<Me
             binding.allowNetworkThumbnailGeneration = this@MediaTvItemAdapter.allowNetworkThumbnailGeneration
             binding.item = item
             var isSquare = true
-            binding.imageWidth = itemSize
+            binding.imageWidth = 80.dp
             var progress = 0
             var seen = 0L
             var description = item?.description

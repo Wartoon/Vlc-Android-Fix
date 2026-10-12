@@ -84,7 +84,10 @@ jobs:
               "application/vlc-android/src/org/videolan/vlc/util/ThumbnailsProvider.kt": ['object ThumbnailGenerationPolicy', 'shouldIndexNetworkThumbnailMedia', 'medialibrary.addMedia(media.uri.toString(), media.length)', 'refreshSelectedThumbnails(mediaItems: List<MediaWrapper>', 'explicitlyOpenedFolder = allowNetworkRequests', 'isAggregateCover = true', 'allowNetworkRequests = false'],
               "application/television/src/test/java/org/videolan/television/ui/ThumbnailRequestPolicyTest.kt": ['indexesUnindexedRemoteVideoOnlyWhenItsFolderIsExplicitlyOpened'],
               "application/tools/src/main/java/org/videolan/tools/BitmapCache.kt": ['fun replaceBitmapInMemCache', 'fun removeBitmapFromMemCache', 'fun removeBitmapKeysStartingWith'],
-              "application/vlc-android/src/org/videolan/vlc/gui/helpers/ImageLoader.kt": ['allowNetworkThumbnailGeneration', 'allowNetworkRequests = !tv || allowNetworkThumbnailGeneration'],
+              "application/vlc-android/src/org/videolan/vlc/gui/helpers/ImageLoader.kt": ['allowNetworkThumbnailGeneration', 'allowNetworkRequests = !tv || allowNetworkThumbnailGeneration', 'if (imageWidth > 0) imageWidth else defaultImageWidthTV'],
+              "application/television/src/main/java/org/videolan/television/ui/MediaTvItemAdapter.kt": ['resetTvFocusPresentation(binding.container)', 'binding.imageWidth = 80.dp'],
+              "application/television/src/main/java/org/videolan/television/ui/browser/FileBrowserTvFragment.kt": ['persistCurrentFolderRoute()', 'tv_last_file_browser_category', 'tv_last_file_browser_uri'],
+              "application/vlc-android/src/org/videolan/vlc/StartActivity.kt": ['tv_last_file_browser_category', 'VerticalGridActivity'],
               "application/television/src/main/java/org/videolan/television/ui/preferences/PreferencesAdvanced.kt": ['"full_backup" ->', 'createFullBackup()', '"full_restore" ->', 'showFullRestoreSelection()', 'Toast.makeText(activity, getString(R.string.full_backup_success), Toast.LENGTH_LONG).show()', 'replaceDirectoryContentsSafely(savedAppDb, appDbDir)', 'replaceDatabaseFileSafely(src, db)', 'val manifestText = manifest.readText()'],
           }
           for filename, needles in checks.items():

@@ -27,6 +27,8 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
+import org.videolan.tools.Settings
+import org.videolan.tools.putSingle
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
@@ -110,6 +112,17 @@ class VerticalGridActivity : BaseTvActivity(), BrowserActivityInterface {
 
     override fun refresh() {
         (supportFragmentManager.findFragmentById(R.id.tv_fragment_placeholder) as? BrowserFragmentInterface)?.refresh()
+    }
+
+    override fun onBackPressed() {
+        if (supportFragmentManager.backStackEntryCount == 0) {
+            val type = intent.getLongExtra(MainTvActivity.BROWSER_TYPE, -1)
+            if (type == HEADER_DIRECTORIES || type == HEADER_NETWORK) {
+                Settings.getInstance(this).putSingle("tv_last_file_browser_category", -1L)
+                Settings.getInstance(this).putSingle("tv_last_file_browser_uri", "")
+            }
+        }
+        super.onBackPressed()
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
