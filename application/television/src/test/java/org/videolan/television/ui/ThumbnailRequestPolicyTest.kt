@@ -67,6 +67,22 @@ class ThumbnailRequestPolicyTest {
     }
 
     @Test
+    fun recycledHolderClearsItsBoundItemBeforeResettingTheCover() {
+        val calls = mutableListOf<String>()
+        var boundItem: String? = "episode"
+
+        resetRecycledMediaItem(boundItem, { item ->
+            boundItem = item
+            calls += "clear"
+        }) {
+            calls += if (boundItem == null) "reset-cover" else "reset-cover-with-bound-item"
+        }
+
+        assertTrue(boundItem == null)
+        org.junit.Assert.assertEquals(listOf("clear", "reset-cover"), calls)
+    }
+
+    @Test
     fun aggregateCoversDoNotReceivePermissionToRequestRemoteThumbnails() {
         assertFalse(ThumbnailGenerationPolicy.shouldRequestNetworkThumbnail(
             isLocalFile = false,

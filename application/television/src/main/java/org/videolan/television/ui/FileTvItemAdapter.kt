@@ -187,7 +187,14 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
             if (VlcMigrationHelper.isLolliPopOrLater) binding.container.clipToOutline = true
             binding.showSeen = seenMediaMarkerVisible
         }
-        override fun recycle() { defaultCover?.let { binding.cover = it }; binding.title.text = ""; binding.subtitle.text = ""; binding.mediaCover.resetFade() }
+        override fun recycle() {
+            resetRecycledMediaItem(binding.item, { binding.item = it }) {
+                defaultCover?.let { binding.cover = it }
+                binding.title.text = ""
+                binding.subtitle.text = ""
+                binding.mediaCover.resetFade()
+            }
+        }
         override fun setItem(item: MediaLibraryItem?) {
             binding.allowNetworkThumbnailGeneration = this@FileTvItemAdapter.allowNetworkThumbnailGeneration
             binding.item = item; var progress = 0; var seen = 0L; var description = item?.description; var resolution = ""
@@ -233,7 +240,14 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
             }
             binding.container.clipToOutline = true; binding.showSeen = seenMediaMarkerVisible
         }
-        override fun recycle() { defaultCover?.let { binding.cover = it }; binding.title.text = ""; binding.subtitle.text = ""; binding.mediaCover.resetFade() }
+        override fun recycle() {
+            resetRecycledMediaItem(binding.item, { binding.item = it }) {
+                defaultCover?.let { binding.cover = it }
+                binding.title.text = ""
+                binding.subtitle.text = ""
+                binding.mediaCover.resetFade()
+            }
+        }
         override fun setItem(item: MediaLibraryItem?) {
             binding.allowNetworkThumbnailGeneration = this@FileTvItemAdapter.allowNetworkThumbnailGeneration
             binding.item = item; var isSquare = true; var progress = 0; var seen = 0L; var description = item?.description; var resolution = ""

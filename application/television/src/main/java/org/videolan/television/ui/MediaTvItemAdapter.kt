@@ -40,6 +40,15 @@ import org.videolan.vlc.util.isOTG
 import org.videolan.vlc.util.isSD
 import org.videolan.vlc.util.isSchemeFile
 
+internal fun <T : Any> resetRecycledMediaItem(
+    currentItem: T?,
+    clearBoundItem: (T?) -> Unit,
+    resetPresentation: () -> Unit
+) {
+    if (currentItem != null) clearBoundItem(null)
+    resetPresentation()
+}
+
 internal fun <T : Any> dispatchMediaTvItemPayloads(
     hasThumbnailPayload: Boolean,
     selectionPayload: T?,
@@ -247,10 +256,12 @@ class MediaTvItemAdapter(type: Int, private val eventsHandler: IEventsHandler<Me
         }
 
         override fun recycle() {
-            if (defaultCover != null) binding.cover = defaultCover
-            binding.title.text = ""
-            binding.subtitle.text = ""
-            binding.mediaCover.resetFade()
+            resetRecycledMediaItem(binding.item, { binding.item = it }) {
+                if (defaultCover != null) binding.cover = defaultCover
+                binding.title.text = ""
+                binding.subtitle.text = ""
+                binding.mediaCover.resetFade()
+            }
         }
 
         override fun setItem(item: MediaLibraryItem?) {
@@ -335,10 +346,12 @@ class MediaTvItemAdapter(type: Int, private val eventsHandler: IEventsHandler<Me
         }
 
         override fun recycle() {
-            if (defaultCover != null) binding.cover = defaultCover
-            binding.title.text = ""
-            binding.subtitle.text = ""
-            binding.mediaCover.resetFade()
+            resetRecycledMediaItem(binding.item, { binding.item = it }) {
+                if (defaultCover != null) binding.cover = defaultCover
+                binding.title.text = ""
+                binding.subtitle.text = ""
+                binding.mediaCover.resetFade()
+            }
         }
 
         override fun setItem(item: MediaLibraryItem?) {
