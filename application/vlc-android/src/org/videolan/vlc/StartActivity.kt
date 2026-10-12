@@ -75,7 +75,6 @@ import org.videolan.tools.PREF_TV_UI
 import org.videolan.tools.Settings
 import org.videolan.tools.awaitAppIsForegroung
 import org.videolan.tools.getContextWithLocale
-import org.videolan.tools.putSingle
 import org.videolan.vlc.gui.BetaWelcomeActivity
 import org.videolan.vlc.gui.helpers.hf.StoragePermissionsDelegate.Companion.getStoragePermission
 import org.videolan.vlc.gui.onboarding.ONBOARDING_DONE_KEY
