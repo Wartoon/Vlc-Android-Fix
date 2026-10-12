@@ -57,7 +57,6 @@ internal class MediaBrowserAnimatorDelegate(val binding: SongBrowserBinding, pri
     private val fabFavorite = binding.imageButtonFavorite
     private val fabSort = binding.imageButtonSort
     private val fabDisplay = binding.imageButtonDisplay
-    private val fabThumbnailRefresh = binding.imageButtonThumbnailRefresh
 
     private var currenstate = MediaBrowserState.SCROLLED_UP
         set(value) {
@@ -112,7 +111,7 @@ internal class MediaBrowserAnimatorDelegate(val binding: SongBrowserBinding, pri
             binding.headerButton -> binding.headerDescription
             binding.sortButton -> binding.sortDescription
             binding.favoriteButton -> binding.favoriteDescription
-            binding.imageButtonThumbnailRefresh -> binding.thumbnailRefreshDescription
+            binding.thumbnailRefreshButton -> binding.thumbnailRefreshDescription
             else -> null
         }
 
@@ -123,7 +122,7 @@ internal class MediaBrowserAnimatorDelegate(val binding: SongBrowserBinding, pri
 
         // FAB has to be expanded / collapsed when its focus changes
         if (currenstate != MediaBrowserState.SCROLLED_UP) {
-            if (!fabSettings.hasFocus() && !fabSort.hasFocus() && !fabDisplay.hasFocus() && !fabDisplay.hasFocus() && !fabHeader.hasFocus() && !fabFavorite.hasFocus() && !fabThumbnailRefresh.hasFocus() && currenstate != MediaBrowserState.HEADER_VISIBLE) {
+            if (!fabSettings.hasFocus() && !fabSort.hasFocus() && !fabDisplay.hasFocus() && !fabDisplay.hasFocus() && !fabHeader.hasFocus() && !fabFavorite.hasFocus() && currenstate != MediaBrowserState.HEADER_VISIBLE) {
                 collapseExtendedFAB()
             }
             if (v == fabSettings && hasFocus) {
@@ -187,10 +186,6 @@ internal class MediaBrowserAnimatorDelegate(val binding: SongBrowserBinding, pri
         scrolledDownFABCollapsedConstraintSet.setMargin(R.id.favoriteButton, ConstraintSet.END, 0)
         scrolledDownFABCollapsedConstraintSet.setMargin(R.id.favoriteButton, ConstraintSet.TOP, 0)
         scrolledDownFABCollapsedConstraintSet.setMargin(R.id.favoriteButton, ConstraintSet.BOTTOM, 0)
-        scrolledDownFABCollapsedConstraintSet.setMargin(R.id.imageButtonThumbnailRefresh, ConstraintSet.START, 0)
-        scrolledDownFABCollapsedConstraintSet.setMargin(R.id.imageButtonThumbnailRefresh, ConstraintSet.END, 0)
-        scrolledDownFABCollapsedConstraintSet.setMargin(R.id.imageButtonThumbnailRefresh, ConstraintSet.TOP, 0)
-        scrolledDownFABCollapsedConstraintSet.setMargin(R.id.imageButtonThumbnailRefresh, ConstraintSet.BOTTOM, 0)
 
         //New constraints for toolbar buttons to make them move to the FAB
         scrolledDownFABCollapsedConstraintSet.connect(R.id.sortButton, ConstraintSet.START, R.id.imageButtonSettings, ConstraintSet.START)
@@ -212,10 +207,6 @@ internal class MediaBrowserAnimatorDelegate(val binding: SongBrowserBinding, pri
         scrolledDownFABCollapsedConstraintSet.connect(R.id.favoriteButton, ConstraintSet.END, R.id.imageButtonSettings, ConstraintSet.END)
         scrolledDownFABCollapsedConstraintSet.connect(R.id.favoriteButton, ConstraintSet.TOP, R.id.imageButtonSettings, ConstraintSet.TOP)
         scrolledDownFABCollapsedConstraintSet.connect(R.id.favoriteButton, ConstraintSet.BOTTOM, R.id.imageButtonSettings, ConstraintSet.BOTTOM)
-        scrolledDownFABCollapsedConstraintSet.connect(R.id.imageButtonThumbnailRefresh, ConstraintSet.START, R.id.imageButtonSettings, ConstraintSet.START)
-        scrolledDownFABCollapsedConstraintSet.connect(R.id.imageButtonThumbnailRefresh, ConstraintSet.END, R.id.imageButtonSettings, ConstraintSet.END)
-        scrolledDownFABCollapsedConstraintSet.connect(R.id.imageButtonThumbnailRefresh, ConstraintSet.TOP, R.id.imageButtonSettings, ConstraintSet.TOP)
-        scrolledDownFABCollapsedConstraintSet.connect(R.id.imageButtonThumbnailRefresh, ConstraintSet.BOTTOM, R.id.imageButtonSettings, ConstraintSet.BOTTOM)
 
         //New constraints for the action description labels (they will be reused when expanding the FAB)
         scrolledDownFABCollapsedConstraintSet.clear(R.id.sortDescription, ConstraintSet.START)
@@ -238,9 +229,6 @@ internal class MediaBrowserAnimatorDelegate(val binding: SongBrowserBinding, pri
         scrolledDownFABCollapsedConstraintSet.connect(R.id.favoriteDescription, ConstraintSet.TOP, R.id.imageButtonFavorite, ConstraintSet.TOP)
         scrolledDownFABCollapsedConstraintSet.connect(R.id.favoriteDescription, ConstraintSet.BOTTOM, R.id.imageButtonFavorite, ConstraintSet.BOTTOM)
         scrolledDownFABCollapsedConstraintSet.clear(R.id.thumbnailRefreshDescription, ConstraintSet.START)
-        scrolledDownFABCollapsedConstraintSet.connect(R.id.thumbnailRefreshDescription, ConstraintSet.END, R.id.imageButtonThumbnailRefresh, ConstraintSet.START)
-        scrolledDownFABCollapsedConstraintSet.connect(R.id.thumbnailRefreshDescription, ConstraintSet.TOP, R.id.imageButtonThumbnailRefresh, ConstraintSet.TOP)
-        scrolledDownFABCollapsedConstraintSet.connect(R.id.thumbnailRefreshDescription, ConstraintSet.BOTTOM, R.id.imageButtonThumbnailRefresh, ConstraintSet.BOTTOM)
 
         // Title escapes by the top of the screen
         scrolledDownFABCollapsedConstraintSet.connect(R.id.title, ConstraintSet.BOTTOM, ConstraintSet.PARENT_ID, ConstraintSet.TOP)
@@ -260,12 +248,10 @@ internal class MediaBrowserAnimatorDelegate(val binding: SongBrowserBinding, pri
         scrolledDownFABExpandedConstraintSet.clear(R.id.imageButtonSort, ConstraintSet.TOP)
         scrolledDownFABExpandedConstraintSet.clear(R.id.imageButtonDisplay, ConstraintSet.TOP)
         scrolledDownFABExpandedConstraintSet.clear(R.id.imageButtonFavorite, ConstraintSet.TOP)
-        scrolledDownFABExpandedConstraintSet.clear(R.id.imageButtonThumbnailRefresh, ConstraintSet.TOP)
         scrolledDownFABExpandedConstraintSet.connect(R.id.imageButtonHeader, ConstraintSet.BOTTOM, R.id.imageButtonSettings, ConstraintSet.TOP)
         scrolledDownFABExpandedConstraintSet.connect(R.id.imageButtonSort, ConstraintSet.BOTTOM, R.id.imageButtonHeader, ConstraintSet.TOP)
         scrolledDownFABExpandedConstraintSet.connect(R.id.imageButtonFavorite, ConstraintSet.BOTTOM, R.id.imageButtonSort, ConstraintSet.TOP)
         scrolledDownFABExpandedConstraintSet.connect(R.id.imageButtonDisplay, ConstraintSet.BOTTOM, R.id.imageButtonFavorite, ConstraintSet.TOP)
-        scrolledDownFABExpandedConstraintSet.connect(R.id.imageButtonThumbnailRefresh, ConstraintSet.BOTTOM, R.id.imageButtonDisplay, ConstraintSet.TOP)
 
         scrolledDownFABExpandedConstraintSet.setAlpha(R.id.displayDescription, 1f)
         scrolledDownFABExpandedConstraintSet.setAlpha(R.id.sortDescription, 1f)
@@ -324,6 +310,6 @@ fun BaseBrowserTvFragment<*>.setAnimator(cl: ConstraintLayout) {
     binding.imageButtonDisplay.onFocusChangeListener = animationDelegate
     binding.imageButtonHeader.onFocusChangeListener = animationDelegate
     binding.imageButtonSettings.onFocusChangeListener = animationDelegate
-    binding.imageButtonThumbnailRefresh.onFocusChangeListener = animationDelegate
+    binding.thumbnailRefreshButton.onFocusChangeListener = animationDelegate
     binding.list.addOnScrollListener(animationDelegate)
 }
