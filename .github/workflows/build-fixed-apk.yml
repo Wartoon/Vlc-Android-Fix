@@ -141,6 +141,15 @@ jobs:
           find application/app/build/outputs/apk -type f -name '*.apk' -exec cp {} out/ \;
           test -f out/VLC-Internal-Storage-all.apk
           test -f out/VLC-SMB-all.apk
+          python3 - <<'PY'
+          from pathlib import Path
+          widget = Path("application/vlc-android/src/org/videolan/vlc/widget/MiniPlayerAppWidgetProvider.kt").read_text()
+          service = Path("application/vlc-android/src/org/videolan/vlc/PlaybackService.kt").read_text()
+          assert "coerceIn(320, 1024)" in widget, "widget artwork must scale with actual widget size"
+          assert "Uri.decode(media.artworkMrl), 1024" in service, "notification artwork decode target must be high resolution"
+          assert "Uri.decode(mw.artworkMrl), 1024" in service, "notification fallback artwork decode target must be high resolution"
+          print("widget and media-notification artwork resolution guards verified")
+          PY
           sha256sum out/VLC-Internal-Storage-all.apk out/VLC-SMB-all.apk
           ls -lh out
 

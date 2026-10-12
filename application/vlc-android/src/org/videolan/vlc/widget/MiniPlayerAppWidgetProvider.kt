@@ -329,7 +329,9 @@ class MiniPlayerAppWidgetProvider : AppWidgetProvider() {
                 log(appWidgetId, WidgetLogType.INFO, "Bugfix Refresh - Update cover: ${widgetCacheEntry.currentMedia?.artworkMrl} for ${widgetCacheEntry.widget.widgetId} -> ${widgetCacheEntry.currentCover}")
                 runIO {
                     log(appWidgetId, WidgetLogType.BITMAP_GENERATION, "Generating cover")
-                    val cover = AudioUtil.readCoverBitmap(Uri.decode(widgetCacheEntry.currentCover), 320)
+                    val targetCoverWidth = (maxOf(widgetCacheEntry.widget.width, widgetCacheEntry.widget.height) *
+                            context.resources.displayMetrics.density).toInt().coerceIn(320, 1024)
+                    val cover = AudioUtil.readCoverBitmap(Uri.decode(widgetCacheEntry.currentCover), targetCoverWidth)
                     val wm = context.getSystemService<WindowManager>()!!
                     val dm = DisplayMetrics().also { wm.defaultDisplay.getMetrics(it) }
                     runOnMainThread {

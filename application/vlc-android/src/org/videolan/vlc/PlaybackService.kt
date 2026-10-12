@@ -1049,7 +1049,7 @@ class PlaybackService : MediaBrowserServiceCompat(), LifecycleOwner, CoroutineSc
                     var cover = if (coverOnLockscreen && metaData != null)
                         metaData.getBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART) else null
                     if (coverOnLockscreen && cover == null)
-                        cover = AudioUtil.readCoverBitmap(Uri.decode(mw.artworkMrl), 256)
+                        cover = AudioUtil.readCoverBitmap(Uri.decode(mw.artworkMrl), 1024)
                     if (cover == null || cover.isRecycled)
                         cover = ctx.getBitmapFromDrawable(R.drawable.ic_no_media)
 
@@ -1240,7 +1240,7 @@ class PlaybackService : MediaBrowserServiceCompat(), LifecycleOwner, CoroutineSc
                 }
                 bob.putString(MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI, albumArtUri.toString())
                 if (!carMode) {
-                    val cover = AudioUtil.readCoverBitmap(Uri.decode(media.artworkMrl), 512)
+                    val cover = AudioUtil.readCoverBitmap(Uri.decode(media.artworkMrl), 1024)
                     val config = cover?.config
                     if (config != null)
                     //In case of format not supported
