@@ -201,12 +201,12 @@ abstract class BaseBrowserTvFragment<T> : Fragment(), BrowserFragmentInterface, 
             else -> false
         }
         val visibility = if (refreshable) View.VISIBLE else View.GONE
-        animationDelegate.setVisibility(binding.imageButtonThumbnailRefresh, visibility)
+        animationDelegate.setVisibility(binding.thumbnailRefreshButton, visibility)
         animationDelegate.setVisibility(binding.thumbnailRefreshDescription, visibility)
-        binding.imageButtonThumbnailRefresh.contentDescription = getString(org.videolan.resources.R.string.refresh_thumbnails)
-        binding.imageButtonThumbnailRefresh.setOnClickListener {
+        binding.thumbnailRefreshButton.contentDescription = getString(org.videolan.resources.R.string.refresh_thumbnails)
+        binding.thumbnailRefreshButton.setOnClickListener {
             val selected = viewModel.currentItem as? MediaLibraryItem ?: return@setOnClickListener
-            binding.imageButtonThumbnailRefresh.isEnabled = false
+            binding.thumbnailRefreshButton.isEnabled = false
             viewLifecycleOwner.lifecycleScope.launch {
                 try {
                     val result = withContext(Dispatchers.IO) {
@@ -225,7 +225,7 @@ abstract class BaseBrowserTvFragment<T> : Fragment(), BrowserFragmentInterface, 
                         Toast.LENGTH_LONG
                     ).show()
                 } finally {
-                    if (isAdded) binding.imageButtonThumbnailRefresh.isEnabled = true
+                    if (isAdded) binding.thumbnailRefreshButton.isEnabled = true
                 }
             }
         }
