@@ -205,7 +205,7 @@ abstract class BaseBrowserTvFragment<T> : Fragment(), BrowserFragmentInterface, 
         animationDelegate.setVisibility(binding.thumbnailRefreshDescription, visibility)
         binding.imageButtonThumbnailRefresh.contentDescription = getString(org.videolan.resources.R.string.refresh_thumbnails)
         binding.imageButtonThumbnailRefresh.setOnClickListener {
-            val selected = viewModel.currentItem ?: return@setOnClickListener
+            val selected = viewModel.currentItem as? MediaLibraryItem ?: return@setOnClickListener
             binding.imageButtonThumbnailRefresh.isEnabled = false
             viewLifecycleOwner.lifecycleScope.launch {
                 try {
