@@ -85,9 +85,9 @@ class MediaTvItemAdapter(type: Int, private val eventsHandler: IEventsHandler<Me
     }
 
     override fun onBindViewHolder(holder: AbstractMediaItemViewHolder<ViewDataBinding>, position: Int, payloads: List<Any>) {
-        if (!payloads.isNullOrEmpty() && payloads.all { it === ThumbnailRefreshPayload }) {
-            val item = getItem(position) as? MediaWrapper ?: return
-            refreshThumbnail(holder, item)
+        val thumbnail = payloads.filterIsInstance<ThumbnailRefreshPayload>().lastOrNull()
+        if (thumbnail != null) {
+            refreshThumbnail(holder, thumbnail.media)
         } else if (!payloads.isNullOrEmpty() && payloads[0] is MediaLibraryItem)  {
             val isSelected = (payloads[0] as MediaLibraryItem).hasStateFlags(MediaLibraryItem.FLAG_SELECTED)
             holder.setCoverlay(isSelected)
@@ -108,7 +108,7 @@ class MediaTvItemAdapter(type: Int, private val eventsHandler: IEventsHandler<Me
         currentList?.forEachIndexed { index, item ->
             val listedMedia = item as? MediaWrapper ?: return@forEachIndexed
             if (isThumbnailEventForMedia(listedMedia.id, listedMedia.uri.toString(), media.id, media.uri.toString())) {
-                notifyItemChanged(index, ThumbnailRefreshPayload)
+                notifyItemChanged(index, ThumbnailRefreshPayload(media))
             }
         }
     }

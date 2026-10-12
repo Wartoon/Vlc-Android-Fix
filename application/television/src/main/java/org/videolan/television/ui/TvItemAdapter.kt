@@ -7,7 +7,7 @@ internal fun isThumbnailEventForMedia(itemId: Long, itemUri: String, thumbnailId
             (itemUri.isNotBlank() && itemUri == thumbnailUri)
 }
 
-internal object ThumbnailRefreshPayload
+internal data class ThumbnailRefreshPayload(val media: MediaWrapper)
 
 interface TvItemAdapter : TvFocusableAdapter {
     fun submitList(pagedList: Any?)
