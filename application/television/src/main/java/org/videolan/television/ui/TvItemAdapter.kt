@@ -8,6 +8,17 @@ internal fun isThumbnailEventForMedia(itemId: Long, itemUri: String, thumbnailId
 }
 
 internal data class ThumbnailRefreshPayload(val media: MediaWrapper)
+internal class ThumbnailMediaOverrides<T : Any> {
+    private val mediaByUri = HashMap<String, T>()
+
+    fun remember(uri: String, media: T) {
+        mediaByUri[uri] = media
+    }
+
+    fun resolve(uri: String, currentItem: T): T = mediaByUri[uri] ?: currentItem
+
+    fun clear() = mediaByUri.clear()
+}
 
 interface TvItemAdapter : TvFocusableAdapter {
     fun submitList(pagedList: Any?)

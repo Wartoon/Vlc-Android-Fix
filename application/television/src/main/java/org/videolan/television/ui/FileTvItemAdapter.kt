@@ -70,7 +70,10 @@ internal fun areFileTvItemContentsTheSame(
 
 class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryItem>, var itemSize: Int, private val showProtocol: Boolean, private var inGrid: Boolean = true, private val allowNetworkThumbnailGeneration: Boolean = false) : DiffUtilAdapter<MediaWrapper, MediaTvItemAdapter.AbstractMediaItemViewHolder<ViewDataBinding>>(), FastScroller.SeparatedAdapter, TvItemAdapter {
 
+    private val latestThumbnailMedia = ThumbnailMediaOverrides<MediaWrapper>()
+
     override fun submitList(pagedList: Any?) {
+        latestThumbnailMedia.clear()
         if (pagedList is List<*>) {
             @Suppress("UNCHECKED_CAST")
             update(pagedList as List<MediaWrapper>)
@@ -80,6 +83,7 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
     override fun thumbnailReady(media: MediaWrapper) {
         dataset.forEachIndexed { index, listedMedia ->
             if (isThumbnailEventForMedia(listedMedia.id, listedMedia.uri.toString(), media.id, media.uri.toString())) {
+                latestThumbnailMedia.remember(media.uri.toString(), media)
                 notifyItemChanged(index, ThumbnailRefreshPayload(media))
             }
         }
@@ -116,7 +120,7 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
     override fun onBindViewHolder(holder: MediaTvItemAdapter.AbstractMediaItemViewHolder<ViewDataBinding>, position: Int) {
         if (position >= itemCount) return
         val item = getItem(position)
-        holder.setItem(item)
+        holder.setItem(latestThumbnailMedia.resolve(item.uri.toString(), item))
         holder.binding.executePendingBindings()
         if (position == focusNext) { holder.binding.root.requestFocus(); focusNext = -1 }
     }

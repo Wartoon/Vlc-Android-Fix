@@ -67,6 +67,20 @@ class ThumbnailRequestPolicyTest {
     }
 
     @Test
+    fun refreshedThumbnailMediaIsReusedWhenTheOldListItemBindsAgain() {
+        val overrides = ThumbnailMediaOverrides<String>()
+        val uri = "smb://server/episode.mkv"
+        val oldListItem = "unindexed-media"
+        val refreshedMedia = "indexed-media-with-thumbnail"
+
+        overrides.remember(uri, refreshedMedia)
+
+        org.junit.Assert.assertEquals(refreshedMedia, overrides.resolve(uri, oldListItem))
+        org.junit.Assert.assertEquals(oldListItem, overrides.resolve("smb://server/other.mkv", oldListItem))
+        overrides.clear()
+        org.junit.Assert.assertEquals(oldListItem, overrides.resolve(uri, oldListItem))
+    }
+    @Test
     fun recycledHolderClearsItsBoundItemBeforeResettingTheCover() {
         val calls = mutableListOf<String>()
         var boundItem: String? = "episode"

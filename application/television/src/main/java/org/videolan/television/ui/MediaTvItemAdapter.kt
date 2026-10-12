@@ -68,6 +68,7 @@ class MediaTvItemAdapter(type: Int, private val eventsHandler: IEventsHandler<Me
         this.inGrid = inGrid
     }
 
+    private val latestThumbnailMedia = ThumbnailMediaOverrides<MediaWrapper>()
     private val defaultCover: BitmapDrawable?
     private var focusListener: FocusListener? = null
     private var seenMediaMarkerVisible: Boolean  =true
@@ -98,7 +99,10 @@ class MediaTvItemAdapter(type: Int, private val eventsHandler: IEventsHandler<Me
     override fun onBindViewHolder(holder: AbstractMediaItemViewHolder<ViewDataBinding>, position: Int) {
         if (position >= itemCount) return
         val item = getItem(position)
-        holder.setItem(item)
+        val itemForBinding = (item as? MediaWrapper)?.let {
+            latestThumbnailMedia.resolve(it.uri.toString(), it)
+        } ?: item
+        holder.setItem(itemForBinding)
         holder.binding.executePendingBindings()
         if (position == focusNext) {
             holder.binding.root.requestFocus()
@@ -139,6 +143,7 @@ class MediaTvItemAdapter(type: Int, private val eventsHandler: IEventsHandler<Me
         currentList?.forEachIndexed { index, item ->
             val listedMedia = item as? MediaWrapper ?: return@forEachIndexed
             if (isThumbnailEventForMedia(listedMedia.id, listedMedia.uri.toString(), media.id, media.uri.toString())) {
+                latestThumbnailMedia.remember(media.uri.toString(), media)
                 notifyItemChanged(index, ThumbnailRefreshPayload(media))
             }
         }
@@ -154,6 +159,7 @@ class MediaTvItemAdapter(type: Int, private val eventsHandler: IEventsHandler<Me
     }
 
     override fun submitList(pagedList: Any?) {
+        latestThumbnailMedia.clear()
         if (pagedList == null) {
             this.submitList(null)
         }
