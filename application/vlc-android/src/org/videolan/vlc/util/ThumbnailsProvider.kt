@@ -34,6 +34,14 @@ import java.io.File
 import java.util.ArrayDeque
 import kotlin.math.min
 
+object ThumbnailCachePolicy {
+    fun shouldClearGeneratedFlag(isThumbnailGenerated: Boolean, cachedThumbnailUnreadable: Boolean) =
+        isThumbnailGenerated && cachedThumbnailUnreadable
+
+    fun needsResolutionUpgrade(width: Int, height: Int, targetSize: Int) =
+        targetSize > 0 && maxOf(width, height) < targetSize
+}
+
 object ThumbnailsProvider {
 
     @Suppress("unused")
@@ -83,7 +91,7 @@ object ThumbnailsProvider {
      * shorter clips start after 25% of their runtime instead.
      * Automatic requests only inspect extra frames if the original looks poor.
      */
-    private fun betterLocalVideoFrame(media: MediaWrapper, original: Bitmap?, manual: Boolean = false): Bitmap? {
+    private fun betterLocalVideoFrame(media: MediaWrapper, original: Bitmap?, manual: Boolean = false, targetSize: Int = 384): Bitmap? {
         if (!media.uri.scheme.isSchemeFile() || Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1)
             return null
         val initialQuality = original?.let(::frameQuality)
@@ -101,11 +109,16 @@ object ThumbnailsProvider {
                 ?: return null
             if (durationMs <= 0L) return null
             val earliestMs = minOf(300_000L, durationMs / 4).coerceAtLeast(1L)
-            val referenceWidth = original?.width ?: 320
-            val referenceHeight = original?.height ?: 180
-            val scale = minOf(1f, 384f / maxOf(referenceWidth, referenceHeight))
-            val targetWidth = (referenceWidth * scale).toInt().coerceAtLeast(1)
-            val targetHeight = (referenceHeight * scale).toInt().coerceAtLeast(1)
+            val requestedSize = targetSize.coerceIn(96, 1024)
+            val referenceWidth = original?.width?.takeIf { it > 0 }
+                ?: media.width.takeIf { it > 0 } ?: requestedSize
+            val referenceHeight = original?.height?.takeIf { it > 0 }
+                ?: media.height.takeIf { it > 0 } ?: (requestedSize * 9 / 16)
+            val aspectRatio = referenceWidth.toFloat() / referenceHeight.coerceAtLeast(1)
+            val targetWidth = if (aspectRatio >= 1f) requestedSize
+                else (requestedSize * aspectRatio).toInt().coerceAtLeast(1)
+            val targetHeight = if (aspectRatio >= 1f) (requestedSize / aspectRatio).toInt().coerceAtLeast(1)
+                else requestedSize
             var best: Bitmap? = null
             var bestScore = if (manual) -1f else initialQuality?.score ?: 0f
             val times = longArrayOf(earliestMs, durationMs / 2, durationMs * 7 / 10).distinct()
@@ -161,8 +174,8 @@ object ThumbnailsProvider {
      * subfolders), group or playlist, without replacing good thumbnails.
      * Paged queries and coroutine cancellation keep the work manageable.
      */
-    suspend fun refreshSelectedThumbnails(item: MediaLibraryItem, width: Int = 320): ThumbnailRefreshResult {
-        val requestedWidth = width.coerceIn(96, 512)
+    suspend fun refreshSelectedThumbnails(item: MediaLibraryItem, width: Int = 1024): ThumbnailRefreshResult {
+        val requestedWidth = width.coerceIn(96, 1024)
         var scanned = 0
         var replaced = 0
         var requested = 0
@@ -273,16 +286,23 @@ object ThumbnailsProvider {
         }
         val existing = localArtworkForInspection(media, width)
         val existingQuality = existing?.let(::frameQuality)
-        if (onlyBad && existingQuality != null && !existingQuality.likelyIntroOrBlank)
+        val needsResolutionUpgrade = existing?.let {
+            ThumbnailCachePolicy.needsResolutionUpgrade(it.width, it.height, width)
+        } == true
+        if (onlyBad && existingQuality != null && !existingQuality.likelyIntroOrBlank && !needsResolutionUpgrade)
             return ThumbnailRefreshChange.UNCHANGED
 
         if (media.uri.scheme.isSchemeFile()) {
-            val selected = betterLocalVideoFrame(media, existing, manual = true)
+            val selected = betterLocalVideoFrame(media, existing, manual = true, targetSize = width)
                 ?: return ThumbnailRefreshChange.UNCHANGED
             val selectedQuality = frameQuality(selected)
-            // Preserve genuinely better existing frames and do not install blank replacements.
-            if (existingQuality != null &&
-                selectedQuality.score < existingQuality.score + if (onlyBad) 0.06f else -0.04f)
+            val existingMaxDimension = existing?.let { maxOf(it.width, it.height) } ?: 0
+            val selectedMaxDimension = maxOf(selected.width, selected.height)
+            val minimumScoreDelta = if (onlyBad && !needsResolutionUpgrade) 0.06f else -0.04f
+            // Keep good frames unless the replacement improves quality or resolves a size deficit.
+            if (existingQuality != null && selectedQuality.score < existingQuality.score + minimumScoreDelta)
+                return ThumbnailRefreshChange.UNCHANGED
+            if (needsResolutionUpgrade && selectedMaxDimension <= existingMaxDimension)
                 return ThumbnailRefreshChange.UNCHANGED
             val oldKey = getMediaThumbnailPath(true, media)
             if (media.id > 0L) {
@@ -350,9 +370,9 @@ object ThumbnailsProvider {
         if (isMedia && isMediaVideo(item as MediaWrapper)) {
             if (item.id == 0L) return item.uri.toString()
             if (appDir == null) appDir = AppContextProvider.appContext.getExternalFilesDir(null)
-            val hasCache = appDir != null && appDir!!.exists()
-            if (hasCache && cacheDir == null) cacheDir = appDir!!.absolutePath + MEDIALIB_FOLDER_NAME
-            return if (hasCache) StringBuilder(cacheDir!!).append('/').append(item.id).append(".jpg").toString() else null
+            if (appDir != null && cacheDir == null) cacheDir = appDir!!.absolutePath + MEDIALIB_FOLDER_NAME
+            // Keep a stable key when external storage is unavailable so in-memory thumbnails still work.
+            return cacheDir?.let { File(it, "${item.id}.jpg").absolutePath } ?: item.uri.toString()
         }
         return item.artworkMrl
     }
@@ -369,6 +389,7 @@ object ThumbnailsProvider {
         val cacheKey = getMediaCacheKey(true, media, width.toString())
         val cacheBM = BitmapCache.getBitmapFromMemCache(cacheKey)
         if (cacheBM != null) return improveCachedVideoThumbnail(media, cacheBM, thumbPath, width)
+        var cachedThumbnailUnreadable = false
         if (hasCache && media.id > 0L && File(thumbPath).isFile) {
             readCoverBitmap(thumbPath, width)?.let { cached ->
                 val selected = improveCachedVideoThumbnail(media, cached, thumbPath, width)
@@ -376,8 +397,13 @@ object ThumbnailsProvider {
                 return selected
             }
             // A stale or unreadable cached JPEG must not suppress thumbnail generation.
+            cachedThumbnailUnreadable = true
         }
-        if (media.isThumbnailGenerated) return null
+        if (media.isThumbnailGenerated) {
+            if (!ThumbnailCachePolicy.shouldClearGeneratedFlag(media.isThumbnailGenerated, cachedThumbnailUnreadable))
+                return null
+            media.removeThumbnail()
+        }
         var bitmap = synchronized(lock) {
             if (media.uri.scheme.isSchemeFile()) ThumbnailUtils.createVideoThumbnail(filePath, MediaStore.Video.Thumbnails.MINI_KIND) else null
         }
