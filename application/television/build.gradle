@@ -44,6 +44,7 @@ dependencies {
     implementation project(':application:vlc-android')
     api project(':application:moviepedia')
     testImplementation "androidx.test:core:$rootProject.ext.testCore"
+    testImplementation "junit:junit:4.13.2"
     androidTestImplementation "androidx.test.ext:junit:$rootProject.ext.junitExtVersion"
     implementation 'com.jaredrummler:colorpicker:1.1.0'
 }
