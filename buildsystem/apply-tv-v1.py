@@ -138,6 +138,17 @@ replace(
 '''
 )
 
+# Match requested thumbnail width to the TV file-browser card/list image size.
+replace("application/television/src/main/java/org/videolan/television/ui/FileTvItemAdapter.kt",
+        "import org.videolan.tools.Settings\\n",
+        "import org.videolan.tools.Settings\\nimport org.videolan.tools.dp\\n")
+replace("application/television/src/main/java/org/videolan/television/ui/FileTvItemAdapter.kt",
+        "binding.allowNetworkThumbnailGeneration = this@FileTvItemAdapter.allowNetworkThumbnailGeneration\\n            binding.item = item; var progress = 0;",
+        "binding.allowNetworkThumbnailGeneration = this@FileTvItemAdapter.allowNetworkThumbnailGeneration\\n            binding.imageWidth = 120.dp\\n            binding.item = item; var progress = 0;")
+replace("application/television/src/main/java/org/videolan/television/ui/FileTvItemAdapter.kt",
+        "binding.allowNetworkThumbnailGeneration = this@FileTvItemAdapter.allowNetworkThumbnailGeneration\\n            binding.item = item; var isSquare = true;",
+        "binding.allowNetworkThumbnailGeneration = this@FileTvItemAdapter.allowNetworkThumbnailGeneration\\n            binding.imageWidth = 80.dp\\n            binding.item = item; var isSquare = true;")
+
 # Reuse the tested full-backup implementation from mobile and adapt it to the TV preference base.
 mobile_path = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/PreferencesAdvanced.kt")
 tv_path = Path("application/television/src/main/java/org/videolan/television/ui/preferences/PreferencesAdvanced.kt")

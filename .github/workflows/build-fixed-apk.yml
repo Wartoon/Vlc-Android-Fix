@@ -100,6 +100,9 @@ jobs:
           if file_tv_adapter.count("resetTvFocusPresentation(binding.container)") < 2:
               raise SystemExit("Verification failed: grid and list file holders must reset focus when recycled")
           print("verified TV file-browser focus reset for grid and list holders")
+          if "binding.imageWidth = 120.dp" not in file_tv_adapter or "binding.imageWidth = 80.dp" not in file_tv_adapter:
+              raise SystemExit("Verification failed: file-browser grid/list thumbnail widths must be explicit")
+          print("verified TV file-browser thumbnail widths for grid and list")
           tv_prefs = Path("application/television/src/main/java/org/videolan/television/ui/preferences/PreferencesAdvanced.kt").read_text()
           if 'snackerConfirm(activity, getString(R.string.full_backup_success)' in tv_prefs:
               raise SystemExit("Regression: AppCompat-only full-backup Snackbar is present in TV preferences")
