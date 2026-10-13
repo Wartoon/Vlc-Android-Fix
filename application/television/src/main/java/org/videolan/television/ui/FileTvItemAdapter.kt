@@ -167,6 +167,8 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
 
     @RequiresApi(Build.VERSION_CODES.M)
     inner class MediaItemTVViewHolder(binding: MediaBrowserTvItemBinding, override val eventsHandler: IEventsHandler<MediaLibraryItem>, private val showProtocol: Boolean) : MediaTvItemAdapter.AbstractMediaItemViewHolder<MediaBrowserTvItemBinding>(binding) {
+        private var focusChangeSequence = 0L
+
         override fun getItem(layoutPosition: Int) = if (layoutPosition in 0 until itemCount) this@FileTvItemAdapter.getItem(layoutPosition) else null
         override fun getView() = binding.container
         init {
@@ -175,18 +177,20 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
             if (AndroidUtil.isMarshMallowOrLater) itemView.setOnContextClickListener { v -> onMoreClick(v); true }
             binding.container.layoutParams.width = itemSize
             binding.container.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
+                val eventSequence = ++focusChangeSequence
                 binding.container.post {
-                if (binding.container.hasFocus() != hasFocus) return@post
-                TvAdapterUtils.itemFocusChange(hasFocus, itemSize, binding.container, false) {
-                    val position = bindingAdapterPosition
-                    if (position in dataset.indices) {
-                        getItem(position)?.let { item ->
-                            eventsHandler.onItemFocused(binding.root, item)
-                            focusListener?.onFocusChanged(position)
+                    val currentHasFocus = binding.container.hasFocus()
+                    TvAdapterUtils.itemFocusChange(currentHasFocus, itemSize, binding.container, false) {
+                        if (!shouldDispatchTvFocusGain(hasFocus, currentHasFocus, eventSequence, focusChangeSequence)) return@itemFocusChange
+                        val position = bindingAdapterPosition
+                        if (position in dataset.indices) {
+                            getItem(position)?.let { item ->
+                                eventsHandler.onItemFocused(binding.root, item)
+                                focusListener?.onFocusChanged(position)
+                            }
                         }
                     }
                 }
-            }
             }
             if (VlcMigrationHelper.isLolliPopOrLater) binding.container.clipToOutline = true
             binding.showSeen = seenMediaMarkerVisible
@@ -223,6 +227,7 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
 
     @TargetApi(Build.VERSION_CODES.M)
     inner class MediaItemTVListViewHolder(binding: MediaBrowserTvItemListBinding, override val eventsHandler: IEventsHandler<MediaLibraryItem>, private val showProtocol: Boolean) : MediaTvItemAdapter.AbstractMediaItemViewHolder<MediaBrowserTvItemListBinding>(binding) {
+        private var focusChangeSequence = 0L
         override fun getItem(layoutPosition: Int) = if (layoutPosition in 0 until itemCount) this@FileTvItemAdapter.getItem(layoutPosition) else null
         override fun getView() = binding.container
         init {
@@ -230,9 +235,11 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
             defaultCover?.let { binding.cover = it }
             if (AndroidUtil.isMarshMallowOrLater) itemView.setOnContextClickListener { v -> onMoreClick(v); true }
             binding.container.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
+                val eventSequence = ++focusChangeSequence
                 binding.container.post {
-                    if (binding.container.hasFocus() != hasFocus) return@post
-                    TvAdapterUtils.itemFocusChange(hasFocus, itemSize, binding.container, true) {
+                    val currentHasFocus = binding.container.hasFocus()
+                    TvAdapterUtils.itemFocusChange(currentHasFocus, itemSize, binding.container, true) {
+                        if (!shouldDispatchTvFocusGain(hasFocus, currentHasFocus, eventSequence, focusChangeSequence)) return@itemFocusChange
                         val position = bindingAdapterPosition
                         if (position in dataset.indices) {
                             getItem(position)?.let { item ->

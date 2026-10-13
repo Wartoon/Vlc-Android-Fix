@@ -81,6 +81,14 @@ class ThumbnailRequestPolicyTest {
         org.junit.Assert.assertEquals(oldListItem, overrides.resolve(uri, oldListItem))
     }
     @Test
+    fun staleQueuedFocusGainIsIgnoredButTheLatestFocusedRowIsDispatched() {
+        assertFalse(shouldDispatchTvFocusGain(true, false, 4L, 5L))
+        assertFalse(shouldDispatchTvFocusGain(true, true, 4L, 5L))
+        assertFalse(shouldDispatchTvFocusGain(false, false, 5L, 5L))
+        assertTrue(shouldDispatchTvFocusGain(true, true, 5L, 5L))
+    }
+
+    @Test
     fun recycledHolderClearsItsBoundItemBeforeResettingTheCover() {
         val calls = mutableListOf<String>()
         var boundItem: String? = "episode"

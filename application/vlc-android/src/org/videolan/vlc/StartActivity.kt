@@ -326,6 +326,7 @@ class StartActivity : FragmentActivity() {
                     val browserIntent = Intent(Intent.ACTION_VIEW)
                             .setClassName(applicationContext, "org.videolan.television.ui.browser.VerticalGridActivity")
                             .putExtra("browser_type", if (lastCategory == TYPE_FILE) HEADER_DIRECTORIES else HEADER_NETWORK)
+                            .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
                     settings.getString("tv_last_file_browser_uri", null)?.takeIf { it.isNotBlank() }?.let { browserIntent.data = it.toUri() }
                     startActivity(browserIntent)
                     finish()

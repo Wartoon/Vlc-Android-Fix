@@ -259,7 +259,7 @@ class FileBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>(), PathAda
         super.onResume()
         persistCurrentFolderRoute()
         if (currentItem == null) (viewModel.provider as BrowserProvider).browseRoot()
-        else refresh()
+        else if ((viewModel as BrowserModel).dataset.isEmpty()) refresh()
         (viewModel as IPathOperationDelegate).getAndRemoveDestination()?.let { browse(it, true) }
     }
 

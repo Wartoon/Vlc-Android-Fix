@@ -50,6 +50,13 @@ internal fun <T : Any> resetRecycledMediaItem(
     resetPresentation()
 }
 
+internal fun shouldDispatchTvFocusGain(
+    eventHasFocus: Boolean,
+    currentHasFocus: Boolean,
+    eventSequence: Long,
+    currentSequence: Long
+): Boolean = eventHasFocus && currentHasFocus && eventSequence == currentSequence
+
 internal fun resetTvFocusPresentation(container: View) {
     container.animate().cancel()
     container.scaleX = 1f

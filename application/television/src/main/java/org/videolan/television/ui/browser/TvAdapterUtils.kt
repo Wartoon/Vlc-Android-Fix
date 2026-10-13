@@ -38,6 +38,7 @@ object TvAdapterUtils {
 
     @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
     fun itemFocusChange(hasFocus: Boolean, itemSize: Int, container: FocusableConstraintLayout, isList: Boolean, listener: () -> Unit) {
+        container.animate().cancel()
         if (hasFocus) {
             val growFactor = if (isList) 1.05 else 1.1
             var newWidth = (itemSize * growFactor).toInt()
