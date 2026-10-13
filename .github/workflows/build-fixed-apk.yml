@@ -96,6 +96,10 @@ jobs:
                   if needle not in text:
                       raise SystemExit(f"Verification failed: {needle!r} missing from {filename}")
               print(f"verified {filename}")
+          file_tv_adapter = Path("application/television/src/main/java/org/videolan/television/ui/FileTvItemAdapter.kt").read_text()
+          if file_tv_adapter.count("resetTvFocusPresentation(binding.container)") < 2:
+              raise SystemExit("Verification failed: grid and list file holders must reset focus when recycled")
+          print("verified TV file-browser focus reset for grid and list holders")
           tv_prefs = Path("application/television/src/main/java/org/videolan/television/ui/preferences/PreferencesAdvanced.kt").read_text()
           if 'snackerConfirm(activity, getString(R.string.full_backup_success)' in tv_prefs:
               raise SystemExit("Regression: AppCompat-only full-backup Snackbar is present in TV preferences")

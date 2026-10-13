@@ -123,6 +123,21 @@ replace("application/television/src/main/java/org/videolan/television/ui/MediaIt
                     }
                 }''')
 
+# Reset stale focus animation/background state when recycling TV file-list rows.
+replace_if_needed(
+    "application/television/src/main/java/org/videolan/television/ui/FileTvItemAdapter.kt",
+    '''        override fun recycle() {
+            resetRecycledMediaItem(binding.item, { binding.item = it }) {
+                defaultCover?.let { binding.cover = it }
+''',
+    '''        override fun recycle() {
+            resetRecycledMediaItem(binding.item, { binding.item = it }) {
+                resetTvFocusPresentation(binding.container)
+                defaultCover?.let { binding.cover = it }
+''',
+    "TV file-list recycled focus"
+)
+
 # Reuse the tested full-backup implementation from mobile and adapt it to the TV preference base.
 mobile_path = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/PreferencesAdvanced.kt")
 tv_path = Path("application/television/src/main/java/org/videolan/television/ui/preferences/PreferencesAdvanced.kt")
