@@ -64,7 +64,7 @@ replace_if_needed(
     '''        if (currentItem == null) (viewModel.provider as BrowserProvider).browseRoot()
         else if (restarted) refresh()''',
     '''        if (currentItem == null) (viewModel.provider as BrowserProvider).browseRoot()
-        else refresh()''',
+        else if ((viewModel as BrowserModel).dataset.isEmpty()) refresh()''',
     "TV folder refresh"
 )
 
