@@ -225,6 +225,8 @@ private suspend fun getImage(v: View, item: MediaLibraryItem, binding: ViewDataB
         binding.executePendingBindings()
         binding.addOnRebindCallback(rebindCallbacks!!)
     }
+
+    try {
     val width = when {
         tv -> {
             if (defaultImageWidthTV == 0) {
@@ -244,7 +246,6 @@ private suspend fun getImage(v: View, item: MediaLibraryItem, binding: ViewDataB
     if (image == null && tv) {
         // binding is set to null to be sure to set the src and not the cover (background)
         if (!bindChanged) updateImageViewTv(getTvIconRes(item), v)
-        binding?.removeOnRebindCallback(rebindCallbacks!!)
         return
     }
 
@@ -252,12 +253,13 @@ private suspend fun getImage(v: View, item: MediaLibraryItem, binding: ViewDataB
         //keep the default image
         binding?.setVariable(BR.scaleType, ImageView.ScaleType.CENTER_INSIDE)
         if (!bindChanged) binding?.setVariable(BR.showProgress, false)
-        binding?.removeOnRebindCallback(rebindCallbacks!!)
         return
     }
 
     if (!bindChanged) updateImageView(image, v, binding, tv = tv, card = card)
-    binding?.removeOnRebindCallback(rebindCallbacks!!)
+    } finally {
+        if (binding != null) binding.removeOnRebindCallback(rebindCallbacks!!)
+    }
 }
 
 private suspend fun getPlaylistOrGenreImage(v: View, item: MediaLibraryItem, binding: ViewDataBinding?, width: Int, card: Boolean) {

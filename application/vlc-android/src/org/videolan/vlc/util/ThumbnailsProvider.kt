@@ -35,8 +35,8 @@ import java.util.ArrayDeque
 import kotlin.math.min
 
 object ThumbnailCachePolicy {
-    fun shouldClearGeneratedFlag(isThumbnailGenerated: Boolean, cachedThumbnailUnreadable: Boolean) =
-        isThumbnailGenerated && cachedThumbnailUnreadable
+    fun shouldClearGeneratedFlag(isThumbnailGenerated: Boolean, cachedThumbnailUnavailable: Boolean) =
+        isThumbnailGenerated && cachedThumbnailUnavailable
 
     fun needsResolutionUpgrade(width: Int, height: Int, targetSize: Int) =
         targetSize > 0 && maxOf(width, height) < targetSize
@@ -389,18 +389,20 @@ object ThumbnailsProvider {
         val cacheKey = getMediaCacheKey(true, media, width.toString())
         val cacheBM = BitmapCache.getBitmapFromMemCache(cacheKey)
         if (cacheBM != null) return improveCachedVideoThumbnail(media, cacheBM, thumbPath, width)
-        var cachedThumbnailUnreadable = false
-        if (hasCache && media.id > 0L && File(thumbPath).isFile) {
-            readCoverBitmap(thumbPath, width)?.let { cached ->
-                val selected = improveCachedVideoThumbnail(media, cached, thumbPath, width)
-                BitmapCache.addBitmapToMemCache(cacheKey, selected)
-                return selected
+        var cachedThumbnailUnavailable = false
+        if (hasCache && media.id > 0L) {
+            if (File(thumbPath).isFile) {
+                readCoverBitmap(thumbPath, width)?.let { cached ->
+                    val selected = improveCachedVideoThumbnail(media, cached, thumbPath, width)
+                    BitmapCache.addBitmapToMemCache(cacheKey, selected)
+                    return selected
+                }
             }
-            // A stale or unreadable cached JPEG must not suppress thumbnail generation.
-            cachedThumbnailUnreadable = true
+            // Missing or undecodable cache files must not suppress thumbnail generation.
+            cachedThumbnailUnavailable = true
         }
         if (media.isThumbnailGenerated) {
-            if (!ThumbnailCachePolicy.shouldClearGeneratedFlag(media.isThumbnailGenerated, cachedThumbnailUnreadable))
+            if (!ThumbnailCachePolicy.shouldClearGeneratedFlag(media.isThumbnailGenerated, cachedThumbnailUnavailable))
                 return null
             media.removeThumbnail()
         }
