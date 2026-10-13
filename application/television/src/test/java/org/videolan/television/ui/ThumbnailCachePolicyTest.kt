@@ -7,7 +7,7 @@ import org.videolan.vlc.util.ThumbnailCachePolicy
 
 class ThumbnailCachePolicyTest {
     @Test
-    fun generatedFlagIsClearedOnlyWhenTheDiskThumbnailIsUnreadable() {
+    fun generatedFlagIsClearedWhenTheDiskThumbnailIsUnavailable() {
         assertTrue(ThumbnailCachePolicy.shouldClearGeneratedFlag(true, true))
         assertFalse(ThumbnailCachePolicy.shouldClearGeneratedFlag(true, false))
         assertFalse(ThumbnailCachePolicy.shouldClearGeneratedFlag(false, true))
