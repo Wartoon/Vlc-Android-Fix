@@ -48,6 +48,14 @@ object ThumbnailGenerationPolicy {
             shouldRequestNetworkThumbnail(isLocalFile, explicitlyOpenedFolder, isAggregateCover)
 }
 
+object ThumbnailCachePolicy {
+    fun shouldClearGeneratedFlag(isThumbnailGenerated: Boolean, cachedThumbnailUnreadable: Boolean) =
+        isThumbnailGenerated && cachedThumbnailUnreadable
+
+    fun needsResolutionUpgrade(width: Int, height: Int, targetSize: Int) =
+        targetSize > 0 && maxOf(width, height) < targetSize
+}
+
 object ThumbnailsProvider {
 
     @Suppress("unused")
@@ -404,7 +412,8 @@ object ThumbnailsProvider {
             if (appDir == null) appDir = AppContextProvider.appContext.getExternalFilesDir(null)
             val hasCache = appDir != null && appDir!!.exists()
             if (hasCache && cacheDir == null) cacheDir = appDir!!.absolutePath + MEDIALIB_FOLDER_NAME
-            return if (hasCache) StringBuilder(cacheDir!!).append('/').append(item.id).append(".jpg").toString() else null
+            // Keep a stable in-memory cache key if app-scoped disk storage is unavailable.
+            return cacheDir?.let { "$it/${item.id}.jpg" } ?: item.uri.toString()
         }
         return item.artworkMrl
     }
@@ -421,6 +430,7 @@ object ThumbnailsProvider {
         val cacheKey = getMediaCacheKey(true, media, width.toString())
         val cacheBM = BitmapCache.getBitmapFromMemCache(cacheKey)
         if (cacheBM != null) return improveCachedVideoThumbnail(media, cacheBM, thumbPath, width)
+        var cachedThumbnailUnreadable = false
         if (hasCache && media.id > 0L && File(thumbPath).isFile) {
             readCoverBitmap(thumbPath, width)?.let { cached ->
                 val selected = improveCachedVideoThumbnail(media, cached, thumbPath, width)
@@ -428,8 +438,13 @@ object ThumbnailsProvider {
                 return selected
             }
             // A stale or unreadable cached JPEG must not suppress thumbnail generation.
+            cachedThumbnailUnreadable = true
         }
-        if (media.isThumbnailGenerated) return null
+        if (media.isThumbnailGenerated) {
+            if (!ThumbnailCachePolicy.shouldClearGeneratedFlag(media.isThumbnailGenerated, cachedThumbnailUnreadable))
+                return null
+            media.removeThumbnail()
+        }
         var bitmap = synchronized(lock) {
             if (media.uri.scheme.isSchemeFile()) ThumbnailUtils.createVideoThumbnail(filePath, MediaStore.Video.Thumbnails.MINI_KIND) else null
         }
