@@ -106,9 +106,13 @@ jobs:
           git diff --check
           echo "All required Gradle project directories exist."
 
+      - name: Verify application and library package IDs
+        shell: bash
+        run: python3 buildsystem/verify-app-id-variants.py
+
       - name: Run thumbnail cache and resolution policy tests
         shell: bash
-        run: gradle :application:vlc-android:testInternalStorageUnitTest :application:vlc-android:testSmbUnitTest :application:television:testDebugUnitTest --no-daemon
+        run: gradle :application:vlc-android:testDebugUnitTest :application:television:testDebugUnitTest --no-daemon
 
       - name: Restore permanent signing keystore
         shell: bash
