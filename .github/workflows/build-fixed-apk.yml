@@ -106,7 +106,7 @@ jobs:
 
       - name: Run TV focus and thumbnail tests
         shell: bash
-        run: gradle :application:vlc-android:testTvFixUnitTest :application:television:testDebugUnitTest --no-daemon
+        run: gradle :application:vlc-android:testDebugUnitTest :application:television:testDebugUnitTest --no-daemon
 
       - name: Restore permanent signing keystore
         shell: bash
