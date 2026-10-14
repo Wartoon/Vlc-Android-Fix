@@ -359,11 +359,19 @@ class MediaItemDetailsFragment : DetailsSupportFragment(), CoroutineScope by Mai
                     }
                 }
                 ID_NAVIGATE_PARENT -> {
-                    viewModel.media.uri.retrieveParent()?.let { item ->
+                    val mediaUri = viewModel.media.uri
+                    val item = if (mediaUri.scheme == "file") {
+                        mediaUri.retrieveParent()
+                    } else {
+                        val mrl = mediaUri.toString().trimEnd('/')
+                        val separator = mrl.lastIndexOf('/')
+                        if (separator > mrl.indexOf("://") + 2) mrl.substring(0, separator + 1).toUri() else null
+                    }
+                    item?.let { parent ->
                         val intent = Intent(activity, VerticalGridActivity::class.java)
-                        intent.putExtra(MainTvActivity.BROWSER_TYPE, if ("file" == item.scheme) HEADER_DIRECTORIES else HEADER_NETWORK)
-                        intent.putExtra(FAVORITE_TITLE, item.lastPathSegment)
-                        intent.data = item
+                        intent.putExtra(MainTvActivity.BROWSER_TYPE, if ("file" == parent.scheme) HEADER_DIRECTORIES else HEADER_NETWORK)
+                        intent.putExtra(FAVORITE_TITLE, parent.lastPathSegment)
+                        intent.data = parent
                         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
                         activity.startActivity(intent)
                     }

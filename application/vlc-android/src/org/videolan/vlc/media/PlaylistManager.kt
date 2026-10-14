@@ -361,7 +361,7 @@ class PlaylistManager(val service: PlaybackService) : MediaWrapperList.EventList
                 saveMediaList(forceVideo = playAsAudio)
             }
             // Video-as-audio has no VideoPlayerActivity lifecycle to guarantee a final progress save.
-            if (getCurrentMedia()?.isPodcast == true || playAsAudio) saveMediaMeta()
+            if (getCurrentMedia()?.type == MediaWrapper.TYPE_VIDEO || getCurrentMedia()?.isPodcast == true || playAsAudio) saveMediaMeta()
         }
     }
 

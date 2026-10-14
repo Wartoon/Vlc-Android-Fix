@@ -31,6 +31,21 @@ android {
             initWith debug
             matchingFallbacks = ['debug']
         }
+        internalStorage {
+            initWith debug
+            matchingFallbacks = ['debug']
+            buildConfigField "String", "APP_ID", "\"${rootProject.ext.appId}.internalstorage\""
+        }
+        smb {
+            initWith debug
+            matchingFallbacks = ['debug']
+            buildConfigField "String", "APP_ID", "\"${rootProject.ext.appId}.smb\""
+        }
+        tvFix {
+            initWith debug
+            matchingFallbacks = ['debug']
+            buildConfigField "String", "APP_ID", "\"${rootProject.ext.appId}.tvfix\""
+        }
         vlcBundle {
             initWith release
             matchingFallbacks = ['release']

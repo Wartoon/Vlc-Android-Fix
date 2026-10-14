@@ -48,14 +48,6 @@ jobs:
           test "$(git rev-parse HEAD)" = "c0cc8ce6443dcb09be9b43c7b7a3ed01e33cb3ac"
           test -d libvlc
 
-      - name: Harden database restore
-        shell: bash
-        run: python3 buildsystem/harden-backup-restore.py
-
-      - name: Apply TV V1 changes
-        shell: bash
-        run: python3 buildsystem/apply-tv-v1.py
-
       - name: Verify complete TV V1 patch
         shell: bash
         run: |
@@ -114,7 +106,7 @@ jobs:
 
       - name: Run TV focus and thumbnail tests
         shell: bash
-        run: gradle :application:television:testDebugUnitTest --no-daemon
+        run: gradle :application:vlc-android:testTvFixUnitTest :application:television:testDebugUnitTest --no-daemon
 
       - name: Restore permanent signing keystore
         shell: bash

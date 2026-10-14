@@ -88,6 +88,23 @@ object BitmapCache {
     }
 
     @Synchronized
+    fun replaceBitmapInMemCache(key: String?, bitmap: Bitmap?) {
+        if (key != null && bitmap != null) memCache.put(key, bitmap)
+    }
+
+    @Synchronized
+    fun removeBitmapFromMemCache(key: String?) {
+        if (key != null) memCache.remove(key)
+    }
+
+    @Synchronized
+    fun removeBitmapKeysStartingWith(prefix: String) {
+        memCache.snapshot().keys.toList().forEach { key ->
+            if (key.startsWith(prefix)) memCache.remove(key)
+        }
+    }
+
+    @Synchronized
     fun clear() {
         memCache.evictAll()
     }

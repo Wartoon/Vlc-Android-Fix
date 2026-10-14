@@ -12,7 +12,7 @@
             android:fragment="org.videolan.television.ui.preferences.PreferencesOptional"/>
 
     <EditTextPreference
-            android:defaultValue="0"
+            android:defaultValue="5000"
             android:key="network_caching"
             android:maxLength="5"
             android:summary="@string/network_caching_summary"
@@ -20,7 +20,7 @@
 
     <CheckBoxPreference
             app:singleLineTitle="false"
-            android:defaultValue="true"
+            android:defaultValue="false"
             android:key="prefer_smbv1"
             android:summary="@string/prefersmbv1_summary"
             android:title="@string/prefersmbv1"/>

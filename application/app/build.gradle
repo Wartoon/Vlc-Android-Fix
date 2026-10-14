@@ -100,6 +100,14 @@ android {
             initWith debug
             matchingFallbacks = ['debug']
         }
+        tvFix {
+            initWith debug
+            signingConfig = signingConfigs.release
+            applicationIdSuffix ".tvfix"
+            matchingFallbacks = ['debug']
+            resValue "string", "app_name", "VLC TV Fix"
+            resValue "string", "tv_provider_authority", "org.videolan.vlc.tvfix.tvsearch"
+        }
         internalStorage {
             initWith debug
             applicationIdSuffix ".internalstorage"
@@ -171,6 +179,7 @@ android {
             if (variant.buildType.name == "debug") outputName += "-debug"
             if (variant.buildType.name == "internalStorage") outputName = "VLC-Internal-Storage"
             if (variant.buildType.name == "smb") outputName = "VLC-SMB"
+            if (variant.buildType.name == "tvFix") outputName = "VLC-TV-Fix"
             outputName += "-" + abiName + ".apk"
             output.outputFileName = outputName
         }

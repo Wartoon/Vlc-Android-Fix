@@ -117,7 +117,7 @@ object VLCOptions {
             } catch (ignored: NumberFormatException) {
             }
 
-            val networkCaching = pref.getInt(KEY_NETWORK_CACHING_VALUE, 0).coerceIn(0, 60000)
+            val networkCaching = pref.getInt(KEY_NETWORK_CACHING_VALUE, 5000).coerceIn(0, 60000)
             val freetypeRelFontsize = pref.getString(KEY_SUBTITLES_SIZE, "16")
             val freetypeBold = pref.getBoolean(KEY_SUBTITLES_BOLD, false)
 
@@ -217,7 +217,7 @@ object VLCOptions {
                 val optionsArray = customOptions.split("\\r?\\n".toRegex()).toTypedArray()
                 if (!optionsArray.isNullOrEmpty()) Collections.addAll(options, *optionsArray)
             }
-            if (pref.getBoolean(KEY_PREFER_SMBV1, true))
+            if (pref.getBoolean(KEY_PREFER_SMBV1, false))
                 options.add("--smb-force-v1")
             if (!Settings.showTvUi) {
                 //Ambisonic
@@ -299,7 +299,7 @@ object VLCOptions {
 
         if (!noHardwareAcceleration) {
             try {
-                hardwareAcceleration = Integer.parseInt(prefs.getString(KEY_HARDWARE_ACCELERATION, "$HW_ACCELERATION_AUTOMATIC")!!)
+                hardwareAcceleration = Integer.parseInt(prefs.getString(KEY_HARDWARE_ACCELERATION, "$HW_ACCELERATION_FULL")!!)
             } catch (ignored: NumberFormatException) {}
 
         }

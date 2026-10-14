@@ -103,6 +103,13 @@ import org.videolan.vlc.util.AutoUpdate
 import org.videolan.vlc.util.FileUtils
 import org.videolan.vlc.util.deleteAllWatchNext
 import java.io.File
+import java.util.zip.ZipOutputStream
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipEntry
+import java.io.FileOutputStream
+import java.io.FileInputStream
+import java.io.BufferedOutputStream
+import java.io.BufferedInputStream
 import java.io.IOException
 
 private const val FILE_PICKER_RESULT_CODE = 10000
@@ -325,6 +332,14 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                 startActivityForResult(filePickerIntent, FILE_PICKER_RESULT_CODE)
                 return true
             }
+            "full_backup" -> {
+                createFullBackup()
+                return true
+            }
+            "full_restore" -> {
+                showFullRestoreSelection()
+                return true
+            }
         }
         return super.onPreferenceTreeClick(preference)
     }
@@ -348,6 +363,379 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                         Toast.makeText(activity, R.string.invalid_settings_file, Toast.LENGTH_LONG).show()
                     }
                 }
+            }
+        }
+    }
+
+    private fun fullBackupFile(): File =
+        File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY + "/VLC-Full-Backup.zip")
+
+    private fun createFullBackup() {
+        val medialibrary = Medialibrary.getInstance()
+        if (medialibrary.isWorking) {
+            UiTools.snacker(activity, getString(R.string.settings_ml_block_scan))
+            return
+        }
+        val dst = fullBackupFile()
+        launch {
+            if (!(activity as FragmentActivity).getWritePermission(Uri.fromFile(dst))) return@launch
+            val success = withContext(Dispatchers.IO) {
+                try {
+                    val context = activity
+                    val dataRoot = context.getDir("db", Context.MODE_PRIVATE).parentFile
+                        ?: return@withContext false
+                    val mediaDbDir = context.getDir("db", Context.MODE_PRIVATE)
+                    val appDbDir = File(dataRoot, "databases")
+                    val keyStoreDir = File(dataRoot, "app_keystore")
+                    val external = context.getExternalFilesDir(null)
+                    val artworkDir = external?.let { File(it, Medialibrary.MEDIALIB_FOLDER_NAME.removePrefix("/")) }
+                    val subtitlesDir = external?.let { File(it, "subtitles") }
+
+                    ZipOutputStream(BufferedOutputStream(FileOutputStream(dst))).use { zip ->
+                        val manifest = """{"format":1,"package":"${context.packageName}","vlc":"3.7.2 Beta 2"}"""
+                        zip.putNextEntry(ZipEntry("manifest.json"))
+                        zip.write(manifest.toByteArray(Charsets.UTF_8))
+                        zip.closeEntry()
+
+                        val settings = PreferenceParser.getChangedPrefsJson(context)
+                        zip.putNextEntry(ZipEntry("settings/settings.json"))
+                        zip.write(settings.toByteArray(Charsets.UTF_8))
+                        zip.closeEntry()
+
+                        mediaDbDir.listFiles()?.forEach { file ->
+                            if (file.name.startsWith(Medialibrary.VLC_MEDIA_DB_NAME.removePrefix("/")))
+                                addToBackup(zip, file, "medialibrary/db/${file.name}")
+                        }
+                        appDbDir.listFiles()?.forEach { file ->
+                            addToBackup(zip, file, "appdb/${file.name}")
+                        }
+                        if (artworkDir?.exists() == true)
+                            addDirectoryToBackup(zip, artworkDir, "artwork/medialib")
+                        if (subtitlesDir?.exists() == true)
+                            addDirectoryToBackup(zip, subtitlesDir, "external/subtitles")
+                        if (keyStoreDir.exists())
+                            addDirectoryToBackup(zip, keyStoreDir, "keystore")
+                    }
+                    true
+                } catch (e: Exception) {
+                    Log.e("FullBackup", "Full backup failed", e)
+                    false
+                }
+            }
+            if (success)
+                Toast.makeText(activity, getString(R.string.full_backup_success), Toast.LENGTH_LONG).show()
+            else
+                Toast.makeText(activity, getString(R.string.full_backup_failure), Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun addDirectoryToBackup(zip: ZipOutputStream, directory: File, prefix: String) {
+        directory.listFiles()?.forEach { child ->
+            val entryName = "$prefix/${child.name}"
+            if (child.isDirectory) addDirectoryToBackup(zip, child, entryName)
+            else addToBackup(zip, child, entryName)
+        }
+    }
+
+    private fun addToBackup(zip: ZipOutputStream, file: File, entryName: String) {
+        if (!file.isFile) return
+        zip.putNextEntry(ZipEntry(entryName))
+        FileInputStream(file).use { input -> input.copyTo(zip) }
+        zip.closeEntry()
+    }
+
+    private fun showFullRestoreSelection() {
+        val src = fullBackupFile()
+        if (!src.isFile) {
+            Toast.makeText(activity, getString(R.string.full_restore_missing, src.name), Toast.LENGTH_LONG).show()
+            return
+        }
+        val labels = arrayOf(
+            getString(R.string.full_restore_item_settings),
+            getString(R.string.full_restore_item_media_db),
+            getString(R.string.full_restore_item_app_db),
+            getString(R.string.full_restore_item_artwork),
+            getString(R.string.full_restore_item_subtitles),
+            getString(R.string.full_restore_item_credentials)
+        )
+        val selected = booleanArrayOf(true, true, true, true, true, false)
+        android.app.AlertDialog.Builder(activity)
+            .setTitle(R.string.full_restore_choose)
+            .setMultiChoiceItems(labels, selected) { _, which, checked -> selected[which] = checked }
+            .setPositiveButton(R.string.full_restore_start) { _, _ ->
+                if (selected.none { it }) {
+                    Toast.makeText(activity, R.string.full_restore_nothing_selected, Toast.LENGTH_LONG).show()
+                } else {
+                    restoreFullBackup(
+                        restoreSettings = selected[0],
+                        restoreMediaDb = selected[1],
+                        restoreAppDb = selected[2],
+                        restoreArtwork = selected[3],
+                        restoreSubtitles = selected[4],
+                        restoreCredentials = selected[5]
+                    )
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun restoreFullBackup(
+        restoreSettings: Boolean,
+        restoreMediaDb: Boolean,
+        restoreAppDb: Boolean,
+        restoreArtwork: Boolean,
+        restoreSubtitles: Boolean,
+        restoreCredentials: Boolean
+    ) {
+        val src = fullBackupFile()
+        if (Medialibrary.getInstance().isWorking) {
+            UiTools.snacker(activity, getString(R.string.settings_ml_block_scan))
+            return
+        }
+        launch {
+            val success = withContext(Dispatchers.IO) {
+                val context = activity
+                val staging = File(context.cacheDir, "vlc_full_restore")
+                try {
+                    staging.deleteRecursively()
+                    staging.mkdirs()
+
+                    ZipInputStream(BufferedInputStream(FileInputStream(src))).use { zip ->
+                        var entry = zip.nextEntry
+                        while (entry != null) {
+                            val outFile = File(staging, entry.name)
+                            val safeRoot = staging.canonicalPath + File.separator
+                            if (!outFile.canonicalPath.startsWith(safeRoot))
+                                throw IOException("Invalid backup entry")
+                            if (entry.isDirectory) outFile.mkdirs()
+                            else {
+                                outFile.parentFile?.mkdirs()
+                                FileOutputStream(outFile).use { output -> zip.copyTo(output) }
+                            }
+                            zip.closeEntry()
+                            entry = zip.nextEntry
+                        }
+                    }
+
+                    val manifest = File(staging, "manifest.json")
+                    if (!manifest.isFile) throw IOException("Backup manifest missing")
+                    val manifestText = manifest.readText()
+                    if (!manifestText.contains("\"format\":1") ||
+                        !manifestText.contains("\"package\":\"${context.packageName}\""))
+                        throw IOException("Unsupported or incompatible backup")
+
+                    val settingsFile = File(staging, "settings/settings.json")
+                    val mediaDb = File(staging, "medialibrary/db/${Medialibrary.VLC_MEDIA_DB_NAME.removePrefix("/")}")
+                    if (restoreSettings && !settingsFile.isFile) throw IOException("Settings missing")
+                    if (restoreMediaDb && (!mediaDb.isFile || mediaDb.length() == 0L)) throw IOException("Media database missing")
+                    val savedAppDb = File(staging, "appdb")
+                    if (restoreAppDb && (savedAppDb.listFiles()?.none { it.isFile && it.length() > 0L } != false))
+                        throw IOException("App database missing")
+
+                    if (restoreSettings)
+                        PreferenceParser.restoreSettings(activity, Uri.fromFile(settingsFile))
+
+                    val dataRoot = context.getDir("db", Context.MODE_PRIVATE).parentFile
+                        ?: throw IOException("No app data directory")
+                    val mediaDbDir = context.getDir("db", Context.MODE_PRIVATE)
+                    val appDbDir = File(dataRoot, "databases")
+                    val keyStoreDir = File(dataRoot, "app_keystore")
+                    val external = context.getExternalFilesDir(null)
+                    val artworkDir = external?.let { File(it, Medialibrary.MEDIALIB_FOLDER_NAME.removePrefix("/")) }
+                    val subtitlesDir = external?.let { File(it, "subtitles") }
+
+                    if (restoreMediaDb) replaceDirectoryContentsSafely(File(staging, "medialibrary/db"), mediaDbDir)
+
+                    if (restoreAppDb) replaceDirectoryContentsSafely(savedAppDb, appDbDir)
+
+                    if (restoreArtwork) {
+                        artworkDir?.let {
+                            it.deleteRecursively()
+                            copyDirectoryContents(File(staging, "artwork/medialib"), it)
+                        }
+                    }
+
+                    if (restoreSubtitles) {
+                        subtitlesDir?.let {
+                            val saved = File(staging, "external/subtitles")
+                            if (saved.exists()) {
+                                it.deleteRecursively()
+                                copyDirectoryContents(saved, it)
+                            }
+                        }
+                    }
+
+                    if (restoreCredentials) {
+                        val savedKeyStore = File(staging, "keystore")
+                        if (savedKeyStore.exists()) {
+                            keyStoreDir.deleteRecursively()
+                            copyDirectoryContents(savedKeyStore, keyStoreDir)
+                        }
+                    }
+
+                    staging.deleteRecursively()
+                    true
+                } catch (e: Exception) {
+                    Log.e("FullBackup", "Full restore failed", e)
+                    staging.deleteRecursively()
+                    false
+                }
+            }
+            if (success) {
+                Toast.makeText(activity, getString(R.string.full_restore_success), Toast.LENGTH_LONG).show()
+                activity.window.decorView.postDelayed({
+                    android.os.Process.killProcess(android.os.Process.myPid())
+                }, 1500L)
+            } else {
+                Toast.makeText(activity, getString(R.string.full_restore_failure), Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun copyDirectoryContents(source: File, destination: File) {
+        if (!source.isDirectory) throw IOException("Restore source directory missing")
+        if (!destination.exists() && !destination.mkdirs())
+            throw IOException("Cannot create restore directory")
+        source.listFiles()?.forEach { child ->
+            val target = File(destination, child.name)
+            if (child.isDirectory) copyDirectoryContents(child, target)
+            else {
+                target.parentFile?.mkdirs()
+                FileInputStream(child).use { input ->
+                    FileOutputStream(target).use { output -> input.copyTo(output) }
+                }
+            }
+        }
+    }
+
+
+    private fun replaceDirectoryContentsSafely(source: File, destination: File) {
+        val children = source.listFiles()
+        if (!source.isDirectory || children.isNullOrEmpty())
+            throw IOException("Restore source directory is missing or empty")
+        val parent = destination.parentFile ?: throw IOException("Restore destination has no parent")
+        val staged = File(parent, destination.name + ".restore-new")
+        val previous = File(parent, destination.name + ".restore-old")
+        staged.deleteRecursively()
+        previous.deleteRecursively()
+        copyDirectoryContents(source, staged)
+        var movedOld = false
+        try {
+            if (destination.exists()) {
+                if (!destination.renameTo(previous)) throw IOException("Cannot stage existing database")
+                movedOld = true
+            }
+            if (!staged.renameTo(destination)) throw IOException("Cannot install restored database")
+            previous.deleteRecursively()
+        } catch (e: Exception) {
+            if (destination.exists() && movedOld) destination.deleteRecursively()
+            if (movedOld && previous.exists()) previous.renameTo(destination)
+            staged.deleteRecursively()
+            throw e
+        }
+    }
+
+    private fun replaceDatabaseFileSafely(source: File, destination: File) {
+        if (!source.isFile || source.length() == 0L) throw IOException("Restore database is missing or empty")
+        val parent = destination.parentFile ?: throw IOException("Restore destination has no parent")
+        val staged = File(parent, destination.name + ".restore-new")
+        if (staged.exists() && !staged.delete()) throw IOException("Cannot clear staged database")
+        if (!FileUtils.copyFile(source, staged)) throw IOException("Cannot stage restored database")
+        val liveFiles = listOf(destination, File(parent, destination.name + "-wal"), File(parent, destination.name + "-shm"), File(parent, destination.name + "-journal"))
+        val backups = mutableListOf<Pair<File, File>>()
+        try {
+            liveFiles.filter { it.exists() }.forEach { live ->
+                val backup = File(parent, live.name + ".restore-old")
+                if (backup.exists() && !backup.delete()) throw IOException("Cannot clear old restore backup")
+                if (!live.renameTo(backup)) throw IOException("Cannot stage existing database")
+                backups += live to backup
+            }
+            if (!staged.renameTo(destination)) throw IOException("Cannot install restored database")
+            backups.forEach { (_, backup) -> backup.delete() }
+        } catch (e: Exception) {
+            if (destination.exists()) destination.delete()
+            backups.asReversed().forEach { (live, backup) -> if (backup.exists()) backup.renameTo(live) }
+            staged.delete()
+            throw e
+        }
+    }
+
+    private fun restoreMediaDatabase() {
+        val src = File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY + Medialibrary.VLC_MEDIA_DB_NAME)
+        if (!src.isFile) {
+            Toast.makeText(activity, getString(R.string.restore_media_db_missing), Toast.LENGTH_LONG).show()
+            return
+        }
+        launch {
+            val restored = withContext(Dispatchers.IO) {
+                try {
+                    val db = File(activity.getDir("db", Context.MODE_PRIVATE).toString() + Medialibrary.VLC_MEDIA_DB_NAME)
+                    replaceDatabaseFileSafely(src, db)
+                    true
+                } catch (e: Exception) {
+                    Log.e("DatabaseRestore", "Media database restore failed", e)
+                    false
+                }
+            }
+            if (restored) {
+                Toast.makeText(activity, getString(R.string.restore_db_success_restart), Toast.LENGTH_LONG).show()
+                activity.window.decorView.postDelayed({
+                    android.os.Process.killProcess(android.os.Process.myPid())
+                }, 1200L)
+            } else {
+                Toast.makeText(activity, getString(R.string.restore_db_failure), Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun restoreAppDatabase() {
+        val src = File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY + ROOM_DATABASE)
+        if (!src.isFile) {
+            Toast.makeText(activity, getString(R.string.restore_app_db_missing), Toast.LENGTH_LONG).show()
+            return
+        }
+        launch {
+            val restored = withContext(Dispatchers.IO) {
+                try {
+                    val dbDir = File(activity.getDir("db", Context.MODE_PRIVATE).parent!!, "databases")
+                    val stagedAppDb = File(activity.cacheDir, "vlc_appdb_restore")
+                    stagedAppDb.deleteRecursively()
+                    if (!stagedAppDb.mkdirs()) return@withContext false
+
+                    val extracted = ZipInputStream(BufferedInputStream(FileInputStream(src))).use { zip ->
+                        var entry = zip.nextEntry
+                        var extracted = false
+                        while (entry != null) {
+                            if (!entry.isDirectory) {
+                                val safeName = File(entry.name).name
+                                if (safeName.isNotEmpty()) {
+                                    val outFile = File(stagedAppDb, safeName)
+                                    FileOutputStream(outFile).use { output -> zip.copyTo(output) }
+                                    extracted = true
+                                }
+                            }
+                            zip.closeEntry()
+                            entry = zip.nextEntry
+                        }
+                        extracted
+                    }
+                    if (!extracted) throw IOException("App database backup is empty")
+                    replaceDirectoryContentsSafely(stagedAppDb, dbDir)
+                    stagedAppDb.deleteRecursively()
+                    true
+                } catch (e: Exception) {
+                    Log.e("DatabaseRestore", "App database restore failed", e)
+                    false
+                }
+            }
+            if (restored) {
+                Toast.makeText(activity, getString(R.string.restore_db_success_restart), Toast.LENGTH_LONG).show()
+                activity.window.decorView.postDelayed({
+                    android.os.Process.killProcess(android.os.Process.myPid())
+                }, 1200L)
+            } else {
+                Toast.makeText(activity, getString(R.string.restore_db_failure), Toast.LENGTH_LONG).show()
             }
         }
     }

@@ -26,7 +26,7 @@
                 android:summary="@string/video_app_switch_summary"
                 android:title="@string/video_app_switch_title"/>
         <ListPreference
-                android:defaultValue="-1"
+                android:defaultValue="2"
                 android:entries="@array/hardware_acceleration_list"
                 android:entryValues="@array/hardware_acceleration_values"
                 android:key="hardware_acceleration"

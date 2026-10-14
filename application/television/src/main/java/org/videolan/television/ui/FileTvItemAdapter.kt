@@ -23,6 +23,7 @@ import org.videolan.television.databinding.MediaBrowserTvItemListBinding
 import org.videolan.television.ui.browser.TvAdapterUtils
 import org.videolan.tools.KEY_MEDIA_SEEN
 import org.videolan.tools.Settings
+import org.videolan.tools.dp
 import org.videolan.vlc.VlcMigrationHelper
 import org.videolan.vlc.gui.DiffUtilAdapter
 import org.videolan.vlc.gui.helpers.getBitmapFromDrawable
@@ -206,6 +207,7 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
         }
         override fun setItem(item: MediaLibraryItem?) {
             binding.allowNetworkThumbnailGeneration = this@FileTvItemAdapter.allowNetworkThumbnailGeneration
+            binding.imageWidth = 120.dp
             binding.item = item; var progress = 0; var seen = 0L; var description = item?.description; var resolution = ""
             if (item is MediaWrapper && item.type == MediaWrapper.TYPE_VIDEO) {
                 resolution = generateResolutionClass(item.width, item.height) ?: ""
@@ -254,6 +256,7 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
         }
         override fun recycle() {
             resetRecycledMediaItem(binding.item, { binding.item = it }) {
+                resetTvFocusPresentation(binding.container)
                 defaultCover?.let { binding.cover = it }
                 binding.title.text = ""
                 binding.subtitle.text = ""
@@ -262,6 +265,7 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
         }
         override fun setItem(item: MediaLibraryItem?) {
             binding.allowNetworkThumbnailGeneration = this@FileTvItemAdapter.allowNetworkThumbnailGeneration
+            binding.imageWidth = 80.dp
             binding.item = item; var isSquare = true; var progress = 0; var seen = 0L; var description = item?.description; var resolution = ""
             if (item is MediaWrapper && item.type == MediaWrapper.TYPE_VIDEO) {
                 resolution = generateResolutionClass(item.width, item.height) ?: ""; isSquare = false

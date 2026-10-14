@@ -585,13 +585,19 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                     }
 
                     val manifest = File(staging, "manifest.json")
-                    if (!manifest.isFile || !manifest.readText().contains("\"format\":1"))
-                        throw IOException("Unsupported backup format")
+                    if (!manifest.isFile) throw IOException("Backup manifest missing")
+                    val manifestText = manifest.readText()
+                    if (!manifestText.contains("\"format\":1") ||
+                        !manifestText.contains("\"package\":\"${context.packageName}\""))
+                        throw IOException("Unsupported or incompatible backup")
 
                     val settingsFile = File(staging, "settings/settings.json")
                     val mediaDb = File(staging, "medialibrary/db/${Medialibrary.VLC_MEDIA_DB_NAME.removePrefix("/")}")
                     if (restoreSettings && !settingsFile.isFile) throw IOException("Settings missing")
-                    if (restoreMediaDb && !mediaDb.isFile) throw IOException("Media database missing")
+                    if (restoreMediaDb && (!mediaDb.isFile || mediaDb.length() == 0L)) throw IOException("Media database missing")
+                    val savedAppDb = File(staging, "appdb")
+                    if (restoreAppDb && (savedAppDb.listFiles()?.none { it.isFile && it.length() > 0L } != false))
+                        throw IOException("App database missing")
 
                     if (restoreSettings)
                         PreferenceParser.restoreSettings(requireActivity(), Uri.fromFile(settingsFile))
@@ -605,20 +611,9 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                     val artworkDir = external?.let { File(it, Medialibrary.MEDIALIB_FOLDER_NAME.removePrefix("/")) }
                     val subtitlesDir = external?.let { File(it, "subtitles") }
 
-                    if (restoreMediaDb) {
-                        mediaDbDir.listFiles()?.filter {
-                            it.name.startsWith(Medialibrary.VLC_MEDIA_DB_NAME.removePrefix("/"))
-                        }?.forEach { if (!it.delete()) throw IOException("Cannot replace media database") }
-                        copyDirectoryContents(File(staging, "medialibrary/db"), mediaDbDir)
-                    }
+                    if (restoreMediaDb) replaceDirectoryContentsSafely(File(staging, "medialibrary/db"), mediaDbDir)
 
-                    if (restoreAppDb) {
-                        if (!appDbDir.exists()) appDbDir.mkdirs()
-                        appDbDir.listFiles()?.forEach {
-                            if (!it.deleteRecursively()) throw IOException("Cannot replace app database")
-                        }
-                        copyDirectoryContents(File(staging, "appdb"), appDbDir)
-                    }
+                    if (restoreAppDb) replaceDirectoryContentsSafely(savedAppDb, appDbDir)
 
                     if (restoreArtwork) {
                         artworkDir?.let {
@@ -665,7 +660,7 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
     }
 
     private fun copyDirectoryContents(source: File, destination: File) {
-        if (!source.exists()) return
+        if (!source.isDirectory) throw IOException("Restore source directory missing")
         if (!destination.exists() && !destination.mkdirs())
             throw IOException("Cannot create restore directory")
         source.listFiles()?.forEach { child ->
@@ -680,6 +675,58 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
         }
     }
 
+
+    private fun replaceDirectoryContentsSafely(source: File, destination: File) {
+        val children = source.listFiles()
+        if (!source.isDirectory || children.isNullOrEmpty())
+            throw IOException("Restore source directory is missing or empty")
+        val parent = destination.parentFile ?: throw IOException("Restore destination has no parent")
+        val staged = File(parent, destination.name + ".restore-new")
+        val previous = File(parent, destination.name + ".restore-old")
+        staged.deleteRecursively()
+        previous.deleteRecursively()
+        copyDirectoryContents(source, staged)
+        var movedOld = false
+        try {
+            if (destination.exists()) {
+                if (!destination.renameTo(previous)) throw IOException("Cannot stage existing database")
+                movedOld = true
+            }
+            if (!staged.renameTo(destination)) throw IOException("Cannot install restored database")
+            previous.deleteRecursively()
+        } catch (e: Exception) {
+            if (destination.exists() && movedOld) destination.deleteRecursively()
+            if (movedOld && previous.exists()) previous.renameTo(destination)
+            staged.deleteRecursively()
+            throw e
+        }
+    }
+
+    private fun replaceDatabaseFileSafely(source: File, destination: File) {
+        if (!source.isFile || source.length() == 0L) throw IOException("Restore database is missing or empty")
+        val parent = destination.parentFile ?: throw IOException("Restore destination has no parent")
+        val staged = File(parent, destination.name + ".restore-new")
+        if (staged.exists() && !staged.delete()) throw IOException("Cannot clear staged database")
+        if (!FileUtils.copyFile(source, staged)) throw IOException("Cannot stage restored database")
+        val liveFiles = listOf(destination, File(parent, destination.name + "-wal"), File(parent, destination.name + "-shm"), File(parent, destination.name + "-journal"))
+        val backups = mutableListOf<Pair<File, File>>()
+        try {
+            liveFiles.filter { it.exists() }.forEach { live ->
+                val backup = File(parent, live.name + ".restore-old")
+                if (backup.exists() && !backup.delete()) throw IOException("Cannot clear old restore backup")
+                if (!live.renameTo(backup)) throw IOException("Cannot stage existing database")
+                backups += live to backup
+            }
+            if (!staged.renameTo(destination)) throw IOException("Cannot install restored database")
+            backups.forEach { (_, backup) -> backup.delete() }
+        } catch (e: Exception) {
+            if (destination.exists()) destination.delete()
+            backups.asReversed().forEach { (live, backup) -> if (backup.exists()) backup.renameTo(live) }
+            staged.delete()
+            throw e
+        }
+    }
+
     private fun restoreMediaDatabase() {
         val src = File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY + Medialibrary.VLC_MEDIA_DB_NAME)
         if (!src.isFile) {
@@ -690,13 +737,8 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
             val restored = withContext(Dispatchers.IO) {
                 try {
                     val db = File(requireContext().getDir("db", Context.MODE_PRIVATE).toString() + Medialibrary.VLC_MEDIA_DB_NAME)
-                    val parent = db.parentFile ?: return@withContext false
-                    val names = arrayOf(db.name, db.name + "-wal", db.name + "-shm", db.name + "-journal")
-                    names.forEach { name ->
-                        val current = File(parent, name)
-                        if (current.exists() && !current.delete()) return@withContext false
-                    }
-                    FileUtils.copyFile(src, db)
+                    replaceDatabaseFileSafely(src, db)
+                    true
                 } catch (e: Exception) {
                     Log.e("DatabaseRestore", "Media database restore failed", e)
                     false
@@ -723,20 +765,18 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
             val restored = withContext(Dispatchers.IO) {
                 try {
                     val dbDir = File(requireContext().getDir("db", Context.MODE_PRIVATE).parent!!, "databases")
-                    if (!dbDir.exists()) dbDir.mkdirs()
+                    val stagedAppDb = File(requireContext().cacheDir, "vlc_appdb_restore")
+                    stagedAppDb.deleteRecursively()
+                    if (!stagedAppDb.mkdirs()) return@withContext false
 
-                    dbDir.listFiles()?.forEach { current ->
-                        if (!current.delete()) return@withContext false
-                    }
-
-                    ZipInputStream(BufferedInputStream(FileInputStream(src))).use { zip ->
+                    val extracted = ZipInputStream(BufferedInputStream(FileInputStream(src))).use { zip ->
                         var entry = zip.nextEntry
                         var extracted = false
                         while (entry != null) {
                             if (!entry.isDirectory) {
                                 val safeName = File(entry.name).name
                                 if (safeName.isNotEmpty()) {
-                                    val outFile = File(dbDir, safeName)
+                                    val outFile = File(stagedAppDb, safeName)
                                     FileOutputStream(outFile).use { output -> zip.copyTo(output) }
                                     extracted = true
                                 }
@@ -746,6 +786,10 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                         }
                         extracted
                     }
+                    if (!extracted) throw IOException("App database backup is empty")
+                    replaceDirectoryContentsSafely(stagedAppDb, dbDir)
+                    stagedAppDb.deleteRecursively()
+                    true
                 } catch (e: Exception) {
                     Log.e("DatabaseRestore", "App database restore failed", e)
                     false
