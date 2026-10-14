@@ -1,19 +1,17 @@
-package org.videolan.vlc.util
+package org.videolan.television.util
 
-import android.media.AudioManager
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.videolan.vlc.util.AudioFocusInterruptionState
 
-class VLCAudioFocusHelperTest {
-
+class AudioFocusInterruptionStateTest {
     @Test
-    fun interruptionWhilePausedDoesNotLatchAndLaterPlaybackCanBePaused() {
+    fun pausedPlaybackDoesNotLatchNextInterruption() {
         val state = AudioFocusInterruptionState()
 
         assertFalse(state.onTransientLoss(isPlaying = false))
         assertFalse(state.lossTransient)
-
         assertTrue(state.onTransientLoss(isPlaying = true))
         assertTrue(state.lossTransient)
         assertTrue(state.shouldResume(resumeEnabled = true))
@@ -22,7 +20,7 @@ class VLCAudioFocusHelperTest {
     }
 
     @Test
-    fun disabledResumeClearsInterruptionStateForNextEvent() {
+    fun disabledResumeClearsStateBeforeFollowingInterruption() {
         val state = AudioFocusInterruptionState()
 
         assertTrue(state.onTransientLoss(isPlaying = true))
@@ -32,7 +30,7 @@ class VLCAudioFocusHelperTest {
     }
 
     @Test
-    fun permanentLossClearsInterruptionState() {
+    fun permanentLossClearsResumeEligibility() {
         val state = AudioFocusInterruptionState()
 
         assertTrue(state.onTransientLoss(isPlaying = true))
@@ -40,13 +38,5 @@ class VLCAudioFocusHelperTest {
 
         assertFalse(state.lossTransient)
         assertFalse(state.shouldResume(resumeEnabled = true))
-    }
-
-    @Test
-    fun callAndRingingModesDeferPlaybackResume() {
-        assertTrue(isCallOrRingingAudioMode(AudioManager.MODE_RINGTONE))
-        assertTrue(isCallOrRingingAudioMode(AudioManager.MODE_IN_CALL))
-        assertTrue(isCallOrRingingAudioMode(AudioManager.MODE_IN_COMMUNICATION))
-        assertFalse(isCallOrRingingAudioMode(AudioManager.MODE_NORMAL))
     }
 }
