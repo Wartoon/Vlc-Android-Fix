@@ -31,6 +31,13 @@ module_texts = [
     Path("application/vlc-android/build.gradle").read_text(),
     Path("application/resources/build.gradle").read_text(),
 ]
+resources_text = module_texts[1]
+for variant in EXPECTED_SUFFIXES:
+    if block_for(Path("application/app/build.gradle").read_text(), variant) is None:
+        continue
+    for artifact in ("libvlc-all", "medialibrary-all"):
+        if not re.search(rf"(?m)^\s*{variant}Api\s+.*{artifact}:", resources_text):
+            raise SystemExit(f"resources {variant} variant is missing {artifact} API dependency")
 validated = 0
 for variant, suffix in EXPECTED_SUFFIXES.items():
     app_block = block_for(app_text, variant)
