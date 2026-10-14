@@ -150,6 +150,18 @@ jobs:
           assert "Uri.decode(media.artworkMrl), 1024" in service, "notification artwork decode target must be high resolution"
           assert "Uri.decode(mw.artworkMrl), 1024" in service, "notification fallback artwork decode target must be high resolution"
           print("widget and media-notification artwork resolution guards verified")
+          import os
+          import subprocess
+          aapt = str(Path(os.environ["ANDROID_HOME"]) / "build-tools/36.0.0/aapt")
+          for filename, expected in (
+              ("VLC-Internal-Storage-all.apk", "org.videolan.vlc.internalstorage"),
+              ("VLC-SMB-all.apk", "org.videolan.vlc.smb"),
+          ):
+              output = subprocess.check_output([aapt, "dump", "badging", str(Path("out") / filename)], text=True)
+              package_line = next(line for line in output.splitlines() if line.startswith("package:"))
+              actual = package_line.split("name='")[1].split("'", 1)[0]
+              assert actual == expected, f"{filename}: expected {expected}, got {actual}"
+              print(f"verified APK package ID {actual}")
           PY
           sha256sum out/VLC-Internal-Storage-all.apk out/VLC-SMB-all.apk
           ls -lh out
