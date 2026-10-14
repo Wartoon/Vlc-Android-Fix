@@ -104,6 +104,10 @@ jobs:
           PY
           git diff --check
 
+      - name: Verify application and library package IDs
+        shell: bash
+        run: python3 buildsystem/verify-app-id-variants.py
+
       - name: Run TV focus and thumbnail tests
         shell: bash
         run: gradle :application:vlc-android:testDebugUnitTest :application:television:testDebugUnitTest --no-daemon
