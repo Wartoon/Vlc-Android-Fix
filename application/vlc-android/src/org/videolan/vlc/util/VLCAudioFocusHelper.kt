@@ -40,6 +40,12 @@ import org.videolan.vlc.BuildConfig
 import org.videolan.vlc.PlaybackService
 
 private const val TAG = "VLCAudioFocusHelper"
+private const val CALL_MODE_CHECK_INTERVAL_MS = 1_000L
+
+internal fun isCallOrRingingAudioMode(mode: Int): Boolean =
+        mode == AudioManager.MODE_RINGTONE ||
+                mode == AudioManager.MODE_IN_CALL ||
+                mode == AudioManager.MODE_IN_COMMUNICATION
 
 @Suppress("DEPRECATION")
 class VLCAudioFocusHelper(private val service: PlaybackService) {
@@ -102,6 +108,19 @@ class VLCAudioFocusHelper(private val service: PlaybackService) {
             private var lossTransientVolume = -1
             private var lossTime: Long = 0
             private var wasPlaying = false
+            private var pendingResumeAction: (() -> Unit)? = null
+
+            private val callModeCheckRunnable = object : Runnable {
+                override fun run() {
+                    val action = pendingResumeAction ?: return
+                    if (isCallOrRingingAudioMode(audioManager.mode)) {
+                        handler.postDelayed(this, CALL_MODE_CHECK_INTERVAL_MS)
+                    } else {
+                        pendingResumeAction = null
+                        action()
+                    }
+                }
+            }
 
             override fun onAudioFocusChange(focusChange: Int) {
                 /*
@@ -110,6 +129,8 @@ class VLCAudioFocusHelper(private val service: PlaybackService) {
                 when (focusChange) {
                     AudioManager.AUDIOFOCUS_LOSS -> {
                         if (BuildConfig.DEBUG) Log.i(TAG, "AUDIOFOCUS_LOSS")
+                        // A permanent loss must cancel any resume queued for a call ending.
+                        cancelPendingResume()
                         // Pause playback
                         changeAudioFocus(false)
                         service.pause()
@@ -147,9 +168,13 @@ class VLCAudioFocusHelper(private val service: PlaybackService) {
                             if (podcastPlaying) {
                                 // If the interruption was short just restart playback
                                 val deltaTime = System.currentTimeMillis() - lossTime
-                                if (deltaTime > 1_000L) schedulePlayback(2_000L) else resumePlayback()
+                                if (deltaTime > 1_000L) {
+                                    resumeWhenCallEnds { schedulePlayback(2_000L) }
+                                } else {
+                                    resumeWhenCallEnds { resumePlayback() }
+                                }
                             } else if (service.settings.getBoolean(RESUME_PLAYBACK, true)) {
-                                resumePlayback()
+                                resumeWhenCallEnds { resumePlayback() }
                             }
                         }
                     }
@@ -166,19 +191,40 @@ class VLCAudioFocusHelper(private val service: PlaybackService) {
                 }
             }
 
+            private fun resumeWhenCallEnds(action: () -> Unit) {
+                handler.removeCallbacks(callModeCheckRunnable)
+                if (isCallOrRingingAudioMode(audioManager.mode)) {
+                    pendingResumeAction = action
+                    handler.postDelayed(callModeCheckRunnable, CALL_MODE_CHECK_INTERVAL_MS)
+                } else {
+                    pendingResumeAction = null
+                    action()
+                }
+            }
+
+            private fun cancelPendingResume() {
+                pendingResumeAction = null
+                handler.removeCallbacks(callModeCheckRunnable)
+                handler.removeCallbacks(delayedPodcastRunnable)
+            }
+
             private fun schedulePlayback(delay: Long) {
                 handler.removeCallbacks(delayedPodcastRunnable)
                 handler.postDelayed(delayedPodcastRunnable, delay)
             }
 
             private val delayedPodcastRunnable = Runnable {
-                val position = (service.getTime() - 5_000L).coerceAtLeast(0)
-                resumePlayback()
-                service.seek(position)
-                service.playlistManager.player.updateProgress(position)
+                resumeWhenCallEnds {
+                    val position = (service.getTime() - 5_000L).coerceAtLeast(0)
+                    resumePlayback()
+                    service.seek(position)
+                    service.playlistManager.player.updateProgress(position)
+                }
             }
 
             private fun resumePlayback() {
+                handler.removeCallbacks(callModeCheckRunnable)
+                pendingResumeAction = null
                 service.play()
                 lossTransient = false
             }
