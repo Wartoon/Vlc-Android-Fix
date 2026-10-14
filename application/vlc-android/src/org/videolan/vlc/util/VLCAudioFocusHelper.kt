@@ -49,6 +49,7 @@ internal fun isCallOrRingingAudioMode(mode: Int): Boolean =
 
 /** Tracks only interruptions that actually paused active playback. */
 internal class AudioFocusInterruptionState {
+    @Volatile
     var lossTransient = false
         private set
     private var wasPlaying = false
@@ -84,7 +85,6 @@ class VLCAudioFocusHelper(private val service: PlaybackService) {
     private var hasAudioFocus = false
     @Volatile
     private var podcastPlaying = false
-    @Volatile
     private val interruptionState = AudioFocusInterruptionState()
     internal val lossTransient get() = interruptionState.lossTransient
 
