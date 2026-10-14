@@ -48,7 +48,7 @@ internal fun isCallOrRingingAudioMode(mode: Int): Boolean =
                 mode == AudioManager.MODE_IN_COMMUNICATION
 
 /** Tracks only interruptions that actually paused active playback. */
-internal class AudioFocusInterruptionState {
+class AudioFocusInterruptionState {
     @Volatile
     var lossTransient = false
         private set
