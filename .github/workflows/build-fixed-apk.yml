@@ -48,13 +48,6 @@ jobs:
           test "$(git rev-parse HEAD)" = "c0cc8ce6443dcb09be9b43c7b7a3ed01e33cb3ac"
           test -d libvlc
 
-      - name: Harden database restore
-        shell: bash
-        run: |
-          python3 buildsystem/harden-backup-restore.py
-          python3 buildsystem/portable-dual-backup.py
-          python3 buildsystem/remove-legacy-backup-ui.py
-
       - name: Verify dual backup contract and restore safety
         shell: bash
         run: |
@@ -115,7 +108,7 @@ jobs:
 
       - name: Run thumbnail cache and resolution policy tests
         shell: bash
-        run: gradle :application:television:testDebugUnitTest --no-daemon
+        run: gradle :application:vlc-android:testInternalStorageUnitTest :application:vlc-android:testSmbUnitTest :application:television:testDebugUnitTest --no-daemon
 
       - name: Restore permanent signing keystore
         shell: bash
