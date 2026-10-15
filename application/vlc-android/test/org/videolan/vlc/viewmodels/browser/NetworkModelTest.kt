@@ -51,8 +51,8 @@ class NetworkModelTest : BaseTest() {
         BrowserProvider.registerCreator(clazz = CoroutineContextProvider::class.java) { TestCoroutineContextProvider() }
     }
 
-    private fun initNetworkModel(url: String?, showHiddenFiles: Boolean = false) {
-        browserModel = NetworkModel(application, url, showHiddenFiles, TestCoroutineContextProvider())
+    private fun initNetworkModel(url: String?) {
+        browserModel = NetworkModel(application, url, coroutineContextProvider = TestCoroutineContextProvider())
         browserProvider = browserModel.provider
     }
 

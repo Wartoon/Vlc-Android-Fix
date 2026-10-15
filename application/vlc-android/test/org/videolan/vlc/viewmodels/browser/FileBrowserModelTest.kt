@@ -24,6 +24,7 @@ import org.videolan.vlc.providers.BrowserProvider
 import org.videolan.vlc.repository.BrowserFavRepository
 import org.videolan.vlc.util.TestCoroutineContextProvider
 import org.videolan.vlc.util.applyMock
+import org.videolan.tools.Settings
 import java.io.File
 
 
@@ -64,7 +65,8 @@ class FileBrowserModelTest : BaseTest() {
     }
 
     private fun initBrowserModel(url: String?, showHiddenFiles: Boolean, showDummyCategory: Boolean = false) {
-        browserModel = BrowserModel(application, url, TYPE_FILE, showHiddenFiles, showDummyCategory, TestCoroutineContextProvider())
+        Settings.showHiddenFiles = showHiddenFiles
+        browserModel = BrowserModel(application, url, TYPE_FILE, showDummyCategory, coroutineContextProvider = TestCoroutineContextProvider())
         browserProvider = browserModel.provider
         mediaBrowser = BrowserProvider.get(browserProvider)
     }
