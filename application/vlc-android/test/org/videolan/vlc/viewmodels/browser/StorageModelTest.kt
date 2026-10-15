@@ -1,5 +1,6 @@
 package org.videolan.vlc.viewmodels.browser
 
+import android.os.Environment
 import android.os.Handler
 import com.jraska.livedata.test
 import io.mockk.coEvery
