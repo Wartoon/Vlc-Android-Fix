@@ -39,7 +39,7 @@ class FileBrowserModelTest : BaseTest() {
     private lateinit var mediaBrowser: MediaBrowser
     private var eventListener: EventListener? = null
     private val mockedFavoritesDao: BrowserFavDao = mockk(relaxed = true)
-    private val mockedFavoritesRepo: BrowserFavRepository = spyk(BrowserFavRepository(mockedFavoritesDao))
+    private val mockedFavoritesRepo: BrowserFavRepository = mockk(relaxed = true)
 
     private lateinit var browserModel: BrowserModel
     private lateinit var browserProvider: BrowserProvider

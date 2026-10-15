@@ -1,11 +1,9 @@
 package org.videolan.vlc.viewmodels.browser
 
 import android.os.Environment
-import android.os.Handler
 import com.jraska.livedata.test
 import io.mockk.coEvery
 import io.mockk.mockk
-import io.mockk.spyk
 import junit.framework.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Rule
@@ -37,7 +35,7 @@ class StorageModelTest : BaseTest() {
 
     private val mockedLibVlc: LibVLC = mockk(relaxed = true)
     private val mockedDirectoryDao: CustomDirectoryDao = mockk()
-    private val mockedDirectoryRepo: DirectoryRepository = spyk(DirectoryRepository(mockedDirectoryDao))
+    private val mockedDirectoryRepo: DirectoryRepository = mockk(relaxed = true)
     private lateinit var mediaBrowser: MediaBrowser
 
     private lateinit var browserModel: BrowserModel
@@ -52,12 +50,9 @@ class StorageModelTest : BaseTest() {
     init {
         DirectoryRepository.applyMock(mockedDirectoryRepo)
 
-        // BrowserHandler mocked.
-        val handler: Handler = mockk()
-
         BrowserProvider.overrideCreator = false
         BrowserProvider.registerCreator {
-            mediaBrowser = spyk(MediaBrowser(mockedLibVlc, null, handler))
+            mediaBrowser = mockk(relaxed = true)
             mediaBrowser
         }
         BrowserProvider.registerCreator(clazz = CoroutineContextProvider::class.java) { TestCoroutineContextProvider() }
