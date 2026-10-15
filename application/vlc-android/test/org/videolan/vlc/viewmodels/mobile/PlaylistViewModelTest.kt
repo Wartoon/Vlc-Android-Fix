@@ -190,21 +190,17 @@ class PlaylistViewModelTest : BaseTest() {
     @Test
     fun whenPlaylistHasSomeTracksButFilteredResultContainsNone_restoringViewModelResetsFilterAndShowsItemAgain() {
         setupViewModel(PLAYLIST_PREFIX, createDummyAudios(2, "test"))
+        waitForProvidersData()
+        assertEquals(2, playlistViewModel.tracksProvider.pagedList.test().value().size)
 
         playlistViewModel.filter("unknown")
 
         waitForProvidersData()
         assertTrue(playlistViewModel.isEmpty())
 
-        val pageObserver = playlistViewModel.tracksProvider.pagedList.test()
         playlistViewModel.restore()
-
-        var page = pageObserver.awaitValue(3, TimeUnit.SECONDS).value()
-        repeat(3) {
-            if (page.size == 2) return@repeat
-            page = pageObserver.awaitValue(3, TimeUnit.SECONDS).value()
-        }
-        assertEquals(2, page.size)
+        waitForProvidersData()
+        assertEquals(2, playlistViewModel.tracksProvider.pagedList.test().value().size)
         assertFalse(playlistViewModel.isEmpty())
     }
 
