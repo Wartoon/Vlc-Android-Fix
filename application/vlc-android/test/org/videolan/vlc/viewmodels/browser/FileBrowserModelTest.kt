@@ -1,18 +1,19 @@
 package org.videolan.vlc.viewmodels.browser
 
-import android.os.Handler
+import android.net.Uri
 import androidx.core.net.toUri
 import androidx.lifecycle.MutableLiveData
 import com.jraska.livedata.test
 import io.mockk.every
+import io.mockk.firstArg
 import io.mockk.mockk
-import io.mockk.spyk
 import junit.framework.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.interfaces.IMedia
+import org.videolan.libvlc.util.MediaBrowser.EventListener
 import org.videolan.libvlc.stubs.StubMedia
 import org.videolan.libvlc.util.MediaBrowser
 import org.videolan.medialibrary.interfaces.media.MediaWrapper
@@ -36,6 +37,7 @@ class FileBrowserModelTest : BaseTest() {
 
     private val mockedLibVlc: LibVLC = mockk(relaxed = true)
     private lateinit var mediaBrowser: MediaBrowser
+    private var eventListener: EventListener? = null
     private val mockedFavoritesDao: BrowserFavDao = mockk(relaxed = true)
     private val mockedFavoritesRepo: BrowserFavRepository = spyk(BrowserFavRepository(mockedFavoritesDao))
 
@@ -48,12 +50,21 @@ class FileBrowserModelTest : BaseTest() {
     init {
         BrowserFavRepository.applyMock(mockedFavoritesRepo)
 
-        // BrowserHandler mocked.
-        val handler: Handler = mockk()
-
         BrowserProvider.overrideCreator = false
         BrowserProvider.registerCreator {
-            this@FileBrowserModelTest.mediaBrowser = spyk(MediaBrowser(mockedLibVlc, null, handler))
+            this@FileBrowserModelTest.mediaBrowser = mockk(relaxed = true)
+            every { mediaBrowser.changeEventListener(any()) } answers { eventListener = firstArg() }
+            every { mediaBrowser.browse(any(), any()) } answers {
+                val root = File(firstArg<Uri>().path ?: "")
+                root.listFiles()?.forEachIndexed { index, file ->
+                    val media = StubMedia(mockedLibVlc, Uri.fromFile(file).toString()).apply {
+                        if (file.isDirectory) type = IMedia.Type.Directory
+                    }
+                    eventListener?.onMediaAdded(index, media)
+                }
+                eventListener?.onBrowseEnd()
+                Unit
+            }
             mediaBrowser
         }
         BrowserProvider.registerCreator(clazz = CoroutineContextProvider::class.java) { TestCoroutineContextProvider() }
@@ -94,45 +105,33 @@ class FileBrowserModelTest : BaseTest() {
     fun whenAtRootAndInternalStorageIsEmpty_checkShowsFolderIsEmpty() {
         initBrowserModel(null, showHiddenFiles = false)
 
-        val internalStorage = browserModel.dataset.test()
-                .awaitValue()
-                .value()[0]
+        val emptyFolder = temporaryFolder.newFolder("empty")
+        val internalStorage = StubMediaWrapper(StubMedia(mockedLibVlc, Uri.fromFile(emptyFolder).toString()).apply { type = IMedia.Type.Directory })
+        browserProvider.parseSubDirectories(listOf(internalStorage))
+        Thread.sleep(500)
 
-        // TODO Has to wait for browserChannel queue
-        Thread.sleep(1000)
-
-        assertTrue(browserModel.isFolderEmpty(internalStorage as MediaWrapper))
+        assertTrue(browserModel.isFolderEmpty(internalStorage))
     }
 
     @Test
     fun whenAtRootAndInternalStorageHasDirectories_checkShowsFolderIsNotEmpty() {
         initBrowserModel(null, showHiddenFiles = false)
 
-        val internalStorage = browserModel.dataset.test()
-                .awaitValue()
-                .value()[0]
+        val internalStorage = StubMediaWrapper(StubMedia(mockedLibVlc, Uri.fromFile(temporaryFolder.root).toString()).apply { type = IMedia.Type.Directory })
+        browserProvider.parseSubDirectories(listOf(internalStorage))
+        Thread.sleep(500)
 
-        Thread.sleep(1000)
-        // TODO Hack because parseSubDirectories is called twice for some reason.
-        fillFilesInDataset(temporaryFolder.root)
-        Thread.sleep(1000)
-
-        assertFalse(browserModel.isFolderEmpty(internalStorage as MediaWrapper))
+        assertFalse(browserModel.isFolderEmpty(internalStorage))
     }
 
     @Test
     fun whenAtRootAndSavedList_checkPrefetchListIsFilled() {
         initBrowserModel(null, showHiddenFiles = false)
 
-        val internalStorage = browserModel.dataset.test()
-                .awaitValue()
-                .value()[0]
-
-        Thread.sleep(1000)
-        fillFilesInDataset(temporaryFolder.root)
-        Thread.sleep(1000)
-
-        browserModel.saveList(internalStorage as MediaWrapper)
+        val internalStorage = StubMediaWrapper(StubMedia(mockedLibVlc, Uri.fromFile(temporaryFolder.root).toString()).apply { type = IMedia.Type.Directory })
+        browserProvider.parseSubDirectories(listOf(internalStorage))
+        Thread.sleep(500)
+        browserModel.saveList(internalStorage)
 
         initBrowserModel(internalStorage.uri.toString(), false)
 
@@ -160,7 +159,7 @@ class FileBrowserModelTest : BaseTest() {
                 .awaitValue()
                 .value()
 
-        // Local favorites are displayed in a separate BrowserFavoritesModel section.
+        // Local favorites are displayed by BrowserFavoritesModel in a separate section.
         assertEquals(1, hasFav.size)
     }
 }

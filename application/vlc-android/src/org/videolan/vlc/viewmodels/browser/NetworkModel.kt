@@ -35,7 +35,7 @@ class NetworkModel(context: Context, url: String? = null, mocked: ArrayList<Medi
     init {
         NetworkMonitor.getInstance(context).connectionFlow.onEach {
             if (it.connected) refresh()
-            else dataset.clear()
+            else (provider as? org.videolan.vlc.providers.NetworkProvider)?.clearNetworkShares()
         }.launchIn(viewModelScope)
     }
 

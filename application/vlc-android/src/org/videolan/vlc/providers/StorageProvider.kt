@@ -29,6 +29,7 @@ import org.videolan.medialibrary.interfaces.Medialibrary
 import org.videolan.medialibrary.media.MediaLibraryItem
 import org.videolan.medialibrary.media.Storage
 import org.videolan.resources.AndroidDevices
+import org.videolan.tools.Settings
 import org.videolan.tools.livedata.LiveDataset
 import org.videolan.vlc.R
 import org.videolan.vlc.repository.DirectoryRepository
@@ -36,19 +37,28 @@ import java.io.File
 
 class StorageProvider(context: Context, dataset: LiveDataset<MediaLibraryItem>, url: String?) : FileBrowserProvider(context, dataset, url, false, sort = Medialibrary.SORT_FILENAME, desc = false) {
 
-    // the ML doesn't index hidden files. no need to display them here
-    override fun getFlags(interact: Boolean) = if (interact) MediaBrowser.Flag.NoSlavesAutodetect else 0
+    override fun getFlags(interact: Boolean): Int {
+        var flags = if (interact) MediaBrowser.Flag.NoSlavesAutodetect else 0
+        if (Settings.showHiddenFiles) flags = flags or MediaBrowser.Flag.ShowHiddenFiles
+        return flags
+    }
 
     override suspend fun browseRootImpl() {
         val storages = DirectoryRepository.getInstance(context).getMediaDirectories()
         val customDirectories = DirectoryRepository.getInstance(context).getCustomDirectories()
         var storage: Storage
         val storagesList = ArrayList<MediaLibraryItem>()
+        val customPaths = customDirectories.map { File(it.path).canonicalFile }
+        val primaryStorage = File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY).canonicalFile
         for (mediaDirLocation in storages) {
-            val file = File(mediaDirLocation)
-            if (!file.exists() || !file.canRead()) continue
             if (mediaDirLocation.isEmpty()) continue
-            storage = Storage(Uri.fromFile(File(mediaDirLocation)))
+            val file = File(mediaDirLocation).canonicalFile
+            if (!file.exists() || !file.canRead()) continue
+            val isNestedCustomDirectory = customPaths.any { custom ->
+                custom.path == file.path && file.path.startsWith(primaryStorage.path + File.separator)
+            }
+            if (isNestedCustomDirectory) continue
+            storage = Storage(Uri.fromFile(file))
             if (AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY == mediaDirLocation)
                 storage.name = context.getString(R.string.internal_memory)
             storagesList.add(storage)

@@ -380,10 +380,11 @@ public class StubMedialibrary extends Medialibrary {
     public MediaWrapper[] history(int type) {
         ArrayList<MediaWrapper> results = new ArrayList<>();
         for (MediaWrapper media : dt.mHistory) {
-            if (type == HISTORY_TYPE_NETWORK && media.getType() == MediaWrapper.TYPE_STREAM ||
-                    type != HISTORY_TYPE_NETWORK && (media.getType() == MediaWrapper.TYPE_VIDEO ||
-                            media.getType() == MediaWrapper.TYPE_AUDIO)) results.add(media);
-            // the native method specifies an nbItems of 100, offset 0
+            int mediaType = media.getType();
+            boolean isLocalMedia = mediaType == MediaWrapper.TYPE_VIDEO || mediaType == MediaWrapper.TYPE_AUDIO;
+            // This stub's addToHistory path stores streams here; include each recorded stream for network history.
+            if (type == HISTORY_TYPE_NETWORK || isLocalMedia) results.add(media);
+            // The native method specifies an nbItems of 100, offset 0.
             if (results.size() >= 100) break;
         }
         return results.toArray(new MediaWrapper[0]);
@@ -548,7 +549,7 @@ public class StubMedialibrary extends Medialibrary {
 
     public MediaWrapper[] searchMedia(String query, int sort, boolean desc, boolean includeMissing, boolean onlyFavorites, int nbItems, int offset) {
         ArrayList<MediaWrapper> results = new ArrayList<>(Arrays.asList(searchMedia(query)));
-        return dt.sortMedia(dt.secureSublist(results, offset, offset + nbItems), sort, desc);
+        return dt.sortMedia(dt.secureSublist(results, offset, nbItems), sort, desc);
     }
 
     public int getMediaCount(String query) {
@@ -578,7 +579,7 @@ public class StubMedialibrary extends Medialibrary {
         for (MediaWrapper media : dt.mAudioMediaWrappers) {
             if (Tools.hasSubString(media.getTitle(), query)) results.add(media);
         }
-        return dt.sortMedia(dt.secureSublist(results, offset, offset + nbItems), sort, desc);
+        return dt.sortMedia(dt.secureSublist(results, offset, nbItems), sort, desc);
     }
 
     public int getAudioCount(String query) {
@@ -602,7 +603,7 @@ public class StubMedialibrary extends Medialibrary {
         for (MediaWrapper media : dt.mVideoMediaWrappers) {
             if (Tools.hasSubString(media.getTitle(), query)) results.add(media);
         }
-        return dt.sortMedia(dt.secureSublist(results, offset, offset + nbItems), sort, desc);
+        return dt.sortMedia(dt.secureSublist(results, offset, nbItems), sort, desc);
     }
 
     public int getVideoCount(String query) {
@@ -623,7 +624,7 @@ public class StubMedialibrary extends Medialibrary {
 
     public Artist[] searchArtist(String query, int sort, boolean desc, boolean includeMissing, boolean onlyFavorites, int nbItems, int offset) {
         ArrayList<Artist> results = new ArrayList<>(Arrays.asList(searchArtist(query)));
-        return dt.sortArtist(dt.secureSublist(results, offset, offset + nbItems), sort, desc);
+        return dt.sortArtist(dt.secureSublist(results, offset, nbItems), sort, desc);
     }
 
     public Album[] searchAlbum(String query) {
@@ -636,7 +637,7 @@ public class StubMedialibrary extends Medialibrary {
 
     public Album[] searchAlbum(String query, int sort, boolean desc, boolean includeMissing, boolean onlyFavorites, int nbItems, int offset) {
         ArrayList<Album> results = new ArrayList<>(Arrays.asList(searchAlbum(query)));
-        return dt.sortAlbum(dt.secureSublist(results, offset, offset + nbItems), sort, desc);
+        return dt.sortAlbum(dt.secureSublist(results, offset, nbItems), sort, desc);
     }
 
     public Genre[] searchGenre(String query) {
@@ -649,7 +650,7 @@ public class StubMedialibrary extends Medialibrary {
 
     public Genre[] searchGenre(String query, int sort, boolean desc, boolean includeMissing, boolean onlyFavorites, int nbItems, int offset) {
         ArrayList<Genre> results = new ArrayList<>(Arrays.asList(searchGenre(query)));
-        return dt.sortGenre(dt.secureSublist(results, offset, offset + nbItems), sort, desc);
+        return dt.sortGenre(dt.secureSublist(results, offset, nbItems), sort, desc);
     }
 
     public Playlist[] searchPlaylist(String query, Playlist.Type type, boolean includeMissing, boolean onlyFavorites) {
@@ -662,7 +663,7 @@ public class StubMedialibrary extends Medialibrary {
 
     public Playlist[] searchPlaylist(String query, Playlist.Type type, int sort, boolean desc, boolean includeMissing, boolean onlyFavorites, int nbItems, int offset) {
         ArrayList<Playlist> results = new ArrayList<>(Arrays.asList(searchPlaylist(query, type, includeMissing, onlyFavorites)));
-        return dt.sortPlaylist(dt.secureSublist(results, offset, offset + nbItems), sort, desc);
+        return dt.sortPlaylist(dt.secureSublist(results, offset, nbItems), sort, desc);
     }
 
     @Override

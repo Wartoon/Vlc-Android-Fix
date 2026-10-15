@@ -1,7 +1,7 @@
 package org.videolan.vlc
 
-import android.Manifest
 import android.content.Context
+import android.Manifest
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.core.app.ApplicationProvider
 import io.mockk.MockKAnnotations

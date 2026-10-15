@@ -61,7 +61,6 @@ class VideosViewModelTest : BaseTest() {
         setupViewModel(StubDataSource.getInstance().createFolder("test"))
 
         StubDataSource.getInstance().setVideoByCount(videoCount, "test")
-        videosViewModel.refresh()
         StubDataSource.getInstance().setAudioByCount(audioCount, "test")
         videosViewModel.refresh()
 
@@ -78,7 +77,6 @@ class VideosViewModelTest : BaseTest() {
         setupViewModel(StubDataSource.getInstance().createFolder("test"))
 
         StubDataSource.getInstance().setVideoByCount(videoCount, "test")
-        videosViewModel.refresh()
         StubDataSource.getInstance().setAudioByCount(audioCount, "test")
         videosViewModel.refresh()
 
@@ -109,9 +107,7 @@ class VideosViewModelTest : BaseTest() {
         setupViewModel(StubDataSource.getInstance().createFolder("test"))
 
         StubDataSource.getInstance().setVideoByCount(videoCount, "test")
-        videosViewModel.refresh()
         StubDataSource.getInstance().setAudioByCount(audioCount, "test")
-        videosViewModel.refresh()
 
         val testResult = videosViewModel.provider.getAll()
 
@@ -243,7 +239,6 @@ class VideosViewModelTest : BaseTest() {
     fun whenFolderIsGivenAndNotEmptyButFilteredResultContainsNone_restoringViewModelResetsFilterAndShowsItemAgain() {
         setupViewModel(StubDataSource.getInstance().createFolder("test"))
         StubDataSource.getInstance().setVideoByCount(3, "test")
-        videosViewModel.refresh()
 
         videosViewModel.filter("unknown")
 
@@ -278,7 +273,6 @@ class VideosViewModelTest : BaseTest() {
     fun whenFolderIsNullAndItHasItems_checkHeaders() {
         setupViewModel(null)
         StubDataSource.getInstance().setVideoByCount(3, null)
-        videosViewModel.refresh()
 
         videosViewModel.provider.pagedList.test()
                 .awaitValue()

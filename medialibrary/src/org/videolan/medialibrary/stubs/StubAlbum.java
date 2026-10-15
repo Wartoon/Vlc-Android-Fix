@@ -51,7 +51,7 @@ public class StubAlbum extends Album {
     }
 
     public MediaWrapper[] getPagedTracks(int sort, boolean desc, boolean includeMissing, boolean onlyFavorites, int nbItems, int offset) {
-        return dt.sortMedia(dt.secureSublist(getAlbumTracks(), offset, offset + nbItems), sort, desc);
+        return dt.sortMedia(dt.secureSublist(getAlbumTracks(), offset, nbItems), sort, desc);
     }
 
     public MediaWrapper[] searchTracks(String query, int sort, boolean desc, boolean includeMissing, boolean onlyFavorites, int nbItems, int offset) {
@@ -62,7 +62,7 @@ public class StubAlbum extends Album {
                 results.add(media);
             }
         }
-        return dt.sortMedia(dt.secureSublist(results, offset, offset + nbItems), sort, desc);
+        return dt.sortMedia(dt.secureSublist(results, offset, nbItems), sort, desc);
     }
 
     public int searchTracksCount(String query) {

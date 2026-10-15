@@ -1,15 +1,15 @@
 package org.videolan.vlc.viewmodels.browser
 
-import android.os.Handler
+import android.net.Uri
 import com.jraska.livedata.test
 import io.mockk.mockk
-import io.mockk.spyk
 import junit.framework.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.videolan.libvlc.interfaces.ILibVLC
 import org.videolan.libvlc.interfaces.IMedia
+import org.videolan.libvlc.util.MediaBrowser.EventListener
 import org.videolan.libvlc.stubs.StubMedia
 import org.videolan.libvlc.util.MediaBrowser
 import org.videolan.medialibrary.stubs.StubMediaWrapper
@@ -26,6 +26,7 @@ class FilePickerModelTest : BaseTest() {
     private val mockedLibVlc: ILibVLC = mockk(relaxed = true)
     private lateinit var dummyUrl: String
     private lateinit var mediaBrowser: MediaBrowser
+    private var eventListener: EventListener? = null
 
     private lateinit var browserModel: BrowserModel
     private lateinit var browserProvider: BrowserProvider
@@ -34,12 +35,21 @@ class FilePickerModelTest : BaseTest() {
     private val countDirs = 4
 
     init {
-        // BrowserHandler mocked.
-        val handler: Handler = mockk()
-
         BrowserProvider.overrideCreator = false
         BrowserProvider.registerCreator {
-            mediaBrowser = spyk(MediaBrowser(mockedLibVlc, null, handler))
+            mediaBrowser = mockk(relaxed = true)
+            every { mediaBrowser.changeEventListener(any()) } answers { eventListener = firstArg() }
+            every { mediaBrowser.browse(any(), any()) } answers {
+                val root = File(firstArg<Uri>().path ?: "")
+                root.listFiles()?.forEachIndexed { index, file ->
+                    val media = StubMedia(mockedLibVlc, Uri.fromFile(file).toString()).apply {
+                        if (file.isDirectory) type = IMedia.Type.Directory
+                    }
+                    eventListener?.onMediaAdded(index, media)
+                }
+                eventListener?.onBrowseEnd()
+                Unit
+            }
             mediaBrowser
         }
         BrowserProvider.registerCreator(clazz = CoroutineContextProvider::class.java) { org.videolan.vlc.util.TestCoroutineContextProvider() }
@@ -81,6 +91,7 @@ class FilePickerModelTest : BaseTest() {
     fun whenBrowseRootAndRootEmpty_checkTheFolderIsEmpty() {
 
         browserModel.dataset.test()
+                .awaitValue()
                 .assertValue { it.isEmpty() }
     }
 
@@ -105,8 +116,8 @@ class FilePickerModelTest : BaseTest() {
 
         browserModel.refresh()
 
-        temporaryFolder.newFile("dir${countDirs + 1}")
-        temporaryFolder.root.listFiles().mapIndexed(this::addFileToProvider)
+        val newDirectory = temporaryFolder.newFile("dir${countDirs + 1}")
+        addFileToProvider(countDirs, newDirectory)
 
         result = browserModel.dataset.test()
                 .value()

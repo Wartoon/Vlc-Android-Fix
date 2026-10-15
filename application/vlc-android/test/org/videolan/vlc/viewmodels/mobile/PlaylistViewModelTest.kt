@@ -3,6 +3,7 @@ package org.videolan.vlc.viewmodels.mobile
 import com.jraska.livedata.test
 import org.junit.Assert.*
 import org.junit.Test
+import kotlinx.coroutines.runBlocking
 import org.videolan.medialibrary.interfaces.media.MediaWrapper
 import org.videolan.medialibrary.interfaces.media.Playlist
 import org.videolan.medialibrary.stubs.StubDataSource
@@ -22,8 +23,9 @@ class PlaylistViewModelTest : BaseTest() {
         StubDataSource.getInstance().addMediaWrapper("$title $it", MediaWrapper.TYPE_AUDIO).id
     }
 
-    private fun waitForProvidersData() = playlistViewModel.providers.map {
-        it.pagedList.test().awaitValue()
+    private fun waitForProvidersData() {
+        runBlocking { playlistViewModel.tracksProvider.awaitRefresh() }
+        playlistViewModel.providers.forEach { it.pagedList.test().awaitValue() }
     }
 
     private fun setupViewModel(playlist: String, mediaIds: List<Long>? = null) {
