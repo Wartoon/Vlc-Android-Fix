@@ -3,6 +3,7 @@ package org.videolan.vlc.viewmodels.mobile
 import com.jraska.livedata.test
 import org.junit.Assert.*
 import org.junit.Test
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.runBlocking
 import org.videolan.medialibrary.interfaces.media.MediaWrapper
 import org.videolan.medialibrary.interfaces.media.Playlist
@@ -158,8 +159,12 @@ class PlaylistViewModelTest : BaseTest() {
 
         assertTrue(playlistViewModel.isEmpty())
 
+        val playlistObserver = playlistViewModel.playlistLiveData.test()
+        playlistObserver.awaitValue(3, TimeUnit.SECONDS)
+
         parent.append(createDummyAudios(3, "test"))
         playlistViewModel.refresh()
+        playlistObserver.awaitValue(3, TimeUnit.SECONDS)
 
         waitForProvidersData()
 
