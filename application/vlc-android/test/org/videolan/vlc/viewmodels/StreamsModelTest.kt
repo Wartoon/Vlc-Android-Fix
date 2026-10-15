@@ -1,21 +1,26 @@
 package org.videolan.vlc.viewmodels
 
+import androidx.core.net.toUri
 import com.jraska.livedata.test
+import io.mockk.every
+import io.mockk.slot
+import io.mockk.spyk
 import junit.framework.TestCase.assertEquals
+import junit.framework.TestCase.assertTrue
 import org.junit.Test
 import org.videolan.medialibrary.interfaces.Medialibrary
+import org.videolan.medialibrary.media.MediaWrapperImpl
 import org.videolan.vlc.BaseTest
 import org.videolan.vlc.util.TestCoroutineContextProvider
 import org.videolan.vlc.util.TestUtil
 
 
 class StreamsModelTest : BaseTest() {
-    private val mediaLibrary: Medialibrary = Medialibrary.getInstance()
     private lateinit var streamsModel: StreamsModel
 
     override fun beforeTest() {
         super.beforeTest()
-        mediaLibrary.clearHistory(Medialibrary.HISTORY_TYPE_GLOBAL)
+        medialibrary.clearHistory(Medialibrary.HISTORY_TYPE_GLOBAL)
         streamsModel = StreamsModel(application, coroutineContextProvider = TestCoroutineContextProvider())
     }
 
@@ -27,13 +32,13 @@ class StreamsModelTest : BaseTest() {
                 .awaitValue()
                 .assertValue(Medialibrary.EMPTY_COLLECTION.toMutableList())
 
-        fakeMediaStrings.forEach { location ->
-            mediaLibrary.addToHistory(location, location)
+        val result = fakeMediaStrings.map {
+            val media = MediaWrapperImpl(it.toUri())
+            println(medialibrary.addToHistory(media.location, media.title))
+            media
         }
-        val result = mediaLibrary.history(Medialibrary.HISTORY_TYPE_NETWORK)
 
         streamsModel.refresh()
-        Thread.sleep(200)
 
         val testResult = streamsModel.dataset
                 .test()
@@ -51,22 +56,28 @@ class StreamsModelTest : BaseTest() {
         val pos = 0
         val fakeMediaStrings = TestUtil.createNetworkUris(2)
 
-        fakeMediaStrings.forEach { location ->
-            mediaLibrary.addToHistory(location, location)
+        val argumentName = slot<String>()
+
+        val result = fakeMediaStrings.map {
+            val media = spyk(MediaWrapperImpl(it.toUri()))
+            medialibrary.addToHistory(media.location, media.title)
+            media
         }
-        val result = mediaLibrary.history(Medialibrary.HISTORY_TYPE_NETWORK)
         val oldMediaTitle = result[pos].title
+
         val media = result[pos]
+
+        every { media.rename(capture(argumentName)) } answers { media.setDisplayTitle(argumentName.captured) }
 
         streamsModel.refresh()
 
         streamsModel.dataset.test()
                 .awaitValue()
+//                .assertValue(result.toMutableList())
 
         val newMediaTitle = "$oldMediaTitle~new"
 
-        streamsModel.rename(media, newMediaTitle)
-        Thread.sleep(200)
+        streamsModel.rename(result[pos], newMediaTitle)
 
         val testResult = streamsModel.dataset.test()
                 .awaitValue()

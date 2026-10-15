@@ -52,7 +52,7 @@ class FileBrowserModelTest : BaseTest() {
         BrowserProvider.overrideCreator = false
         BrowserProvider.registerCreator {
             this@FileBrowserModelTest.mediaBrowser = mockk(relaxed = true)
-            every { mediaBrowser.changeEventListener(any()) } answers { eventListener = args[0] as EventListener }
+            every { mediaBrowser.changeEventListener(any()) } answers { eventListener = args[0] as? EventListener }
             every { mediaBrowser.browse(any<Uri>(), any<Int>()) } answers {
                 val root = File((args[0] as Uri).path ?: "")
                 root.listFiles()?.forEachIndexed { index, file ->
@@ -82,7 +82,7 @@ class FileBrowserModelTest : BaseTest() {
     }
 
     private fun setupTestFiles() {
-        (0 until countDirs).map { temporaryFolder.newFile("dir$it") }
+        (0 until countDirs).map { temporaryFolder.newFolder("dir$it") }
         (0 until countVideos).map { temporaryFolder.newFile("video$it.mp4") }
     }
 
