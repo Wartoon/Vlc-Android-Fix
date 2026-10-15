@@ -41,7 +41,7 @@ class FilePickerModelTest : BaseTest() {
     private fun idleMainLooper() = Shadows.shadowOf(Looper.getMainLooper()).idle()
 
     init {
-        BrowserProvider.overrideCreator = false
+        BrowserProvider.overrideCreator = true
         BrowserProvider.registerCreator {
             mediaBrowser = mockk(relaxed = true)
             every { mediaBrowser.changeEventListener(any()) } answers { eventListener = args[0] as? EventListener }
@@ -59,6 +59,7 @@ class FilePickerModelTest : BaseTest() {
             mediaBrowser
         }
         BrowserProvider.registerCreator(clazz = CoroutineContextProvider::class.java) { org.videolan.vlc.util.TestCoroutineContextProvider() }
+        BrowserProvider.overrideCreator = false
     }
 
     override fun beforeTest() {
