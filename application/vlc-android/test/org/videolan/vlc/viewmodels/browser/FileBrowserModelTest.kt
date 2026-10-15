@@ -14,6 +14,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.robolectric.Shadows
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.android.asCoroutineDispatcher
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.interfaces.IMedia
