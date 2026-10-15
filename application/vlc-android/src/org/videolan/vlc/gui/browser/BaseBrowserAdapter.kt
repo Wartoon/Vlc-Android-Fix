@@ -155,28 +155,33 @@ open class BaseBrowserAdapter(val browserContainer: BrowserContainer<MediaLibrar
     }
 
     override fun onBindViewHolder(holder: ViewHolder<ViewDataBinding>, position: Int) {
-        val viewType = getItemViewType(position)
-        if (viewType == TYPE_MEDIA) {
-            onBindMediaViewHolder(holder as MediaViewHolder, position)
-        } else {
-            val vh = holder as SeparatorViewHolder
-            vh.binding.title = dataset[position].title
+        when (holder) {
+            is MediaViewHolder -> {
+                onBindMediaViewHolder(holder, position)
+                if (!forMain) holder.bindingContainer.setupGrid()
+            }
+            is SeparatorViewHolder -> holder.binding.title = dataset[position].title
         }
-        itemFocusChanged(position, false, (holder as MediaViewHolder).bindingContainer)
-        if (!forMain) holder.bindingContainer.setupGrid()
     }
 
     override fun onBindViewHolder(holder: ViewHolder<ViewDataBinding>, position: Int, payloads: MutableList<Any>) {
-        if (payloads.isEmpty())
+        if (payloads.isEmpty()) {
             onBindViewHolder(holder, position)
-        else if (payloads[0] == UPDATE_PROGRESS) {
+            return
+        }
+        if (holder !is MediaViewHolder) {
+            // RecyclerView can deliver payloads to separator rows, which have no media controls.
+            onBindViewHolder(holder, position)
+            return
+        }
+        if (payloads[0] == UPDATE_PROGRESS) {
             val media = getItem(position) as MediaWrapper
             val max = (media.length / 1000).toInt()
             val progress = (media.displayTime / 1000).toInt()
-            (holder as MediaViewHolder).bindingContainer.setProgress(holder.bindingContainer.container.context, progress, max)
+            holder.bindingContainer.setProgress(holder.bindingContainer.container.context, progress, max)
             if (media.type != MediaWrapper.TYPE_AUDIO || media.isPodcast) holder.bindingContainer.setIsPlayed(holder.bindingContainer.container.context, media.playCount > 0)
         }  else if (payloads[0] is CharSequence) {
-            (holder as MediaViewHolder).bindingContainer.text.visibility = View.VISIBLE
+            holder.bindingContainer.text.visibility = View.VISIBLE
             holder.bindingContainer.text.text = (payloads[0] as CharSequence).getDescriptionSpan(holder.bindingContainer.text.context)
             val item = getItem(position) as MediaWrapper
             holder.bindingContainer.container.contentDescription = TalkbackUtil.getDir(holder.binding.root.context, item, item.hasStateFlags(MediaLibraryItem.FLAG_FAVORITE))
@@ -184,7 +189,7 @@ open class BaseBrowserAdapter(val browserContainer: BrowserContainer<MediaLibrar
             val value = payloads[0] as Int
             if (value == UPDATE_SELECTION) holder.selectView(multiSelectHelper.isSelected(position))
         }
-        itemFocusChanged(position, false, (holder as MediaViewHolder).bindingContainer)
+        itemFocusChanged(position, false, holder.bindingContainer)
     }
 
     private fun onBindMediaViewHolder(vh: MediaViewHolder, position: Int) {
