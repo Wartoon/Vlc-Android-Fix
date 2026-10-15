@@ -60,6 +60,8 @@ class StorageModelTest : BaseTest() {
 
     override fun beforeTest() {
         super.beforeTest()
+        coEvery { mockedDirectoryRepo.getMediaDirectories() } returns mutableListOf(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY)
+        coEvery { mockedDirectoryRepo.getCustomDirectories() } returns emptyList()
         setupTestFiles()
     }
 
