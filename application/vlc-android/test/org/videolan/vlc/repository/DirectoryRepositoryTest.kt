@@ -15,6 +15,7 @@ import org.videolan.vlc.database.MediaDatabase
 import org.videolan.vlc.mediadb.models.CustomDirectory
 import org.videolan.vlc.util.TestUtil
 import org.videolan.vlc.util.argumentCaptor
+import org.videolan.vlc.util.mock
 import org.videolan.vlc.util.uninitialized
 
 @RunWith(PowerMockRunner::class)

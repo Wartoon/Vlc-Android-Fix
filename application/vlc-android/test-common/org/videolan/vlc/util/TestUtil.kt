@@ -110,4 +110,64 @@ object TestUtil {
             movieReleaseName: String,
             zipDownloadLink: String): SubtitleItem = SubtitleItem(idSubtitle, -1L, mediaUri, subLanguageID, movieReleaseName, State.Downloading, zipDownloadLink, false, 0F, 0L, "")
 
+    fun createDownloadingSubtitleItem(
+            idSubtitle: String,
+            mediaUri: String,
+            subLanguageID: String,
+            movieReleaseName: String,
+            zipDownloadLink: String): SubtitleItem = createDownloadingSubtitleItem(
+            idSubtitle, mediaUri.toUri(), subLanguageID, movieReleaseName, zipDownloadLink)
+
+    fun createOpenSubtitle(
+            idSubtitle: String,
+            subLanguageID: String,
+            movieReleaseName: String,
+            downloadLink: String): org.videolan.resources.opensubtitles.Data {
+        return org.videolan.resources.opensubtitles.Data(
+                attributes = org.videolan.resources.opensubtitles.Attributes(
+                        aiTranslated = null,
+                        comments = null,
+                        downloadCount = 0L,
+                        featureDetails = org.videolan.resources.opensubtitles.FeatureDetails(
+                                episodeNumber = null,
+                                featureId = null,
+                                featureType = null,
+                                imdbId = null,
+                                movieName = movieReleaseName,
+                                parentFeatureId = null,
+                                parentImdbId = null,
+                                parentTitle = null,
+                                parentTmdbId = null,
+                                seasonNumber = null,
+                                title = movieReleaseName,
+                                tmdbId = null,
+                                year = null),
+                        fileHashes = null,
+                        files = listOf(org.videolan.resources.opensubtitles.File(
+                                cdNumber = null,
+                                fileId = idSubtitle.toLongOrNull() ?: 0L,
+                                fileName = "$movieReleaseName.srt")),
+                        foreignPartsOnly = null,
+                        fps = null,
+                        fromTrusted = null,
+                        hd = null,
+                        hearingImpaired = false,
+                        language = subLanguageID,
+                        legacySubtitleId = null,
+                        legacyUploaderId = null,
+                        machineTranslated = null,
+                        nbCd = null,
+                        newDownloadCount = null,
+                        ratings = 0F,
+                        relatedLinks = null,
+                        release = movieReleaseName,
+                        slug = null,
+                        subtitleId = idSubtitle,
+                        uploadDate = null,
+                        uploader = null,
+                        url = downloadLink,
+                        votes = null),
+                id = idSubtitle,
+                type = "subtitle")
+
 }
