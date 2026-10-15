@@ -2,7 +2,6 @@ package org.videolan.vlc.viewmodels.browser
 
 import android.net.Uri
 import com.jraska.livedata.test
-import io.mockk.any
 import io.mockk.every
 import io.mockk.mockk
 import junit.framework.Assert.assertEquals
