@@ -62,6 +62,11 @@ class FileBrowserModelTest : BaseTest() {
 
     private fun idleMainLooper() = Shadows.shadowOf(Looper.getMainLooper()).idle()
 
+    override fun afterTest() {
+        Dispatchers.setMain(Dispatchers.Unconfined)
+        super.afterTest()
+    }
+
     init {
         BrowserFavRepository.applyMock(mockedFavoritesRepo)
 
@@ -88,7 +93,6 @@ class FileBrowserModelTest : BaseTest() {
 
     override fun beforeTest() {
         super.beforeTest()
-        Dispatchers.setMain(robolectricMainDispatcher)
         setupTestFiles()
     }
 
@@ -120,6 +124,7 @@ class FileBrowserModelTest : BaseTest() {
 
     @Test
     fun whenAtRootAndInternalStorageIsEmpty_checkShowsFolderIsEmpty() {
+        Dispatchers.setMain(robolectricMainDispatcher)
         initBrowserModel(null, showHiddenFiles = false)
 
         val emptyFolder = temporaryFolder.newFolder("empty")
@@ -132,6 +137,7 @@ class FileBrowserModelTest : BaseTest() {
 
     @Test
     fun whenAtRootAndInternalStorageHasDirectories_checkShowsFolderIsNotEmpty() {
+        Dispatchers.setMain(robolectricMainDispatcher)
         initBrowserModel(null, showHiddenFiles = false)
 
         val internalStorage = StubMediaWrapper(StubMedia(mockedLibVlc, Uri.fromFile(temporaryFolder.root).toString()).apply { type = IMedia.Type.Directory })
@@ -143,6 +149,7 @@ class FileBrowserModelTest : BaseTest() {
 
     @Test
     fun whenAtRootAndSavedList_checkPrefetchListIsFilled() {
+        Dispatchers.setMain(robolectricMainDispatcher)
         initBrowserModel(null, showHiddenFiles = false)
 
         val internalStorage = StubMediaWrapper(StubMedia(mockedLibVlc, Uri.fromFile(temporaryFolder.root).toString()).apply { type = IMedia.Type.Directory })
