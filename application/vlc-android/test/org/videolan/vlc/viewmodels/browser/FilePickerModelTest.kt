@@ -41,7 +41,7 @@ class FilePickerModelTest : BaseTest() {
     private fun idleMainLooper() = Shadows.shadowOf(Looper.getMainLooper()).idle()
 
     init {
-        BrowserProvider.overrideCreator = true
+        BrowserProvider.overrideCreator = false
         BrowserProvider.registerCreator {
             mediaBrowser = mockk(relaxed = true)
             every { mediaBrowser.changeEventListener(any()) } answers { eventListener = args[0] as? EventListener }

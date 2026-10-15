@@ -53,7 +53,7 @@ class FileBrowserModelTest : BaseTest() {
     init {
         BrowserFavRepository.applyMock(mockedFavoritesRepo)
 
-        BrowserProvider.overrideCreator = true
+        BrowserProvider.overrideCreator = false
         BrowserProvider.registerCreator {
             this@FileBrowserModelTest.mediaBrowser = mockk(relaxed = true)
             every { mediaBrowser.changeEventListener(any()) } answers { eventListener = args[0] as? EventListener }
