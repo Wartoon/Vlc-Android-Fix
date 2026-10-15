@@ -34,16 +34,15 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.mockito.Mockito.*
-import org.powermock.api.mockito.PowerMockito
-import org.powermock.core.classloader.annotations.PrepareForTest
-import org.powermock.modules.junit4.PowerMockRunner
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import org.videolan.vlc.database.ExternalSubDao
 import org.videolan.vlc.database.MediaDatabase
 import org.videolan.vlc.util.*
 
 
-@RunWith(PowerMockRunner::class)
-@PrepareForTest(Uri::class)
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
 class ExternalSubRepositoryTest {
     private val externalSubDao = mock<ExternalSubDao>()
     private lateinit var externalSubRepository: ExternalSubRepository
@@ -77,9 +76,6 @@ class ExternalSubRepositoryTest {
             externalSubRepository.saveDownloadedSubtitle(it.idSubtitle, it.subtitlePath, it.mediaPath, it.subLanguageID, it.movieReleaseName, it.hearingImpaired)
         }
 
-
-        PowerMockito.mockStatic(Uri::class.java)
-        PowerMockito.`when`<Any>(Uri::class.java, "decode", anyString()).thenAnswer { it.arguments[0] as String }
 
         val inserted = argumentCaptor<org.videolan.vlc.mediadb.models.ExternalSub>()
         verify(externalSubDao, times(4)).insert(inserted.capture() ?: uninitialized())
@@ -117,9 +113,6 @@ class ExternalSubRepositoryTest {
             externalSubRepository.saveDownloadedSubtitle("2$it", file.path, bar, "en", "bar", false)
             TestUtil.createExternalSub("2$it", file.path, bar, "en", "bar")
         }
-
-        PowerMockito.mockStatic(Uri::class.java)
-        PowerMockito.`when`<Any>(Uri::class.java, "decode", anyString()).thenAnswer { it.arguments[0] as String }
 
         val inserted = argumentCaptor<org.videolan.vlc.mediadb.models.ExternalSub>()
         verify(externalSubDao, times(4)).insert(inserted.capture() ?: uninitialized())
