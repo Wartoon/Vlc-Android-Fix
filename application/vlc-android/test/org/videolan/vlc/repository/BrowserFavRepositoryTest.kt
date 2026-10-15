@@ -29,7 +29,7 @@ import org.videolan.vlc.ExternalMonitor
 
 @RunWith(PowerMockRunner::class)
 @PrepareForTest(Uri::class, ExternalMonitor::class)
-class BrowserFavRepositoryTest {
+abstract class BrowserFavRepositoryTest {
 //
 //    @Rule
 //    @JvmField

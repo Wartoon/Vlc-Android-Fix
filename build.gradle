@@ -110,7 +110,7 @@ ext {
     powerMock = '2.0.2'
     espressoVersion = '3.5.1'
     livedataTest = '1.2.0'
-    robolectric = '4.3.1'
+    robolectric = '4.15'
     mockk = '1.9.3'
     testRunner = '1.4.0'
     orchestrator = '1.4.2'
