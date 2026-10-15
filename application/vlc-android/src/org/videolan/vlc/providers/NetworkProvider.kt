@@ -55,9 +55,8 @@ class NetworkProvider(context: Context, dataset: LiveDataset<MediaLibraryItem>, 
         dataset.value = mutableListOf()
         if (mocked!= null)
             dataset.value = mocked.toMutableList()
-        else if (NetworkMonitor.getInstance(context).lanAllowed) browse()
-        // browseRootImpl resets the dataset; re-apply favorites observed before this reset.
-        onChanged(favorites.value.orEmpty())
+        else
+            if (NetworkMonitor.getInstance(context).lanAllowed) browse()
     }
 
     override fun fetch() {}
@@ -69,7 +68,7 @@ class NetworkProvider(context: Context, dataset: LiveDataset<MediaLibraryItem>, 
         }
         initBrowser()
         mediabrowser?.let {
-            changeEventListener(eventListener)
+            it.changeEventListener(eventListener)
             if (url != null) it.browse(url.toUri(), getFlags(interact))
             else it.discoverNetworkShares()
         }
@@ -99,11 +98,6 @@ class NetworkProvider(context: Context, dataset: LiveDataset<MediaLibraryItem>, 
     override fun stop() {
         if (url == null) clearListener()
         return super.stop()
-    }
-
-    fun clearNetworkShares() {
-        dataset.clear()
-        onChanged(favorites.value.orEmpty())
     }
 
     override fun onChanged(favs: List<MediaWrapper>) {
