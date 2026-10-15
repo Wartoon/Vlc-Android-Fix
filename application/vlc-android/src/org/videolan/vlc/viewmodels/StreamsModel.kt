@@ -42,7 +42,7 @@ import org.videolan.vlc.PlaybackService
 import org.videolan.vlc.util.DummyMediaWrapperProvider
 import org.videolan.vlc.util.EmptyPBSCallback
 
-class StreamsModel(context: Context, private val showDummy: Boolean = false, coroutineContextProvider: CoroutineContextProvider = CoroutineContextProvider()) : MedialibraryModel<MediaWrapper>(context, coroutineContextProvider) {
+class StreamsModel(context: Context, private val showDummy: Boolean = false, coroutineContextProvider: CoroutineContextProvider = CoroutineContextProvider(), private val networkHistoryProvider: (() -> List<MediaWrapper>)? = null) : MedialibraryModel<MediaWrapper>(context, coroutineContextProvider) {
     var deletingMedia: MediaWrapper? = null
     val observableSearchText = ObservableField<String>()
     var service: PlaybackService? = null
@@ -61,7 +61,7 @@ class StreamsModel(context: Context, private val showDummy: Boolean = false, cor
 
     override suspend fun updateList() {
         dataset.value = withContext(coroutineContextProvider.Default) {
-            medialibrary.history(Medialibrary.HISTORY_TYPE_NETWORK).toMutableList()
+            (networkHistoryProvider?.invoke() ?: medialibrary.history(Medialibrary.HISTORY_TYPE_NETWORK).toList()).toMutableList()
                     .also {
                         deletingMedia?.let { remove(it) }
                         if (showDummy) it.add(0, DummyMediaWrapperProvider.getDummyMediaWrapper(-1))
