@@ -1,5 +1,6 @@
 package org.videolan.vlc
 
+import android.Manifest
 import android.content.Context
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.core.app.ApplicationProvider
@@ -12,12 +13,13 @@ import org.junit.*
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 import org.videolan.medialibrary.MLServiceLocator
 import org.videolan.medialibrary.interfaces.Medialibrary
 
 @RunWith(RobolectricTestRunner::class)
-@Config(application = VLCTestApplication::class, manifest = Config.NONE, sdk = [35])
+@Config(application = VLCTestApplication::class, manifest = Config.NONE, sdk = [28])
 abstract class BaseTest {
     val context: Context = ApplicationProvider.getApplicationContext()
     val application = (RuntimeEnvironment.application as VLCTestApplication)
@@ -28,6 +30,7 @@ abstract class BaseTest {
     val instantTaskExecutorRule = InstantTaskExecutorRule()
 
     init {
+        Shadows.shadowOf(application).grantPermissions(Manifest.permission.READ_EXTERNAL_STORAGE)
         MockKAnnotations.init(this)
         medialibrary = MLServiceLocator.getAbstractMedialibrary().apply { init(context) }
     }
