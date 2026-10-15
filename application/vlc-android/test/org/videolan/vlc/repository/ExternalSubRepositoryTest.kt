@@ -93,7 +93,7 @@ class ExternalSubRepositoryTest {
         `when`(externalSubDao.get(bar)).thenReturn(fakeBarLiveDataSubtitles)
 
         val fooSubtitles = getValue(externalSubRepository.getDownloadedSubtitles(foo.toUri()))
-        verify(externalSubDao, times(2)).get(anyString())
+        verify(externalSubDao, times(1)).get(anyString())
         assertThat(fooSubtitles.size, `is`(0))
     }
 

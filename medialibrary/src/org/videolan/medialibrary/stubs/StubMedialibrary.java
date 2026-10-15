@@ -120,7 +120,7 @@ public class StubMedialibrary extends Medialibrary {
     }
 
     public MediaWrapper[] getPagedVideos(int sort, boolean desc, boolean includeMissing, boolean onlyFavorites, int nbItems, int offset) {
-        return dt.sortMedia(dt.secureSublist(dt.mVideoMediaWrappers, offset, offset + nbItems), sort, desc);
+        return dt.sortMedia(dt.secureSublist(dt.mVideoMediaWrappers, offset, nbItems), sort, desc);
     }
 
     public MediaWrapper[] getVideos(int sort, boolean desc, boolean includeMissing, boolean onlyFavorites) {
@@ -144,7 +144,7 @@ public class StubMedialibrary extends Medialibrary {
     }
 
     public MediaWrapper[] getPagedAudio(int sort, boolean desc, boolean includeMissing, boolean onlyFavorites, int nbitems, int offset) {
-        return dt.sortMedia(dt.secureSublist(dt.mAudioMediaWrappers, offset, offset + nbitems), sort, desc);
+        return dt.sortMedia(dt.secureSublist(dt.mAudioMediaWrappers, offset, nbitems), sort, desc);
     }
 
     public MediaWrapper[] getRecentAudio() {
@@ -210,7 +210,7 @@ public class StubMedialibrary extends Medialibrary {
     }
 
     public Album[] getPagedAlbums(int sort, boolean desc, boolean includeMissing, boolean onlyFavorites, int nbItems, int offset) {
-        return dt.sortAlbum(dt.secureSublist(dt.mAlbums, offset, offset + nbItems), sort, desc);
+        return dt.sortAlbum(dt.secureSublist(dt.mAlbums, offset, nbItems), sort, desc);
     }
 
     public int getAlbumsCount() {
@@ -268,7 +268,7 @@ public class StubMedialibrary extends Medialibrary {
         ArrayList<Artist> results;
         if (all) results = dt.mArtists;
         else results = new ArrayList<>(Arrays.asList(getAlbumArtists()));
-        return dt.sortArtist(dt.secureSublist(results, offset, offset + nbItems), sort, desc);
+        return dt.sortArtist(dt.secureSublist(results, offset, nbItems), sort, desc);
     }
 
     public int getArtistsCount(boolean all) {
@@ -302,7 +302,7 @@ public class StubMedialibrary extends Medialibrary {
     }
 
     public Genre[] getPagedGenres(int sort, boolean desc, boolean includeMissing, boolean onlyFavorites, int nbItems, int offset) {
-        return dt.sortGenre(dt.secureSublist(dt.mGenres, offset, offset + nbItems), sort, desc);
+        return dt.sortGenre(dt.secureSublist(dt.mGenres, offset, nbItems), sort, desc);
     }
 
     public int getGenresCount() {
@@ -333,7 +333,7 @@ public class StubMedialibrary extends Medialibrary {
     }
 
     public Playlist[] getPagedPlaylists(Playlist.Type type, int sort, boolean desc, boolean includeMissing, boolean onlyFavorites, int nbItems, int offset) {
-        return dt.sortPlaylist(dt.secureSublist(dt.mPlaylists, offset, offset + nbItems), sort, desc);
+        return dt.sortPlaylist(dt.secureSublist(dt.mPlaylists, offset, nbItems), sort, desc);
     }
 
     public int getPlaylistsCount() {
@@ -380,8 +380,9 @@ public class StubMedialibrary extends Medialibrary {
     public MediaWrapper[] history(int type) {
         ArrayList<MediaWrapper> results = new ArrayList<>();
         for (MediaWrapper media : dt.mHistory) {
-            if (media.getType() == MediaWrapper.TYPE_VIDEO ||
-                    media.getType() == MediaWrapper.TYPE_AUDIO) results.add(media);
+            if (type == HISTORY_TYPE_NETWORK && media.getType() == MediaWrapper.TYPE_STREAM ||
+                    type != HISTORY_TYPE_NETWORK && (media.getType() == MediaWrapper.TYPE_VIDEO ||
+                            media.getType() == MediaWrapper.TYPE_AUDIO)) results.add(media);
             // the native method specifies an nbItems of 100, offset 0
             if (results.size() >= 100) break;
         }

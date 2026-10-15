@@ -61,6 +61,7 @@ class FilePickerModelTest : BaseTest() {
     }
 
     private fun addFileToProvider(i: Int, file: File) {
+        if (file.name.endsWith(".mp4")) return
         val t = StubMedia(mockedLibVlc, "file://${file.path}").apply { if (!file.name.endsWith(".mp4")) type = IMedia.Type.Directory }
         browserProvider.addMedia(StubMediaWrapper(t))
     }

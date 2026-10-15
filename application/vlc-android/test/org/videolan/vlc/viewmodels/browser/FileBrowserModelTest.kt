@@ -160,6 +160,7 @@ class FileBrowserModelTest : BaseTest() {
                 .awaitValue()
                 .value()
 
-        assertEquals(3, hasFav.size)
+        // Local favorites are displayed in a separate BrowserFavoritesModel section.
+        assertEquals(1, hasFav.size)
     }
 }
