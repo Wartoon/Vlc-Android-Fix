@@ -58,7 +58,7 @@ class FileBrowserModelTest : BaseTest() {
                 val root = File(firstArg<Uri>().path ?: "")
                 root.listFiles()?.forEachIndexed { index, file ->
                     val media = StubMedia(mockedLibVlc, Uri.fromFile(file).toString()).apply {
-                        if (file.isDirectory) type = IMedia.Type.Directory
+                        if (file.isDirectory || !file.name.endsWith(".mp4")) type = IMedia.Type.Directory
                     }
                     eventListener?.onMediaAdded(index, media)
                 }
