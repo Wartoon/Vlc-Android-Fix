@@ -1,6 +1,7 @@
 package org.videolan.vlc.viewmodels.browser
 
 import android.net.Uri
+import android.os.Handler
 import android.os.Looper
 import androidx.core.net.toUri
 import androidx.lifecycle.MutableLiveData
@@ -10,11 +11,10 @@ import io.mockk.mockk
 import junit.framework.Assert.*
 import org.junit.Rule
 import org.junit.Test
-import org.junit.BeforeClass
-import org.junit.AfterClass
 import org.junit.rules.TemporaryFolder
 import org.robolectric.Shadows
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.android.asCoroutineDispatcher
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.interfaces.IMedia
 import org.videolan.libvlc.util.MediaBrowser.EventListener
@@ -32,6 +32,8 @@ import org.videolan.vlc.util.applyMock
 import org.videolan.tools.Settings
 import java.io.File
 
+
+private val robolectricMainDispatcher = Handler(Looper.getMainLooper()).asCoroutineDispatcher()
 
 private class BrowserCoroutineContextProvider : CoroutineContextProvider() {
     override val Default by lazy { Dispatchers.Unconfined }
@@ -85,7 +87,7 @@ class FileBrowserModelTest : BaseTest() {
 
     override fun beforeTest() {
         super.beforeTest()
-        Dispatchers.resetMain()
+        Dispatchers.setMain(robolectricMainDispatcher)
         setupTestFiles()
     }
 
