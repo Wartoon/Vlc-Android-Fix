@@ -172,7 +172,7 @@
                 app:layout_constraintStart_toStartOf="@+id/imageButtonSort"
                 app:layout_constraintTop_toTopOf="@+id/imageButtonSort" />
 
-    
+
 
     <androidx.appcompat.widget.AppCompatImageButton
                 android:id="@+id/imageButtonSort"

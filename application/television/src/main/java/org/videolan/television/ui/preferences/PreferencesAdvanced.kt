@@ -503,15 +503,44 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
 
                     ZipInputStream(BufferedInputStream(FileInputStream(src))).use { zip ->
                         var entry = zip.nextEntry
+                        var entryCount = 0
+                        var totalExtracted = 0L
+                        val extractedNames = HashSet<String>()
+                        val maxExtracted = 4L * 1024 * 1024 * 1024
                         while (entry != null) {
+                            entryCount++
+                            if (entryCount > 100000) throw IOException("Backup contains too many entries")
+                            val normalizedName = entry.name.trimEnd('/')
+                            if (entry.name.startsWith("/") || entry.name.contains(92.toChar()) ||
+                                normalizedName.isEmpty() ||
+                                normalizedName.split('/').any { it.isEmpty() || it == "." || it == ".." })
+                                throw IOException("Invalid backup entry path")
+                            if (!extractedNames.add(normalizedName)) throw IOException("Duplicate backup entry")
                             val outFile = File(staging, entry.name)
                             val safeRoot = staging.canonicalPath + File.separator
                             if (!outFile.canonicalPath.startsWith(safeRoot))
                                 throw IOException("Invalid backup entry")
-                            if (entry.isDirectory) outFile.mkdirs()
+                            if (entry.isDirectory) {
+                                if (!outFile.mkdirs() && !outFile.isDirectory)
+                                    throw IOException("Cannot create restore directory")
+                            }
                             else {
-                                outFile.parentFile?.mkdirs()
-                                FileOutputStream(outFile).use { output -> zip.copyTo(output) }
+                                if (outFile.exists()) throw IOException("Duplicate backup entry")
+                                val parent = outFile.parentFile ?: throw IOException("Invalid backup entry path")
+                                if (!parent.exists() && !parent.mkdirs())
+                                    throw IOException("Cannot create restore directory")
+                                if (!parent.isDirectory) throw IOException("Invalid restore directory")
+                                FileOutputStream(outFile).use { output ->
+                                    val buffer = ByteArray(8192)
+                                    while (true) {
+                                        val count = zip.read(buffer)
+                                        if (count < 0) break
+                                        totalExtracted += count.toLong()
+                                        if (totalExtracted > maxExtracted)
+                                            throw IOException("Backup exceeds 4 GiB uncompressed")
+                                        output.write(buffer, 0, count)
+                                    }
+                                }
                             }
                             zip.closeEntry()
                             entry = zip.nextEntry
@@ -521,8 +550,13 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                     val manifest = File(staging, "manifest.json")
                     if (!manifest.isFile) throw IOException("Backup manifest missing")
                     val manifestText = manifest.readText()
-                    if (!manifestText.contains("\"format\":1") ||
-                        !manifestText.contains("\"package\":\"${context.packageName}\""))
+                    val manifestJson = try {
+                        org.json.JSONObject(manifestText)
+                    } catch (e: org.json.JSONException) {
+                        throw IOException("Invalid backup manifest", e)
+                    }
+                    if (manifestJson.optInt("format", -1) != 1 ||
+                        manifestJson.optString("package") != context.packageName)
                         throw IOException("Unsupported or incompatible backup")
 
                     val settingsFile = File(staging, "settings/settings.json")
@@ -551,27 +585,21 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
 
                     if (restoreArtwork) {
                         artworkDir?.let {
-                            it.deleteRecursively()
-                            copyDirectoryContents(File(staging, "artwork/medialib"), it)
+                            val savedArtwork = File(staging, "artwork/medialib")
+                            if (savedArtwork.isDirectory) replaceDirectoryContentsSafely(savedArtwork, it)
                         }
                     }
 
                     if (restoreSubtitles) {
                         subtitlesDir?.let {
                             val saved = File(staging, "external/subtitles")
-                            if (saved.exists()) {
-                                it.deleteRecursively()
-                                copyDirectoryContents(saved, it)
-                            }
+                            if (saved.isDirectory) replaceDirectoryContentsSafely(saved, it)
                         }
                     }
 
                     if (restoreCredentials) {
                         val savedKeyStore = File(staging, "keystore")
-                        if (savedKeyStore.exists()) {
-                            keyStoreDir.deleteRecursively()
-                            copyDirectoryContents(savedKeyStore, keyStoreDir)
-                        }
+                        if (savedKeyStore.isDirectory) replaceDirectoryContentsSafely(savedKeyStore, keyStoreDir)
                     }
 
                     staging.deleteRecursively()
@@ -618,7 +646,8 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
         val staged = File(parent, destination.name + ".restore-new")
         val previous = File(parent, destination.name + ".restore-old")
         staged.deleteRecursively()
-        previous.deleteRecursively()
+        // An interrupted restore may have left the only recoverable copy here.
+        if (previous.exists()) throw IOException("Previous restore backup still exists")
         copyDirectoryContents(source, staged)
         var movedOld = false
         try {

@@ -100,6 +100,17 @@ jobs:
               raise SystemExit("Regression: AppCompat-only full-backup Snackbar is present in TV preferences")
           if 'if (!it.deleteRecursively()) throw IOException("Cannot replace app database")' in tv_prefs:
               raise SystemExit("Regression: destructive app database pre-delete remains")
+          for required in (
+              'val maxExtracted = 4L * 1024 * 1024 * 1024',
+              'if (entryCount > 100000)',
+              'org.json.JSONObject(manifestText)',
+              'if (previous.exists()) throw IOException("Previous restore backup still exists")',
+              'replaceDirectoryContentsSafely(savedArtwork, it)',
+          ):
+              if required not in tv_prefs:
+                  raise SystemExit(f"Regression: safe full-restore guard is missing: {required}")
+          if 'it.deleteRecursively()\n                            copyDirectoryContents' in tv_prefs:
+              raise SystemExit("Regression: destructive artwork pre-delete remains")
           print("verified TV backup/restore regression guards")
           PY
           git diff --check
