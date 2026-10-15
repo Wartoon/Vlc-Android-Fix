@@ -37,7 +37,7 @@ class FilePickerModelTest : BaseTest() {
     private val countDirs = 4
 
     init {
-        BrowserProvider.overrideCreator = false
+        BrowserProvider.overrideCreator = true
         BrowserProvider.registerCreator {
             mediaBrowser = mockk(relaxed = true)
             every { mediaBrowser.changeEventListener(any()) } answers { eventListener = args[0] as? EventListener }
@@ -95,7 +95,6 @@ class FilePickerModelTest : BaseTest() {
         val observer = browserModel.dataset.test()
         browserModel.refresh()
         observer.awaitValue(3, TimeUnit.SECONDS)
-                .awaitValue(3, TimeUnit.SECONDS)
                 .assertValue { it.isEmpty() }
     }
 
