@@ -4,7 +4,6 @@ import android.net.Uri
 import androidx.core.net.toUri
 import androidx.lifecycle.MutableLiveData
 import com.jraska.livedata.test
-import io.mockk.any
 import io.mockk.every
 import io.mockk.mockk
 import junit.framework.Assert.*
