@@ -107,7 +107,7 @@ class FileBrowserModelTest : BaseTest() {
         initBrowserModel(null, showHiddenFiles = false)
 
         val emptyFolder = temporaryFolder.newFolder("empty")
-        val internalStorage = StubMediaWrapper(StubMedia(mockedLibVlc, Uri.fromFile(emptyFolder).toString()).apply { type = IMedia.Type.Directory })
+        val internalStorage = StubMediaWrapper(StubMedia(mockedLibVlc, Uri.fromFile(emptyFolder).toString()).apply { type = IMedia.Type.Directory }).apply { type = MediaWrapper.TYPE_DIR }
         browserProvider.parseSubDirectories(listOf(internalStorage))
         runBlocking { browserProvider.browseUrl(internalStorage.uri.toString()) }
 
@@ -118,7 +118,7 @@ class FileBrowserModelTest : BaseTest() {
     fun whenAtRootAndInternalStorageHasDirectories_checkShowsFolderIsNotEmpty() {
         initBrowserModel(null, showHiddenFiles = false)
 
-        val internalStorage = StubMediaWrapper(StubMedia(mockedLibVlc, Uri.fromFile(temporaryFolder.root).toString()).apply { type = IMedia.Type.Directory })
+        val internalStorage = StubMediaWrapper(StubMedia(mockedLibVlc, Uri.fromFile(temporaryFolder.root).toString()).apply { type = IMedia.Type.Directory }).apply { type = MediaWrapper.TYPE_DIR }
         browserProvider.parseSubDirectories(listOf(internalStorage))
 
         assertFalse(browserModel.isFolderEmpty(internalStorage))
@@ -128,7 +128,7 @@ class FileBrowserModelTest : BaseTest() {
     fun whenAtRootAndSavedList_checkPrefetchListIsFilled() {
         initBrowserModel(null, showHiddenFiles = false)
 
-        val internalStorage = StubMediaWrapper(StubMedia(mockedLibVlc, Uri.fromFile(temporaryFolder.root).toString()).apply { type = IMedia.Type.Directory })
+        val internalStorage = StubMediaWrapper(StubMedia(mockedLibVlc, Uri.fromFile(temporaryFolder.root).toString()).apply { type = IMedia.Type.Directory }).apply { type = MediaWrapper.TYPE_DIR }
         browserProvider.parseSubDirectories(listOf(internalStorage))
         browserModel.saveList(internalStorage)
 
