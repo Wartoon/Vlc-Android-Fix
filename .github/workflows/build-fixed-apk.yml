@@ -119,6 +119,9 @@ jobs:
         shell: bash
         run: python3 buildsystem/verify-app-id-variants.py
 
+      - name: Verify media and separator ViewHolder binding
+        run: python3 buildsystem/verify-browser-viewholder-bindings.py
+
       - name: Run VLC and TV unit tests
         shell: bash
         run: gradle :application:vlc-android:testDebugUnitTest :application:television:testDebugUnitTest --no-daemon
