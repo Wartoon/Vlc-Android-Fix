@@ -53,7 +53,7 @@ class FileBrowserModelTest : BaseTest() {
         BrowserProvider.registerCreator {
             this@FileBrowserModelTest.mediaBrowser = mockk(relaxed = true)
             every { mediaBrowser.changeEventListener(any()) } answers { eventListener = args[0] as EventListener }
-            every { mediaBrowser.browse(any(), any()) } answers {
+            every { mediaBrowser.browse(any<Uri>(), any<Int>()) } answers {
                 val root = File((args[0] as Uri).path ?: "")
                 root.listFiles()?.forEachIndexed { index, file ->
                     val media = StubMedia(mockedLibVlc, Uri.fromFile(file).toString()).apply {
