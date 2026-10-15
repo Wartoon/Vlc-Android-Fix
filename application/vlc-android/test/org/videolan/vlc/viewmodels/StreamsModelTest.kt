@@ -1,22 +1,26 @@
 package org.videolan.vlc.viewmodels
 
+import androidx.core.net.toUri
 import com.jraska.livedata.test
 import junit.framework.TestCase.assertEquals
-import junit.framework.TestCase.assertTrue
 import org.junit.Test
-import org.videolan.medialibrary.interfaces.Medialibrary
+import org.videolan.medialibrary.interfaces.media.MediaWrapper
+import org.videolan.medialibrary.stubs.StubMediaWrapper
 import org.videolan.vlc.BaseTest
 import org.videolan.vlc.util.TestCoroutineContextProvider
 import org.videolan.vlc.util.TestUtil
 
 
 class StreamsModelTest : BaseTest() {
+    private var networkHistory: List<MediaWrapper> = emptyList()
     private lateinit var streamsModel: StreamsModel
 
     override fun beforeTest() {
         super.beforeTest()
-        medialibrary.clearHistory(Medialibrary.HISTORY_TYPE_GLOBAL)
-        streamsModel = StreamsModel(application, coroutineContextProvider = TestCoroutineContextProvider())
+        streamsModel = StreamsModel(
+                application,
+                coroutineContextProvider = TestCoroutineContextProvider(),
+                networkHistoryProvider = { networkHistory })
     }
 
     @Test
@@ -25,13 +29,10 @@ class StreamsModelTest : BaseTest() {
 
         streamsModel.dataset.test()
                 .awaitValue()
-                .assertValue(Medialibrary.EMPTY_COLLECTION.toMutableList())
+                .assertValue(emptyList<MediaWrapper>())
 
-        fakeMediaStrings.forEach { location ->
-            assertTrue(medialibrary.addToHistory(location, location))
-        }
-        val result = medialibrary.history(Medialibrary.HISTORY_TYPE_NETWORK)
-        assertEquals(fakeMediaStrings.size, result.size)
+        val expected = fakeMediaStrings.map { StubMediaWrapper(it.toUri()) }
+        networkHistory = expected
 
         streamsModel.refresh()
         Thread.sleep(200)
@@ -42,30 +43,25 @@ class StreamsModelTest : BaseTest() {
                 .assertHasValue()
                 .value()
 
-        assertEquals(result.size, testResult.size)
-        assertEquals(result[0], testResult[0])
-        assertEquals(result[1], testResult[1])
+        assertEquals(expected.size, testResult.size)
+        assertEquals(expected[0], testResult[0])
+        assertEquals(expected[1], testResult[1])
     }
 
     @Test
     fun whenRenameCalledAtPos_MediaTitleIsUpdated() {
-        val pos = 0
         val fakeMediaStrings = TestUtil.createNetworkUris(2)
-
-        fakeMediaStrings.forEach { location ->
-            assertTrue(medialibrary.addToHistory(location, location))
-        }
-        val result = medialibrary.history(Medialibrary.HISTORY_TYPE_NETWORK)
-        assertEquals(fakeMediaStrings.size, result.size)
-        val oldMediaTitle = result[pos].title
-        val media = result[pos]
+        val expected = fakeMediaStrings.map { StubMediaWrapper(it.toUri()) }
+        networkHistory = expected
 
         streamsModel.refresh()
-
         streamsModel.dataset.test()
                 .awaitValue()
+                .assertHasValue()
 
-        val newMediaTitle = "$oldMediaTitle~new"
+        val pos = 0
+        val media = expected[pos]
+        val newMediaTitle = "${media.title}~new"
 
         streamsModel.rename(media, newMediaTitle)
         Thread.sleep(200)
