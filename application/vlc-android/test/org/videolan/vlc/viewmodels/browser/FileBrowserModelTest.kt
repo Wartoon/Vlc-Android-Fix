@@ -1,6 +1,7 @@
 package org.videolan.vlc.viewmodels.browser
 
 import android.net.Uri
+import android.os.Looper
 import androidx.core.net.toUri
 import androidx.lifecycle.MutableLiveData
 import com.jraska.livedata.test
@@ -9,6 +10,7 @@ import io.mockk.mockk
 import junit.framework.Assert.*
 import org.junit.Rule
 import org.junit.Test
+import org.robolectric.Shadows
 import org.junit.rules.TemporaryFolder
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.interfaces.IMedia
@@ -45,6 +47,8 @@ class FileBrowserModelTest : BaseTest() {
 
     private val countVideos = 2
     private val countDirs = 4
+
+    private fun idleMainLooper() = Shadows.shadowOf(Looper.getMainLooper()).idle()
 
     init {
         BrowserFavRepository.applyMock(mockedFavoritesRepo)
@@ -107,7 +111,7 @@ class FileBrowserModelTest : BaseTest() {
         val emptyFolder = temporaryFolder.newFolder("empty")
         val internalStorage = StubMediaWrapper(StubMedia(mockedLibVlc, Uri.fromFile(emptyFolder).toString()).apply { type = IMedia.Type.Directory })
         browserProvider.parseSubDirectories(listOf(internalStorage))
-        Thread.sleep(500)
+        idleMainLooper()
 
         assertTrue(browserModel.isFolderEmpty(internalStorage))
     }
@@ -118,7 +122,7 @@ class FileBrowserModelTest : BaseTest() {
 
         val internalStorage = StubMediaWrapper(StubMedia(mockedLibVlc, Uri.fromFile(temporaryFolder.root).toString()).apply { type = IMedia.Type.Directory })
         browserProvider.parseSubDirectories(listOf(internalStorage))
-        Thread.sleep(500)
+        idleMainLooper()
 
         assertFalse(browserModel.isFolderEmpty(internalStorage))
     }
@@ -129,7 +133,7 @@ class FileBrowserModelTest : BaseTest() {
 
         val internalStorage = StubMediaWrapper(StubMedia(mockedLibVlc, Uri.fromFile(temporaryFolder.root).toString()).apply { type = IMedia.Type.Directory })
         browserProvider.parseSubDirectories(listOf(internalStorage))
-        Thread.sleep(500)
+        idleMainLooper()
         browserModel.saveList(internalStorage)
 
         initBrowserModel(internalStorage.uri.toString(), false)
