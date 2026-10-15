@@ -1,6 +1,5 @@
 package org.videolan.vlc.viewmodels.browser
 
-import android.os.Environment
 import android.os.Handler
 import com.jraska.livedata.test
 import io.mockk.coEvery
@@ -17,6 +16,7 @@ import org.videolan.libvlc.stubs.StubMedia
 import org.videolan.libvlc.util.MediaBrowser
 import org.videolan.medialibrary.interfaces.Medialibrary
 import org.videolan.medialibrary.stubs.StubMediaWrapper
+import org.videolan.resources.AndroidDevices
 import org.videolan.vlc.BaseTest
 import org.videolan.vlc.R
 import org.videolan.vlc.database.CustomDirectoryDao
@@ -88,6 +88,7 @@ class StorageModelTest : BaseTest() {
     }
 
     private fun addFileToProvider(i: Int, file: File) {
+        if (file.name.endsWith(".mp4")) return
         if (file.name.startsWith(".") && !showHiddenFiles)
             return
         val t = StubMedia(mockedLibVlc, "file://${file.path}").apply { if (!file.name.endsWith(".mp4")) type = IMedia.Type.Directory }
@@ -113,7 +114,7 @@ class StorageModelTest : BaseTest() {
     @Test
     fun whenAtRootAndTwoCustomDirectoriesWithOneChildOfInternalStorage_checkTwoResultsAreObtained() {
         val customDir = org.videolan.vlc.mediadb.models.CustomDirectory(temporaryFolder.newFile("custom1").path)
-        val newDirInsideInternalStorage = File("${Environment.getExternalStorageDirectory().path}/custom2")
+        val newDirInsideInternalStorage = File("${AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY}/custom2")
         newDirInsideInternalStorage.mkdir()
         val customDirInsideInternalStorage = org.videolan.vlc.mediadb.models.CustomDirectory(newDirInsideInternalStorage.path)
         coEvery { mockedDirectoryRepo.getCustomDirectories() } returns listOf(customDir, customDirInsideInternalStorage)

@@ -79,6 +79,7 @@ class NetworkModelTest : BaseTest() {
 
         liveFavorites.value = listOf(getFakeMediaWrapper(0).apply { setStateFlags(MediaLibraryItem.FLAG_FAVORITE) })
         initNetworkModel(null)
+        browserModel.refresh()
 
         val oldResult = browserModel.dataset.test()
                 .awaitValue()

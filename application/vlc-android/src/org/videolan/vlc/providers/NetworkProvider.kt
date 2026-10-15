@@ -36,8 +36,14 @@ import org.videolan.tools.NetworkMonitor
 import org.videolan.tools.Settings
 import org.videolan.tools.livedata.LiveDataset
 import org.videolan.vlc.R
+import org.videolan.vlc.repository.BrowserFavRepository
 
 class NetworkProvider(context: Context, dataset: LiveDataset<MediaLibraryItem>, url: String? = null, val mocked: ArrayList<MediaLibraryItem>? = null): BrowserProvider(context, dataset, url, Medialibrary.SORT_FILENAME, false), Observer<List<MediaWrapper>> {
+    private val favorites = BrowserFavRepository.getInstance(context).networkFavorites
+
+    init {
+        favorites.observeForever(this)
+    }
 
 
     override suspend fun browseRootImpl() {
@@ -103,6 +109,11 @@ class NetworkProvider(context: Context, dataset: LiveDataset<MediaLibraryItem>, 
             }
         }
         dataset.value = data.apply { getFavoritesList(favs)?.let { addAll(0, it) } }
+    }
+
+    override fun release() {
+        favorites.removeObserver(this)
+        super.release()
     }
 
     private fun getFavoritesList(favs: List<MediaWrapper>?): MutableList<MediaLibraryItem>? {

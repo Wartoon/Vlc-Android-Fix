@@ -21,6 +21,7 @@ class PlaylistsViewModelTest : BaseTest() {
 
     private fun createDummyPlaylists(count: Int) {
         (0 until count).map { mediaLibrary.createPlaylist("test$it", true, false) }
+        playlistsViewModel.refresh()
     }
 
     @Test

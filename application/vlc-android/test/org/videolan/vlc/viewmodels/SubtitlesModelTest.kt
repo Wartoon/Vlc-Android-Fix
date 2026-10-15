@@ -194,6 +194,7 @@ class SubtitlesModelTest : BaseTest() {
     @Test
     fun searchByHashAndNoResultHasFound_checkResultIsEmpty() {
         coEvery { mockedOpenSubRepo.queryWithHash(any(), any<List<String>>(), any()) } returns emptyOpenSubtitleResponse()
+        coEvery { mockedOpenSubRepo.queryWithName(any(), any(), any(), any<List<String>>(), any()) } returns emptyOpenSubtitleResponse()
 
         subtitlesModel.search(true)
 

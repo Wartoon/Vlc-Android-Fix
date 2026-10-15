@@ -36,6 +36,7 @@ class VideosViewModelTest : BaseTest() {
         setupViewModel(null)
 
         StubDataSource.getInstance().setVideoByCount(videoCount, null)
+        videosViewModel.refresh()
 
         val testResult = videosViewModel.provider.pagedList.test()
                 .awaitValue().value()
@@ -60,7 +61,9 @@ class VideosViewModelTest : BaseTest() {
         setupViewModel(StubDataSource.getInstance().createFolder("test"))
 
         StubDataSource.getInstance().setVideoByCount(videoCount, "test")
+        videosViewModel.refresh()
         StubDataSource.getInstance().setAudioByCount(audioCount, "test")
+        videosViewModel.refresh()
 
         val testResult = videosViewModel.provider.pagedList.test()
                 .awaitValue().value()
@@ -75,7 +78,9 @@ class VideosViewModelTest : BaseTest() {
         setupViewModel(StubDataSource.getInstance().createFolder("test"))
 
         StubDataSource.getInstance().setVideoByCount(videoCount, "test")
+        videosViewModel.refresh()
         StubDataSource.getInstance().setAudioByCount(audioCount, "test")
+        videosViewModel.refresh()
 
         videosViewModel.provider.pagedList.test()
                 .awaitValue()
@@ -88,6 +93,7 @@ class VideosViewModelTest : BaseTest() {
         val videoCount = MEDIALIBRARY_PAGE_SIZE * 3 + 1
         setupViewModel(null)
         StubDataSource.getInstance().setVideoByCount(videoCount, "test")
+        videosViewModel.refresh()
 
         val testResult = videosViewModel.provider.pagedList.test()
                 .awaitValue()
@@ -103,7 +109,9 @@ class VideosViewModelTest : BaseTest() {
         setupViewModel(StubDataSource.getInstance().createFolder("test"))
 
         StubDataSource.getInstance().setVideoByCount(videoCount, "test")
+        videosViewModel.refresh()
         StubDataSource.getInstance().setAudioByCount(audioCount, "test")
+        videosViewModel.refresh()
 
         val testResult = videosViewModel.provider.getAll()
 
@@ -153,6 +161,7 @@ class VideosViewModelTest : BaseTest() {
     fun whenFolderIsNullAndNotEmptyAndFilteredWithNonExistingVideo_checkResultIsEmpty() {
         setupViewModel(null)
         StubDataSource.getInstance().setVideoByCount(3, null)
+        videosViewModel.refresh()
 
         videosViewModel.provider.pagedList.test()
                 .awaitValue()
@@ -172,6 +181,7 @@ class VideosViewModelTest : BaseTest() {
     fun whenFolderIsGivenAndNotEmptyAndFilteredWithNonExistingVideo_checkResultIsEmpty() {
         setupViewModel(StubDataSource.getInstance().createFolder("test"))
         StubDataSource.getInstance().setVideoByCount(3, "test")
+        videosViewModel.refresh()
 
         videosViewModel.provider.pagedList.test()
                 .awaitValue()
@@ -191,6 +201,7 @@ class VideosViewModelTest : BaseTest() {
     fun whenFolderIsNullAndNotEmptyAndFilteredWithExistingVideoTitle_checkResultContainsThem() {
         setupViewModel(null)
         StubDataSource.getInstance().setVideoByCount(3, null)
+        videosViewModel.refresh()
 
         videosViewModel.provider.pagedList.test()
                 .awaitValue()
@@ -211,6 +222,7 @@ class VideosViewModelTest : BaseTest() {
     fun whenFolderIsGivenAndNotEmptyAndFilteredWithExistingVideoTitle_checkResultContainsThem() {
         setupViewModel(StubDataSource.getInstance().createFolder("test"))
         StubDataSource.getInstance().setVideoByCount(3, "test")
+        videosViewModel.refresh()
 
         videosViewModel.provider.pagedList.test()
                 .awaitValue()
@@ -231,6 +243,7 @@ class VideosViewModelTest : BaseTest() {
     fun whenFolderIsGivenAndNotEmptyButFilteredResultContainsNone_restoringViewModelResetsFilterAndShowsItemAgain() {
         setupViewModel(StubDataSource.getInstance().createFolder("test"))
         StubDataSource.getInstance().setVideoByCount(3, "test")
+        videosViewModel.refresh()
 
         videosViewModel.filter("unknown")
 
@@ -248,6 +261,7 @@ class VideosViewModelTest : BaseTest() {
     fun whenFilteredAndLaterRestored_isFilteringIsTrueLaterFalse() {
         setupViewModel(null)
         StubDataSource.getInstance().setVideoByCount(3, null)
+        videosViewModel.refresh()
 
         assertFalse(videosViewModel.isFiltering())
 
@@ -264,6 +278,7 @@ class VideosViewModelTest : BaseTest() {
     fun whenFolderIsNullAndItHasItems_checkHeaders() {
         setupViewModel(null)
         StubDataSource.getInstance().setVideoByCount(3, null)
+        videosViewModel.refresh()
 
         videosViewModel.provider.pagedList.test()
                 .awaitValue()

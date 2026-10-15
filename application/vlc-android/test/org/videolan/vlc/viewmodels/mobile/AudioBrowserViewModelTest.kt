@@ -21,7 +21,7 @@ class AudioBrowserViewModelTest : BaseTest() {
 
     private fun createDummyAudios(count: Int, title: String): List<Long> = (0 until count).map {
         StubDataSource.getInstance().addMediaWrapper("$title $it", MediaWrapper.TYPE_AUDIO).id
-    }
+    }.also { if (::audioBrowserViewModel.isInitialized) audioBrowserViewModel.refresh() }
 
     private fun waitForProvidersData() = audioBrowserViewModel.providers.map {
         it.pagedList.test().awaitValue()
@@ -55,6 +55,7 @@ class AudioBrowserViewModelTest : BaseTest() {
     fun whenThereAre5Tracks_checkResultIsNotEmpty() {
         setupViewModel()
         StubDataSource.getInstance().setAudioByCount(2, null)
+        audioBrowserViewModel.refresh()
         createDummyAudios(3, "XYZ")
 
         waitForProvidersData()
@@ -64,6 +65,7 @@ class AudioBrowserViewModelTest : BaseTest() {
     fun whenThereAre5Tracks_checkTracksAre5GenresAre5AlbumsAre5ArtistsAre5ForTotalCount() {
         setupViewModel()
         StubDataSource.getInstance().setAudioByCount(2, null) // AlbumArtist & Artist are same, so only one is added.
+        audioBrowserViewModel.refresh()
         createDummyAudios(3, "XYZ") // AlbumArtist & Artist are different, so both are added.
 
         waitForProvidersData()
@@ -81,6 +83,7 @@ class AudioBrowserViewModelTest : BaseTest() {
     fun whenThereAre5TracksWithShowAllTrue_checkTracksAre5GenresAre5AlbumsAre5ArtistsAre5ForTotalCount() {
         setupViewModel(showAll = true)
         StubDataSource.getInstance().setAudioByCount(2, null) // AlbumArtist & Artist are same, so only one is added.
+        audioBrowserViewModel.refresh()
         createDummyAudios(3, "XYZ") // AlbumArtist & Artist are different, so both are added.
 
         waitForProvidersData()
@@ -95,6 +98,7 @@ class AudioBrowserViewModelTest : BaseTest() {
     fun whenThereAre5TracksWithShowAllTrue_checkTracksAre5GenresAre5AlbumsAre5ArtistsAre5ForPagedData() {
         setupViewModel(showAll = true)
         StubDataSource.getInstance().setAudioByCount(2, null) // AlbumArtist & Artist are same, so only one is added.
+        audioBrowserViewModel.refresh()
         createDummyAudios(3, "XYZ") // AlbumArtist & Artist are different, so both are added.
 
         waitForProvidersData()
@@ -110,6 +114,7 @@ class AudioBrowserViewModelTest : BaseTest() {
         setupViewModel()
         val count = MEDIALIBRARY_PAGE_SIZE * 3 + 1
         StubDataSource.getInstance().setAudioByCount(count, null)
+        audioBrowserViewModel.refresh()
 
         assertEquals(count, audioBrowserViewModel.tracksProvider.getTotalCount())
         assertEquals(count, audioBrowserViewModel.genresProvider.getTotalCount())
@@ -122,6 +127,7 @@ class AudioBrowserViewModelTest : BaseTest() {
         setupViewModel()
         val count = MEDIALIBRARY_PAGE_SIZE * 3 + 1
         StubDataSource.getInstance().setAudioByCount(count, null)
+        audioBrowserViewModel.refresh()
 
         waitForProvidersData()
 
@@ -136,6 +142,7 @@ class AudioBrowserViewModelTest : BaseTest() {
         setupViewModel()
         val count = MEDIALIBRARY_PAGE_SIZE * 3 + 1
         StubDataSource.getInstance().setAudioByCount(count, null)
+        audioBrowserViewModel.refresh()
 
         assertNotNull(audioBrowserViewModel.tracksProvider.getAll()[count - 1])
         assertNotNull(audioBrowserViewModel.genresProvider.getAll()[count - 1])
@@ -147,6 +154,7 @@ class AudioBrowserViewModelTest : BaseTest() {
     fun whenThereAre5TracksWith3TracksHavingDifferentAlbumArtistAndArtistAndShowAllIsTrue_checkResultContainsEightArtists() {
         setupViewModel()
         StubDataSource.getInstance().setAudioByCount(2, null) // AlbumArtist & Artist are same, so only one is added.
+        audioBrowserViewModel.refresh()
         createDummyAudios(3, "XYZ") // AlbumArtist & Artist are different, so both are added.
 
         audioBrowserViewModel.artistsProvider.showAll = true
@@ -157,6 +165,7 @@ class AudioBrowserViewModelTest : BaseTest() {
     fun whenThereAre5TracksWith3TracksHavingDifferentAlbumArtistAndArtistAndShowAllIsFalse_checkResultContainsFiveArtists() {
         setupViewModel()
         StubDataSource.getInstance().setAudioByCount(2, null) // AlbumArtist & Artist are same, so only one is added.
+        audioBrowserViewModel.refresh()
         createDummyAudios(3, "XYZ") // AlbumArtist & Artist are different, so both are added.
 
         audioBrowserViewModel.artistsProvider.showAll = false
