@@ -136,10 +136,11 @@ class AudioBrowserViewModelTest : BaseTest() {
 
         waitForProvidersData()
 
-        assertNull(audioBrowserViewModel.tracksProvider.pagedList.test().value()[count - 1])
-        assertNull(audioBrowserViewModel.genresProvider.pagedList.test().value()[count - 1])
-        assertNull(audioBrowserViewModel.albumsProvider.pagedList.test().value()[count - 1])
-        assertNull(audioBrowserViewModel.artistsProvider.pagedList.test().value()[count - 1])
+        val tracks = audioBrowserViewModel.tracksProvider.pagedList.test().value()
+        assertTrue("The initial page must not contain all $count tracks", tracks.snapshot().size < count)
+        assertEquals(1, audioBrowserViewModel.genresProvider.pagedList.test().value().snapshot().size)
+        assertEquals(1, audioBrowserViewModel.albumsProvider.pagedList.test().value().snapshot().size)
+        assertEquals(1, audioBrowserViewModel.artistsProvider.pagedList.test().value().snapshot().size)
     }
 
     @Test

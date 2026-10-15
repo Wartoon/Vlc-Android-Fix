@@ -1,12 +1,14 @@
 package org.videolan.vlc.viewmodels.browser
 
 import android.net.Uri
+import android.os.Looper
 import com.jraska.livedata.test
 import io.mockk.every
 import io.mockk.mockk
 import junit.framework.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+import org.robolectric.Shadows
 import org.junit.rules.TemporaryFolder
 import org.videolan.libvlc.interfaces.ILibVLC
 import org.videolan.libvlc.interfaces.IMedia
@@ -36,6 +38,8 @@ class FilePickerModelTest : BaseTest() {
     private val countVideos = 2
     private val countDirs = 4
 
+    private fun idleMainLooper() = Shadows.shadowOf(Looper.getMainLooper()).idle()
+
     init {
         BrowserProvider.overrideCreator = true
         BrowserProvider.registerCreator {
@@ -63,6 +67,7 @@ class FilePickerModelTest : BaseTest() {
 
         browserModel = BrowserModel(application, dummyUrl, TYPE_PICKER, false, coroutineContextProvider = TestCoroutineContextProvider())
         browserProvider = browserModel.provider
+        idleMainLooper()
 
         setupTestFiles()
     }
@@ -94,6 +99,7 @@ class FilePickerModelTest : BaseTest() {
         temporaryFolder.root.listFiles()?.forEach { it.deleteRecursively() }
         val observer = browserModel.dataset.test()
         browserModel.refresh()
+        idleMainLooper()
         observer.awaitValue(3, TimeUnit.SECONDS)
                 .assertValue { it.isEmpty() }
     }
@@ -102,6 +108,7 @@ class FilePickerModelTest : BaseTest() {
     fun whenBrowseRootAndBrowseEndEventTriggered_ensureLoadingIsSetToFalse() {
         val observer = browserModel.loading.test()
         browserModel.refresh()
+        idleMainLooper()
         observer.awaitValue(3, TimeUnit.SECONDS)
                 .awaitValue(3, TimeUnit.SECONDS)
                 .awaitValue(3, TimeUnit.SECONDS)
@@ -118,6 +125,7 @@ class FilePickerModelTest : BaseTest() {
         assertEquals(countDirs, result.size)
 
         browserModel.refresh()
+        idleMainLooper()
 
         val newDirectory = temporaryFolder.newFile("dir${countDirs + 1}")
         addFileToProvider(countDirs, newDirectory)
