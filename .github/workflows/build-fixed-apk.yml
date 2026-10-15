@@ -110,9 +110,9 @@ jobs:
         shell: bash
         run: python3 buildsystem/verify-app-id-variants.py
 
-      - name: Run thumbnail cache and resolution policy tests
+      - name: Run VLC module and TV unit tests
         shell: bash
-        run: gradle :application:television:testDebugUnitTest --no-daemon
+        run: gradle :application:vlc-android:testDebugUnitTest :application:television:testDebugUnitTest --no-daemon
 
       - name: Restore permanent signing keystore
         shell: bash
