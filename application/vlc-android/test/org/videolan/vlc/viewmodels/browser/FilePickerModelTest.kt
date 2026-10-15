@@ -2,6 +2,8 @@ package org.videolan.vlc.viewmodels.browser
 
 import android.net.Uri
 import com.jraska.livedata.test
+import io.mockk.any
+import io.mockk.every
 import io.mockk.mockk
 import junit.framework.Assert.assertEquals
 import org.junit.Rule
@@ -38,9 +40,9 @@ class FilePickerModelTest : BaseTest() {
         BrowserProvider.overrideCreator = false
         BrowserProvider.registerCreator {
             mediaBrowser = mockk(relaxed = true)
-            every { mediaBrowser.changeEventListener(any()) } answers { eventListener = firstArg() }
+            every { mediaBrowser.changeEventListener(any()) } answers { eventListener = args[0] as EventListener }
             every { mediaBrowser.browse(any(), any()) } answers {
-                val root = File(firstArg<Uri>().path ?: "")
+                val root = File((args[0] as Uri).path ?: "")
                 root.listFiles()?.forEachIndexed { index, file ->
                     val media = StubMedia(mockedLibVlc, Uri.fromFile(file).toString()).apply {
                         if (file.isDirectory || !file.name.endsWith(".mp4")) type = IMedia.Type.Directory
