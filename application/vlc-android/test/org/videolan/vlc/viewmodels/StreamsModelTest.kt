@@ -2,6 +2,7 @@ package org.videolan.vlc.viewmodels
 
 import com.jraska.livedata.test
 import junit.framework.TestCase.assertEquals
+import junit.framework.TestCase.assertTrue
 import org.junit.Test
 import org.videolan.medialibrary.interfaces.Medialibrary
 import org.videolan.vlc.BaseTest
@@ -10,12 +11,11 @@ import org.videolan.vlc.util.TestUtil
 
 
 class StreamsModelTest : BaseTest() {
-    private val mediaLibrary: Medialibrary = Medialibrary.getInstance()
     private lateinit var streamsModel: StreamsModel
 
     override fun beforeTest() {
         super.beforeTest()
-        mediaLibrary.clearHistory(Medialibrary.HISTORY_TYPE_GLOBAL)
+        medialibrary.clearHistory(Medialibrary.HISTORY_TYPE_GLOBAL)
         streamsModel = StreamsModel(application, coroutineContextProvider = TestCoroutineContextProvider())
     }
 
@@ -28,9 +28,10 @@ class StreamsModelTest : BaseTest() {
                 .assertValue(Medialibrary.EMPTY_COLLECTION.toMutableList())
 
         fakeMediaStrings.forEach { location ->
-            mediaLibrary.addToHistory(location, location)
+            assertTrue(medialibrary.addToHistory(location, location))
         }
-        val result = mediaLibrary.history(Medialibrary.HISTORY_TYPE_NETWORK)
+        val result = medialibrary.history(Medialibrary.HISTORY_TYPE_NETWORK)
+        assertEquals(fakeMediaStrings.size, result.size)
 
         streamsModel.refresh()
         Thread.sleep(200)
@@ -52,9 +53,10 @@ class StreamsModelTest : BaseTest() {
         val fakeMediaStrings = TestUtil.createNetworkUris(2)
 
         fakeMediaStrings.forEach { location ->
-            mediaLibrary.addToHistory(location, location)
+            assertTrue(medialibrary.addToHistory(location, location))
         }
-        val result = mediaLibrary.history(Medialibrary.HISTORY_TYPE_NETWORK)
+        val result = medialibrary.history(Medialibrary.HISTORY_TYPE_NETWORK)
+        assertEquals(fakeMediaStrings.size, result.size)
         val oldMediaTitle = result[pos].title
         val media = result[pos]
 

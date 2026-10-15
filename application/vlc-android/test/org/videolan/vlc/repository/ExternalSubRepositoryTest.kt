@@ -132,7 +132,7 @@ class ExternalSubRepositoryTest {
 
         val fooSubtitles = getValue(externalSubRepository.getDownloadedSubtitles(foo.toUri()))
         val barSubtitles = getValue(externalSubRepository.getDownloadedSubtitles(bar.toUri()))
-        verify(externalSubDao, times(1)).get(anyString())
+        verify(externalSubDao, times(2)).get(anyString())
         assertThat(fooSubtitles.size, `is`(2))
         assertThat(barSubtitles.size, `is`(2))
 

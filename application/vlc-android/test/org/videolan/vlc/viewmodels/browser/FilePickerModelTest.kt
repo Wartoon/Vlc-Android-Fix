@@ -19,6 +19,7 @@ import org.videolan.vlc.providers.BrowserProvider
 import org.videolan.tools.CoroutineContextProvider
 import org.videolan.vlc.util.TestCoroutineContextProvider
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 class FilePickerModelTest : BaseTest() {
     @get:Rule
@@ -39,7 +40,7 @@ class FilePickerModelTest : BaseTest() {
         BrowserProvider.overrideCreator = false
         BrowserProvider.registerCreator {
             mediaBrowser = mockk(relaxed = true)
-            every { mediaBrowser.changeEventListener(any()) } answers { eventListener = args[0] as EventListener }
+            every { mediaBrowser.changeEventListener(any()) } answers { eventListener = args[0] as? EventListener }
             every { mediaBrowser.browse(any<Uri>(), any<Int>()) } answers {
                 val root = File((args[0] as Uri).path ?: "")
                 root.listFiles()?.forEachIndexed { index, file ->
@@ -90,17 +91,21 @@ class FilePickerModelTest : BaseTest() {
 
     @Test
     fun whenBrowseRootAndRootEmpty_checkTheFolderIsEmpty() {
-
-        browserModel.dataset.test()
-                .awaitValue()
+        temporaryFolder.root.listFiles()?.forEach { it.deleteRecursively() }
+        val observer = browserModel.dataset.test()
+        browserModel.refresh()
+        observer.awaitValue(3, TimeUnit.SECONDS)
+                .awaitValue(3, TimeUnit.SECONDS)
                 .assertValue { it.isEmpty() }
     }
 
     @Test
     fun whenBrowseRootAndBrowseEndEventTriggered_ensureLoadingIsSetToFalse() {
+        val observer = browserModel.loading.test()
         browserModel.refresh()
-        browserModel.loading.test()
-                .awaitValue()
+        observer.awaitValue(3, TimeUnit.SECONDS)
+                .awaitValue(3, TimeUnit.SECONDS)
+                .awaitValue(3, TimeUnit.SECONDS)
                 .assertValue(false)
     }
 
