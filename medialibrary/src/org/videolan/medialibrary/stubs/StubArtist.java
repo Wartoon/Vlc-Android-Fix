@@ -60,7 +60,7 @@ public class StubArtist extends Artist {
                 results.add(album);
             }
         }
-        return dt.sortAlbum(dt.secureSublist(results, offset, offset + nbItems), sort, desc);
+        return dt.sortAlbum(dt.secureSublist(results, offset, nbItems), sort, desc);
     }
 
     public int searchAlbumsCount(String query) {
@@ -97,7 +97,7 @@ public class StubArtist extends Artist {
                 results.add(media);
             }
         }
-        return dt.sortMedia(dt.secureSublist(results, offset, offset + nbItems), sort, desc);
+        return dt.sortMedia(dt.secureSublist(results, offset, nbItems), sort, desc);
     }
 
     public MediaWrapper[] getTracks(int sort, boolean desc, boolean includeMissing, boolean onlyFavorites) {
@@ -119,7 +119,7 @@ public class StubArtist extends Artist {
                 results.add(media);
             }
         }
-        return dt.sortMedia(dt.secureSublist(results, offset, offset + nbItems), sort, desc);
+        return dt.sortMedia(dt.secureSublist(results, offset, nbItems), sort, desc);
     }
 
     public int getTracksCount() {

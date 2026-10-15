@@ -35,7 +35,7 @@ public class StubGenre extends Genre {
 
     public Album[] getPagedAlbums(int sort, boolean desc, boolean includeMissing, boolean onlyFavorites, int nbItems, int offset) {
         ArrayList<Album> results = new ArrayList<>(Arrays.asList(getAlbums(sort, desc, includeMissing, onlyFavorites)));
-        return dt.secureSublist(results, offset, offset + nbItems).toArray(new Album[0]);
+        return dt.secureSublist(results, offset, nbItems).toArray(new Album[0]);
     }
 
     @Override
@@ -57,7 +57,7 @@ public class StubGenre extends Genre {
             }
         }
         results = new ArrayList<>(Arrays.asList(dt.sortAlbum(results, sort, desc)));
-        return dt.secureSublist(results, offset, offset + nbItems).toArray(new Album[0]);
+        return dt.secureSublist(results, offset, nbItems).toArray(new Album[0]);
     }
 
     public int searchAlbumsCount(String query) {
@@ -106,7 +106,7 @@ public class StubGenre extends Genre {
         for (MediaWrapper media : dt.mAudioMediaWrappers) {
             if (media.getGenre().equals(this.getTitle())) results.add(media);
         }
-        return dt.sortMedia(dt.secureSublist(results, offset, offset + nbItems), sort, desc);
+        return dt.sortMedia(dt.secureSublist(results, offset, nbItems), sort, desc);
     }
 
     public int getTracksCount() {
@@ -126,7 +126,7 @@ public class StubGenre extends Genre {
                 results.add(media);
             }
         }
-        return dt.sortMedia(dt.secureSublist(results, offset, offset + nbItems), sort, desc);
+        return dt.sortMedia(dt.secureSublist(results, offset, nbItems), sort, desc);
     }
 
     public int searchTracksCount(String query) {

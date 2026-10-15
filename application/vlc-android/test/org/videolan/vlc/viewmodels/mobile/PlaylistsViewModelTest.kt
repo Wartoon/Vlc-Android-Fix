@@ -3,6 +3,7 @@ package org.videolan.vlc.viewmodels.mobile
 import com.jraska.livedata.test
 import org.junit.Assert.*
 import org.junit.Test
+import kotlinx.coroutines.runBlocking
 import org.videolan.medialibrary.MLServiceLocator
 import org.videolan.medialibrary.interfaces.media.Playlist
 import org.videolan.medialibrary.stubs.StubDataSource
@@ -21,7 +22,7 @@ class PlaylistsViewModelTest : BaseTest() {
 
     private fun createDummyPlaylists(count: Int) {
         (0 until count).map { mediaLibrary.createPlaylist("test$it", true, false) }
-        playlistsViewModel.refresh()
+        runBlocking { playlistsViewModel.provider.awaitRefresh() }
     }
 
     @Test

@@ -40,7 +40,7 @@ public class StubFolder extends Folder {
             if (isParentFolder(this.mMrl, media.getUri().getPath())) results.add(media);
         }
         results = new ArrayList<>(Arrays.asList(dt.sortMedia(results, sort, desc)));
-        return dt.secureSublist(results, offset, offset + nbItems).toArray(new MediaWrapper[0]);
+        return dt.secureSublist(results, offset, nbItems).toArray(new MediaWrapper[0]);
     }
 
     public int mediaCount(int type) {
@@ -61,7 +61,7 @@ public class StubFolder extends Folder {
             if (isParentFolder(this.mMrl, folder.mMrl)) results.add(folder);
         }
         results = new ArrayList<>(Arrays.asList(dt.sortFolder(results, sort, desc)));
-        return dt.secureSublist(results, offset, offset + nbItems).toArray(new Folder[0]);
+        return dt.secureSublist(results, offset, nbItems).toArray(new Folder[0]);
     }
 
     public int subfoldersCount(int type) {
@@ -85,7 +85,7 @@ public class StubFolder extends Folder {
             }
         }
         results = new ArrayList<>(Arrays.asList(dt.sortMedia(results, sort, desc)));
-        return dt.secureSublist(results, offset, offset + nbItems).toArray(new MediaWrapper[0]);
+        return dt.secureSublist(results, offset, nbItems).toArray(new MediaWrapper[0]);
     }
 
     public int searchTracksCount(String query, int mediaType) {

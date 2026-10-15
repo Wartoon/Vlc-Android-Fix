@@ -38,7 +38,7 @@ public class StubPlaylist extends Playlist {
 
     public MediaWrapper[] getPagedTracks(int nbItems, int offset, boolean includeMissing, boolean onlyFavorites) {
         ArrayList<MediaWrapper> results = new ArrayList<>(Arrays.asList(getTracks()));
-        return dt.secureSublist(results, offset, offset + nbItems).toArray(new MediaWrapper[0]);
+        return dt.secureSublist(results, offset, nbItems).toArray(new MediaWrapper[0]);
     }
 
     public int getRealTracksCount(boolean includeMissing, boolean onlyFavorites) {
@@ -110,7 +110,7 @@ public class StubPlaylist extends Playlist {
                     Tools.hasSubString(media.getTitle(), query)) results.add(media);
         }
         results = new ArrayList<>(Arrays.asList(dt.sortMedia(results, sort, desc)));
-        return dt.secureSublist(results, offset, offset + nbItems).toArray(new MediaWrapper[0]);
+        return dt.secureSublist(results, offset, nbItems).toArray(new MediaWrapper[0]);
 
     }
 

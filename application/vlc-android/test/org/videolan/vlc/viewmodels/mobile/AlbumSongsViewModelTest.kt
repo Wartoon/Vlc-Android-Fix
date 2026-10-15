@@ -3,6 +3,7 @@ package org.videolan.vlc.viewmodels.mobile
 import com.jraska.livedata.test
 import org.junit.Assert.*
 import org.junit.Test
+import kotlinx.coroutines.runBlocking
 import org.videolan.medialibrary.MLServiceLocator
 import org.videolan.medialibrary.interfaces.media.MediaWrapper
 import org.videolan.medialibrary.media.MediaLibraryItem
@@ -33,8 +34,9 @@ class AlbumSongsViewModelTest : BaseTest() {
         dataSource.addMediaWrapper("$title $it", MediaWrapper.TYPE_AUDIO).id
     }
 
-    private fun waitForProvidersData() = albumSongsViewModel.providers.map {
-        it.pagedList.test().awaitValue()
+    private fun waitForProvidersData() {
+        runBlocking { albumSongsViewModel.providers.forEach { it.awaitRefresh() } }
+        albumSongsViewModel.providers.forEach { it.pagedList.test().awaitValue() }
     }
 
     @Test
@@ -141,7 +143,7 @@ class AlbumSongsViewModelTest : BaseTest() {
     @Test
     fun whenThereAreAlbumsWithArtistButFilteredWithNonExistingAlbum_checkAlbumResultIsEmpty() {
         createDummyAudios(3, "XYZ")
-        setupViewModel("CrazyArtists", true)
+        setupViewModel("Artisto", true)
 
         albumSongsViewModel.filter("unknown")
 
@@ -165,7 +167,7 @@ class AlbumSongsViewModelTest : BaseTest() {
     @Test
     fun whenThereAreAlbumsWithArtistAndFilteredWithExistingAlbum_checkAlbumResultIsNotEmpty() {
         createDummyAudios(3, "XYZ")
-        setupViewModel("CrazyArtists", true) // That's the name of Album Artist
+        setupViewModel("Artisto", true) // That's the name of Album Artist
 
         albumSongsViewModel.filter("CD1")
 
@@ -258,7 +260,7 @@ class AlbumSongsViewModelTest : BaseTest() {
     fun whenThereAreFourArtistTracksWithAlternatelyDifferentTitles_checkAlbumHeadersIsSortedByDate() {
         createDummyAudios(2, "test")
         createDummyAudios(2, "fake")
-        setupViewModel("CrazyArtists", true)
+        setupViewModel("Artisto", true)
 
         waitForProvidersData()
 
