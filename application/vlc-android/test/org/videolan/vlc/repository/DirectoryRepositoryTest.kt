@@ -86,7 +86,7 @@ class DirectoryRepositoryTest {
         assertThat(inserted.allValues.size, `is`(1))
         assertThat(inserted.allValues[0], `is`(fakeCustomDirectories[0]))
 
-        `when`(customDirectoryDao[fakeCustomDirectories[0].path]).thenReturn(fakeCustomDirectories)
+        `when`(customDirectoryDao.get(fakeCustomDirectories[0].path)).thenReturn(fakeCustomDirectories)
 
         val bool = directoryRepository.customDirectoryExists(fakeCustomDirectories[0].path)
         assertTrue(bool)
@@ -104,7 +104,7 @@ class DirectoryRepositoryTest {
         assertThat(inserted.allValues.size, `is`(1))
         assertThat(inserted.allValues[0], `is`(fakeCustomDirectories[0]))
 
-        `when`(customDirectoryDao[fakeCustomDirectories[0].path]).thenReturn(fakeCustomDirectories)
+        `when`(customDirectoryDao.get(fakeCustomDirectories[0].path)).thenReturn(fakeCustomDirectories)
 
         val bool = directoryRepository.customDirectoryExists(fakeCustomDirectories[0].path+"foo")
         assertFalse(bool)
