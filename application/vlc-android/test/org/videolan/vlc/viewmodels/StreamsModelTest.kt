@@ -29,7 +29,7 @@ class StreamsModelTest : BaseTest() {
 
         streamsModel.dataset.test()
                 .awaitValue()
-                .assertValue(emptyList<MediaWrapper>())
+                .assertValue(mutableListOf<MediaWrapper>())
 
         val expected = fakeMediaStrings.map { StubMediaWrapper(it.toUri()) }
         networkHistory = expected
