@@ -40,6 +40,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.videolan.medialibrary.interfaces.media.MediaWrapper
+import org.videolan.medialibrary.media.DummyItem
 import org.videolan.medialibrary.media.MediaLibraryItem
 import org.videolan.medialibrary.media.MediaWrapperImpl
 import org.videolan.resources.EXTRA_FOR_ESPRESSO
@@ -86,6 +87,14 @@ import org.videolan.vlc.viewmodels.browser.BrowserModel
 import org.videolan.vlc.viewmodels.browser.TYPE_FILE
 import org.videolan.vlc.viewmodels.browser.TYPE_NETWORK
 import org.videolan.vlc.viewmodels.browser.getBrowserModel
+
+/**
+ * The main Files page already has its own section title. The network provider's
+ * DummyItems belong to the full network browser, not its horizontal card row.
+ * Keep the underlying dataset untouched so the dedicated browser can group it.
+ */
+internal fun List<MediaLibraryItem>.withoutNetworkSectionHeaders(): List<MediaLibraryItem> =
+    filterNot { it is DummyItem }
 
 class MainBrowserFragment : BaseFragment(), View.OnClickListener, CtxActionReceiver {
 
@@ -278,7 +287,7 @@ class MainBrowserFragment : BaseFragment(), View.OnClickListener, CtxActionRecei
         containerAdapterAssociation[networkBrowserContainer] = Pair(networkAdapter, networkViewModel)
         networkViewModel.dataset.observe(viewLifecycleOwner) { list ->
             list?.let {
-                networkAdapter.update(it)
+                networkAdapter.update(it.withoutNetworkSectionHeaders())
                 updateNetworkEmptyView(networkEntry.loading)
                 if (networkViewModel.loading.value == false) networkEntry.loading.state = if (list.isEmpty()) EmptyLoadingState.EMPTY else EmptyLoadingState.NONE
             }
