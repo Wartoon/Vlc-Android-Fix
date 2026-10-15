@@ -1,5 +1,7 @@
 package org.videolan.vlc.viewmodels.mobile
 
+import androidx.lifecycle.Observer
+import androidx.paging.PagedList
 import com.jraska.livedata.test
 import org.junit.Assert.*
 import org.junit.Test
@@ -32,6 +34,20 @@ class PlaylistViewModelTest : BaseTest() {
     private fun setupViewModel(playlist: String, mediaIds: List<Long>? = null) {
         parent = medialibrary.createPlaylist(playlist, true, false).apply { if (mediaIds != null) append(mediaIds) }
         playlistViewModel = PlaylistViewModel(context, parent)
+    }
+
+    private fun awaitTracksCount(expectedCount: Int) {
+        val tracks = playlistViewModel.tracksProvider.pagedList
+        val latch = java.util.concurrent.CountDownLatch(1)
+        val observer = Observer<PagedList<MediaWrapper>> { value ->
+            if (value?.size == expectedCount) latch.countDown()
+        }
+        tracks.observeForever(observer)
+        try {
+            assertTrue("Timed out waiting for $expectedCount playlist tracks", latch.await(3, TimeUnit.SECONDS))
+        } finally {
+            tracks.removeObserver(observer)
+        }
     }
 
     @Test
@@ -159,14 +175,9 @@ class PlaylistViewModelTest : BaseTest() {
 
         assertTrue(playlistViewModel.isEmpty())
 
-        val playlistObserver = playlistViewModel.playlistLiveData.test()
-        playlistObserver.awaitValue(3, TimeUnit.SECONDS)
-
         parent.append(createDummyAudios(3, "test"))
         playlistViewModel.refresh()
-        playlistObserver.awaitValue(3, TimeUnit.SECONDS)
-
-        waitForProvidersData()
+        awaitTracksCount(3)
 
         assertFalse(playlistViewModel.isEmpty())
         assertEquals(3, playlistViewModel.tracksProvider.pagedList.test().value().size)

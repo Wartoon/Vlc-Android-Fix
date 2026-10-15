@@ -120,6 +120,7 @@ class FileBrowserModelTest : BaseTest() {
 
         val internalStorage = StubMediaWrapper(StubMedia(mockedLibVlc, Uri.fromFile(temporaryFolder.root).toString()).apply { type = IMedia.Type.Directory }).apply { type = MediaWrapper.TYPE_DIR }
         browserProvider.parseSubDirectories(listOf(internalStorage))
+        runBlocking { browserProvider.browseUrl(internalStorage.uri.toString()) }
 
         assertFalse(browserModel.isFolderEmpty(internalStorage))
     }
@@ -130,6 +131,7 @@ class FileBrowserModelTest : BaseTest() {
 
         val internalStorage = StubMediaWrapper(StubMedia(mockedLibVlc, Uri.fromFile(temporaryFolder.root).toString()).apply { type = IMedia.Type.Directory }).apply { type = MediaWrapper.TYPE_DIR }
         browserProvider.parseSubDirectories(listOf(internalStorage))
+        runBlocking { browserProvider.browseUrl(internalStorage.uri.toString()) }
         browserModel.saveList(internalStorage)
 
         initBrowserModel(internalStorage.uri.toString(), false)
