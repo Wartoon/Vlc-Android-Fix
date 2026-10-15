@@ -196,8 +196,15 @@ class PlaylistViewModelTest : BaseTest() {
         waitForProvidersData()
         assertTrue(playlistViewModel.isEmpty())
 
+        val pageObserver = playlistViewModel.tracksProvider.pagedList.test()
         playlistViewModel.restore()
-        waitForProvidersData()
+
+        var page = pageObserver.awaitValue(3, TimeUnit.SECONDS).value()
+        repeat(3) {
+            if (page.size == 2) return@repeat
+            page = pageObserver.awaitValue(3, TimeUnit.SECONDS).value()
+        }
+        assertEquals(2, page.size)
         assertFalse(playlistViewModel.isEmpty())
     }
 
