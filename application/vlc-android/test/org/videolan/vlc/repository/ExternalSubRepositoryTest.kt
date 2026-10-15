@@ -69,11 +69,11 @@ class ExternalSubRepositoryTest {
         val fakeBarSubtitles = TestUtil.createExternalSubsForMedia(bar, "bar", 2)
 
         fakeFooSubtitles.forEach {
-            externalSubRepository.saveDownloadedSubtitle(it.idSubtitle, it.subtitlePath, it.mediaPath, it.subLanguageID, it.movieReleaseName, it.hearingImpaired)
+            externalSubRepository.saveDownloadedSubtitle(it.idSubtitle, it.subtitlePath, it.mediaPath, it.subLanguageID, it.movieReleaseName, it.hearingImpaired).join()
         }
 
         fakeBarSubtitles.forEach {
-            externalSubRepository.saveDownloadedSubtitle(it.idSubtitle, it.subtitlePath, it.mediaPath, it.subLanguageID, it.movieReleaseName, it.hearingImpaired)
+            externalSubRepository.saveDownloadedSubtitle(it.idSubtitle, it.subtitlePath, it.mediaPath, it.subLanguageID, it.movieReleaseName, it.hearingImpaired).join()
         }
 
 
@@ -104,13 +104,13 @@ class ExternalSubRepositoryTest {
 
         val fakeFooSubtitles = (0 until 2).map {
             val file = temp.newFile("foo.$it.srt")
-            externalSubRepository.saveDownloadedSubtitle("1$it", file.path, foo, "en", "foo", false)
+            runBlocking { externalSubRepository.saveDownloadedSubtitle("1$it", file.path, foo, "en", "foo", false).join() }
             TestUtil.createExternalSub("1$it", file.path, foo, "en", "foo")
         }
 
         val fakeBarSubtitles = (0 until 2).map {
             val file = temp.newFile("bar.$it.srt")
-            externalSubRepository.saveDownloadedSubtitle("2$it", file.path, bar, "en", "bar", false)
+            runBlocking { externalSubRepository.saveDownloadedSubtitle("2$it", file.path, bar, "en", "bar", false).join() }
             TestUtil.createExternalSub("2$it", file.path, bar, "en", "bar")
         }
 
