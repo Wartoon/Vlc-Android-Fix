@@ -3,18 +3,17 @@ package org.videolan.vlc.gui.preferences
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.os.Build
-import androidx.sqlite.driver.bundled.BundledSQLite
-import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import org.videolan.medialibrary.interfaces.Medialibrary
 import java.io.File
 import java.io.IOException
+import java.lang.reflect.InvocationTargetException
 import java.util.zip.CRC32
 import java.util.zip.ZipFile
 
 /** A valid ZIP can still contain a library that silently lost its media sources. */
 internal class FullBackupLibraryReduced(message: String) : IOException(message)
 
-internal data class FullBackupLibrarySnapshot(
+data class FullBackupLibrarySnapshot(
     val media: Long,
     val folders: Long,
     val playlists: Long,
@@ -128,28 +127,16 @@ private fun readFullBackupDatabase(file: File, artwork: Long): FullBackupLibrary
 }
 
 private fun readWithBundledSqlite(file: File, artwork: Long): FullBackupLibrarySnapshot {
-    val db = try {
-        BundledSQLiteDriver().open(file.absolutePath, BundledSQLite.SQLITE_OPEN_READONLY)
+    return try {
+        val reader = Class.forName("org.videolan.vlc.gui.preferences.BundledBackupDatabaseReader")
+        reader.getMethod("read", File::class.java, java.lang.Long.TYPE)
+            .invoke(null, file, artwork) as FullBackupLibrarySnapshot
+    } catch (e: InvocationTargetException) {
+        throw IOException("Media library tables are not readable", e.targetException)
+    } catch (e: LinkageError) {
+        throw IOException("Bundled SQLite validator is unavailable", e)
     } catch (e: Exception) {
-        throw IOException("Media database cannot be opened", e)
-    }
-    try {
-        fun count(table: String): Long {
-            db.prepare("SELECT COUNT(*) FROM $table").use { statement ->
-                if (!statement.step()) throw IOException("Cannot count $table")
-                return statement.getLong(0)
-            }
-        }
-        val paths = HashSet<String>()
-        db.prepare("SELECT path FROM Folder WHERE path IS NOT NULL").use { statement ->
-            while (statement.step()) paths += statement.getText(0)
-        }
-        return FullBackupLibrarySnapshot(count("Media"), count("Folder"),
-            count("Playlist"), artwork, paths)
-    } catch (e: Exception) {
-        throw IOException("Media library tables are not readable", e)
-    } finally {
-        db.close()
+        throw IOException("Bundled SQLite validator is unavailable", e)
     }
 }
 
