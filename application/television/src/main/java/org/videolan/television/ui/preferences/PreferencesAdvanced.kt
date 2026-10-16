@@ -31,6 +31,7 @@ import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.system.Os
 import android.text.InputFilter
 import android.text.InputType
 import android.util.Log
@@ -368,7 +369,12 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
     }
 
     private fun fullBackupFile(): File =
-        File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY + "/VLC-Full-Backup.zip")
+        tvFullBackupFile(File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY))
+
+    // Keep an older root-level TV backup available for restore.
+    private fun backupFileForRestore(): File =
+        fullBackupFile().takeIf { it.isFile }
+            ?: File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY, "VLC-Full-Backup.zip")
 
     private fun createFullBackup() {
         val medialibrary = Medialibrary.getInstance()
@@ -380,6 +386,7 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
         launch {
             if (!(activity as FragmentActivity).getWritePermission(Uri.fromFile(dst))) return@launch
             val success = withContext(Dispatchers.IO) {
+                var staged: File? = null
                 try {
                     val context = activity
                     val dataRoot = context.getDir("db", Context.MODE_PRIVATE).parentFile
@@ -391,7 +398,12 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                     val artworkDir = external?.let { File(it, Medialibrary.MEDIALIB_FOLDER_NAME.removePrefix("/")) }
                     val subtitlesDir = external?.let { File(it, "subtitles") }
 
-                    ZipOutputStream(BufferedOutputStream(FileOutputStream(dst))).use { zip ->
+                    val outputDirectory = dst.parentFile ?: throw IOException("Backup directory missing")
+                    if (!outputDirectory.isDirectory && !outputDirectory.mkdirs())
+                        throw IOException("Cannot create TV backup directory")
+                    val temporary = File.createTempFile("vlc-tv-full-backup-", ".zip.tmp", outputDirectory)
+                    staged = temporary
+                    ZipOutputStream(BufferedOutputStream(FileOutputStream(temporary))).use { zip ->
                         val manifest = """{"format":1,"package":"${context.packageName}","vlc":"3.7.2 Beta 2"}"""
                         zip.putNextEntry(ZipEntry("manifest.json"))
                         zip.write(manifest.toByteArray(Charsets.UTF_8))
@@ -416,10 +428,13 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                         if (keyStoreDir.exists())
                             addDirectoryToBackup(zip, keyStoreDir, "keystore")
                     }
+                    Os.rename(temporary.absolutePath, dst.absolutePath)
                     true
                 } catch (e: Exception) {
                     Log.e("FullBackup", "Full backup failed", e)
                     false
+                } finally {
+                    staged?.delete()
                 }
             }
             if (success)
@@ -445,7 +460,7 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
     }
 
     private fun showFullRestoreSelection() {
-        val src = fullBackupFile()
+        val src = backupFileForRestore()
         if (!src.isFile) {
             Toast.makeText(activity, getString(R.string.full_restore_missing, src.name), Toast.LENGTH_LONG).show()
             return
@@ -488,7 +503,7 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
         restoreSubtitles: Boolean,
         restoreCredentials: Boolean
     ) {
-        val src = fullBackupFile()
+        val src = backupFileForRestore()
         if (Medialibrary.getInstance().isWorking) {
             UiTools.snacker(activity, getString(R.string.settings_ml_block_scan))
             return
