@@ -53,7 +53,10 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          s = Path('application/vlc-android/src/org/videolan/vlc/gui/preferences/PreferencesAdvanced.kt').read_text()
+          # Restore guards remain in PreferencesAdvanced; the shared writer and
+          # format-2 manifest were intentionally moved into FullBackupEngine.
+          s = (Path('application/vlc-android/src/org/videolan/vlc/gui/preferences/PreferencesAdvanced.kt').read_text()
+               + '\n' + Path('application/vlc-android/src/org/videolan/vlc/gui/preferences/FullBackupEngine.kt').read_text())
           xml = Path('application/vlc-android/res/xml/preferences_adv.xml').read_text()
           required = [
               'replaceDirectoryContentsSafely(File(staging, "medialibrary/db"), mediaDbDir)',
@@ -88,7 +91,7 @@ jobs:
           ]
           for needle in forbidden:
               if needle in s: raise SystemExit(f'forbidden legacy/destructive restore code remains: {needle}')
-          for key in ('android:key="full_backup"', 'android:key="full_restore"'):
+          for key in ('android:key="full_backup"', 'android:key="full_restore"', 'android:key="vlc_auto_full_backup_enabled"'):
               if key not in xml: raise SystemExit(f'missing complete backup UI: {key}')
           for key in ('dump_media_db', 'restore_media_db', 'restore_app_db', 'dump_app_db', 'export_settings', 'restore_settings'):
               if f'android:key="{key}"' in xml: raise SystemExit(f'legacy backup UI remains: {key}')
