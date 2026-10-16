@@ -29,6 +29,24 @@ class PlaylistViewModelTest : BaseTest() {
         playlistViewModel.providers.forEach { it.pagedList.test().awaitValue() }
     }
 
+    /**
+     * PlaylistViewModel.refresh() launches on viewModelScope and the paged
+     * provider invalidates asynchronously. Waiting for any LiveData value can
+     * return the OLD snapshot; verify the requested dataset instead.
+     */
+    private fun awaitTrackCount(expected: Int) {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+        var count = -1
+        do {
+            waitForProvidersData()
+            count = playlistViewModel.tracksProvider.pagedList.test().value().size
+            if (count == expected && playlistViewModel.isEmpty() == (expected == 0)) return
+            Thread.sleep(20)
+        } while (System.nanoTime() < deadline)
+        assertEquals("Playlist provider did not refresh to expected track count", expected, count)
+        assertEquals(expected == 0, playlistViewModel.isEmpty())
+    }
+
     private fun setupViewModel(playlist: String, mediaIds: List<Long>? = null) {
         parent = medialibrary.createPlaylist(playlist, true, false).apply { if (mediaIds != null) append(mediaIds) }
         playlistViewModel = PlaylistViewModel(context, parent)
@@ -164,9 +182,7 @@ class PlaylistViewModelTest : BaseTest() {
 
         parent.append(createDummyAudios(3, "test"))
         playlistViewModel.refresh()
-        playlistObserver.awaitValue(3, TimeUnit.SECONDS)
-
-        waitForProvidersData()
+        awaitTrackCount(3)
 
         assertFalse(playlistViewModel.isEmpty())
         assertEquals(3, playlistViewModel.tracksProvider.pagedList.test().value().size)
@@ -195,11 +211,11 @@ class PlaylistViewModelTest : BaseTest() {
 
         playlistViewModel.filter("unknown")
 
-        waitForProvidersData()
+        awaitTrackCount(0)
         assertTrue(playlistViewModel.isEmpty())
 
         playlistViewModel.restore()
-        waitForProvidersData()
+        awaitTrackCount(2)
         assertEquals(2, playlistViewModel.tracksProvider.pagedList.test().value().size)
         assertFalse(playlistViewModel.isEmpty())
     }
