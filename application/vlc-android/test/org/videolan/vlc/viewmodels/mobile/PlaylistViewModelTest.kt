@@ -206,11 +206,11 @@ class PlaylistViewModelTest : BaseTest() {
 
         playlistViewModel.filter("unknown")
 
-        waitForProvidersData()
+        awaitTracksCount(0)
         assertTrue(playlistViewModel.isEmpty())
 
         playlistViewModel.restore()
-        waitForProvidersData()
+        awaitTracksCount(2)
         assertEquals(2, playlistViewModel.tracksProvider.pagedList.test().value().size)
         assertFalse(playlistViewModel.isEmpty())
     }
