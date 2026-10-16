@@ -22,6 +22,13 @@ class AutoFullBackupTest {
         assertTrue(fullBackupIsDue(true, lastSuccessfulBackup, lastSuccessfulBackup + day))
     }
 
+    @Test fun onDemandBackupBypassesDisabledToggleAndDailyInterval() {
+        assertTrue(shouldRunFullBackup(true, false))
+        assertTrue(shouldRunFullBackup(true, true))
+        assertFalse(shouldRunFullBackup(false, false))
+        assertTrue(shouldRunFullBackup(false, true))
+    }
+
     @Test fun aClockSetBackwardsDoesNotTriggerRepeatedBackups() {
         assertFalse(fullBackupIsDue(true, 50000L, 49999L))
     }

@@ -310,7 +310,7 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                 return true
             }
             "full_backup" -> {
-                createFullBackup()
+                requestFullBackupNow()
                 return true
             }
             "full_restore" -> {
@@ -440,31 +440,17 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
         fullBackupFile().takeIf { it.isFile }
             ?: File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY, "VLC-Full-Backup.zip")
 
-    private fun createFullBackup() {
-        if (Medialibrary.getInstance().isWorking) {
-            UiTools.snacker(requireActivity(), getString(R.string.settings_ml_block_scan))
-            return
-        }
-        val dst = fullBackupFile()
+    private fun requestFullBackupNow() {
+        val destination = fullBackupFile()
         lifecycleScope.launch {
-            if (!getWritePermission(Uri.fromFile(dst))) return@launch
-            val success = try {
-                FullBackupEngine.create(requireContext(), automatic = false)
-                true
+            if (!getWritePermission(Uri.fromFile(destination))) return@launch
+            try {
+                AutoFullBackup.requestNow(requireContext())
+                Toast.makeText(requireContext(), R.string.full_backup_now_queued, Toast.LENGTH_LONG).show()
             } catch (e: Exception) {
-                Log.e("FullBackup", "Manual backup failed", e)
-                false
+                Log.e("FullBackup", "Could not enqueue requested backup", e)
+                Toast.makeText(requireContext(), R.string.full_backup_failure, Toast.LENGTH_LONG).show()
             }
-            if (success) {
-                UiTools.snackerConfirm(requireActivity(), getString(R.string.full_backup_success),
-                    confirmMessage = R.string.share, overAudioPlayer = false) {
-                    requireActivity().share(dst)
-                }
-            } else {
-                Toast.makeText(requireContext(), getString(R.string.full_backup_failure),
-                    Toast.LENGTH_LONG).show()
-            }
-            updateAutoBackupSummary()
         }
     }
 
