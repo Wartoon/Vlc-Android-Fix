@@ -77,6 +77,29 @@ internal fun verifyAndReplaceFullBackup(staged: File, destination: File) {
 }
 
 /**
+ * Stage the old TV backup from shared-storage root in the canonical folder.
+ * Keep the root copy until a new full backup has been fully verified and installed.
+ * Invalid legacy files remain available as a fallback and do not block a fresh backup.
+ */
+internal fun stageLegacyTvBackup(storageRoot: File): File? {
+    val legacy = File(storageRoot, "VLC-Full-Backup.zip")
+    if (!legacy.isFile) return null
+    val destination = tvFullBackupFile(storageRoot)
+    if (destination.exists()) return legacy
+
+    val staged = createFullBackupStagingFile(destination)
+    try {
+        Files.copy(legacy.toPath(), staged.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        verifyAndReplaceFullBackup(staged, destination)
+    } catch (_: IOException) {
+        android.util.Log.w("FullBackup", "Could not stage the legacy TV backup; preserving it")
+    } finally {
+        if (staged.exists()) staged.delete()
+    }
+    return legacy
+}
+
+/**
  * Three generations in total: primary ZIP and two historical ZIPs.
  * Save an independent copy of the previous primary before replacing it.
  * Both manual and automatic backups use this same rotation.
