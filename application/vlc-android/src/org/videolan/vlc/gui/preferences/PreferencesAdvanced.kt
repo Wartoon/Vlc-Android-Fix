@@ -116,6 +116,22 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import java.util.zip.ZipEntry
 
+/**
+ * Each VLC Dual application owns one directory under shared internal storage.
+ * The device-storage root is injected so directory selection can be tested
+ * without creating files in the real phone storage.
+ */
+internal fun dualBackupFile(storageRoot: File, packageName: String): File {
+    val (folder, name) = when (packageName) {
+        "org.videolan.vlc.internalstorage" ->
+            "VLC Internal Storage App Backup" to "VLC Complete Backup - Internal Storage.zip"
+        "org.videolan.vlc.smb" ->
+            "VLC SMB App Backup" to "VLC Complete Backup - SMB.zip"
+        else -> throw IllegalStateException("Unsupported VLC Dual package")
+    }
+    return File(File(File(storageRoot, "VLC"), folder), name)
+}
+
 private const val FILE_PICKER_RESULT_CODE = 10000
 private const val RESULT_VALUE_CLEAR_HISTORY = 1
 private const val RESULT_VALUE_CLEAR_MEDIA_DATABASE = 2
@@ -350,14 +366,8 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
         else -> null
     }
 
-    private fun fullBackupFile(): File {
-        val name = when (dualVariantForPackage(requireContext().packageName)) {
-            "internal" -> "VLC Complete Backup - Internal Storage.zip"
-            "smb" -> "VLC Complete Backup - SMB.zip"
-            else -> throw IllegalStateException("Unsupported VLC Dual package")
-        }
-        return File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY + "/" + name)
-    }
+    private fun fullBackupFile(): File =
+        dualBackupFile(File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY), requireContext().packageName)
 
     private fun createFullBackup() {
         val medialibrary = Medialibrary.getInstance()
@@ -373,6 +383,11 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
             val success = withContext(Dispatchers.IO) {
                 try {
                     val context = requireContext()
+                    // Android shared-storage folders must exist before writing the ZIP.
+                    // Leave existing backups (including legacy root backups) untouched.
+                    val backupDir = dst.parentFile ?: throw IOException("Backup directory unavailable")
+                    if (!backupDir.isDirectory && !backupDir.mkdirs())
+                        throw IOException("Cannot create backup directory: $backupDir")
                     val dataRoot = context.getDir("db", Context.MODE_PRIVATE).parentFile
                         ?: return@withContext false
                     val mediaDbDir = context.getDir("db", Context.MODE_PRIVATE)
