@@ -1,9 +1,12 @@
 package org.videolan.vlc.gui.preferences
 
+import android.os.Build
 import android.system.Os
 import java.io.File
 import java.io.IOException
 import java.io.RandomAccessFile
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.zip.CRC32
 import java.util.zip.ZipFile
 
@@ -57,11 +60,17 @@ internal fun verifyAndReplaceFullBackup(staged: File, destination: File) {
     // Ensure the fully-written archive reaches storage before replacing the old copy.
     RandomAccessFile(staged, "rw").use { it.fd.sync() }
     try {
-        // Android's rename(2) replaces the old destination in one operation.
-        Os.rename(staged.absolutePath, destination.absolutePath)
-        // Real rename(2) removes the source path. Some Android test
-        // environments emulate replacement by copying; clean up in both cases.
-        if (staged.exists()) staged.delete()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // An atomic same-directory move replaces the existing ZIP only once
+            // its replacement has been completely checked. Also works in JVM tests.
+            Files.move(
+                staged.toPath(), destination.toPath(),
+                StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING
+            )
+        } else {
+            // java.nio.file is unavailable below API 26.
+            Os.rename(staged.absolutePath, destination.absolutePath)
+        }
     } catch (e: Exception) {
         throw IOException("Could not safely replace previous full backup", e)
     }
