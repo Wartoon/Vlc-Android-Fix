@@ -29,6 +29,7 @@ private const val LAST_AUTO_FULL_BACKUP_SUCCESS = "vlc_last_auto_full_backup_suc
 private const val LAST_AUTO_FULL_BACKUP_ERROR = "vlc_last_auto_full_backup_error"
 private const val DAY_MILLIS = 24L * 60 * 60 * 1000
 internal const val FORCE_FULL_BACKUP_NOW = "vlc_force_full_backup_now"
+internal const val ACCEPT_REDUCED_LIBRARY = "vlc_accept_reduced_library"
 
 /** Pure scheduling decision; successful manual backups reset the same 24h clock. */
 internal fun fullBackupIsDue(enabled: Boolean, lastSuccess: Long, now: Long): Boolean =
@@ -85,14 +86,15 @@ object AutoFullBackup {
     }
 
     /** Same WorkManager worker as the daily backup, but on-demand even if disabled. */
-    fun requestNow(context: Context) {
+    fun requestNow(context: Context, acceptReducedLibrary: Boolean = false) {
         val request = OneTimeWorkRequestBuilder<AutoFullBackupWorker>()
-            .setInputData(workDataOf(FORCE_FULL_BACKUP_NOW to true))
+            .setInputData(workDataOf(FORCE_FULL_BACKUP_NOW to true,
+                ACCEPT_REDUCED_LIBRARY to acceptReducedLibrary))
             .setConstraints(conditions())
             .setBackoffCriteria(androidx.work.BackoffPolicy.EXPONENTIAL, 30, TimeUnit.MINUTES)
             .build()
         WorkManager.getInstance(context.applicationContext)
-            .enqueueUniqueWork(USER_REQUEST, ExistingWorkPolicy.KEEP, request)
+            .enqueueUniqueWork(USER_REQUEST, ExistingWorkPolicy.REPLACE, request)
     }
 
     fun deferAfterRestore(context: Context) {
@@ -149,9 +151,13 @@ class AutoFullBackupWorker(context: Context, params: WorkerParameters) : Corouti
         val forced = inputData.getBoolean(FORCE_FULL_BACKUP_NOW, false)
         if (!shouldRunFullBackup(forced, AutoFullBackup.isDue(app))) return Result.success()
         return try {
-            FullBackupEngine.create(app, automatic = true, force = forced)
+            FullBackupEngine.create(app, automatic = true, force = forced,
+                allowReduction = forced && inputData.getBoolean(ACCEPT_REDUCED_LIBRARY, false))
             AutoFullBackup.automaticBackupSucceeded(app)
             Result.success()
+        } catch (e: FullBackupLibraryReduced) {
+            AutoFullBackup.automaticBackupFailed(app, e)
+            Result.failure()
         } catch (_: FullBackupDeferred) {
             // Playback, scanning, a concurrent manual backup, or a recent
             // successful backup are not failures. WorkManager retries later.
