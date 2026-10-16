@@ -1410,6 +1410,9 @@
     <string name="full_backup_now">Start automatic backup now</string>
     <string name="full_backup_now_summary">Create a complete backup using the automatic backup worker, regardless of the daily schedule. Runs when device conditions allow.</string>
     <string name="full_backup_now_queued">Full backup requested. It will run when conditions allow.</string>
+    <string name="full_backup_reduction_title">Backup contains fewer library items</string>
+    <string name="full_backup_reduction_details">The current library has fewer items or missing media folders than the last backup. Existing backup is protected. Replace it with the reduced library?\n\n%1$s</string>
+    <string name="full_backup_reduction_accept">Replace protected backup</string>
     <string name="full_backup">Back up complete app</string>
     <string name="full_backup_summary">Back up media library, playback data, app database, settings, artwork, thumbnails and app-managed subtitles to one ZIP file</string>
     <string name="full_restore">Restore complete app</string>
