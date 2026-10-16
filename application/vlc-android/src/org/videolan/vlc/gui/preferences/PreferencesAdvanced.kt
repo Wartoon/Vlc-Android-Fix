@@ -432,7 +432,12 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
     }
 
     private fun fullBackupFile(): File =
-        File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY + "/VLC-Full-Backup.zip")
+        tvFullBackupFile(File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY))
+
+    // Keep the pre-folder TV backup restorable without migrating or deleting it.
+    private fun backupFileForRestore(): File =
+        fullBackupFile().takeIf { it.isFile }
+            ?: File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY, "VLC-Full-Backup.zip")
 
     private fun createFullBackup() {
         val medialibrary = Medialibrary.getInstance()
@@ -446,6 +451,7 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
             // Capture the live player on Main; ZIP creation runs off-thread.
             val playbackState = PlaybackStateBackup.capture(requireContext())
             val success = withContext(Dispatchers.IO) {
+                var stagedBackup: File? = null
                 try {
                     val context = requireContext()
                     val dataRoot = context.getDir("db", Context.MODE_PRIVATE).parentFile
@@ -457,7 +463,9 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                     val artworkDir = external?.let { File(it, Medialibrary.MEDIALIB_FOLDER_NAME.removePrefix("/")) }
                     val subtitlesDir = external?.let { File(it, "subtitles") }
 
-                    ZipOutputStream(BufferedOutputStream(FileOutputStream(dst))).use { zip ->
+                    val staged = createFullBackupStagingFile(dst)
+                    stagedBackup = staged
+                    ZipOutputStream(BufferedOutputStream(FileOutputStream(staged))).use { zip ->
                         val manifest = """{"format":1,"package":"${context.packageName}","vlc":"3.7.2 Beta 2"}"""
                         zip.putNextEntry(ZipEntry("manifest.json"))
                         zip.write(manifest.toByteArray(Charsets.UTF_8))
@@ -486,10 +494,13 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                         if (keyStoreDir.exists())
                             addDirectoryToBackup(zip, keyStoreDir, "keystore")
                     }
+                    verifyAndReplaceFullBackup(staged, dst)
                     true
                 } catch (e: Exception) {
                     Log.e("FullBackup", "Full backup failed", e)
                     false
+                } finally {
+                    stagedBackup?.delete()
                 }
             }
             if (success)
@@ -517,7 +528,7 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
     }
 
     private fun showFullRestoreSelection() {
-        val src = fullBackupFile()
+        val src = backupFileForRestore()
         if (!src.isFile) {
             Toast.makeText(requireContext(), getString(R.string.full_restore_missing, src.name), Toast.LENGTH_LONG).show()
             return
@@ -560,7 +571,7 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
         restoreSubtitles: Boolean,
         restoreCredentials: Boolean
     ) {
-        val src = fullBackupFile()
+        val src = backupFileForRestore()
         if (Medialibrary.getInstance().isWorking) {
             UiTools.snacker(requireActivity(), getString(R.string.settings_ml_block_scan))
             return
