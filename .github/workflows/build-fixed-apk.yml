@@ -124,7 +124,7 @@ jobs:
 
       - name: Run VLC and TV unit tests
         shell: bash
-        run: gradle :application:vlc-android:testDebugUnitTest :application:television:testDebugUnitTest :application:app:testDebugUnitTest --no-daemon
+        run: gradle :application:vlc-android:testDebugUnitTest :application:television:testDebugUnitTest :application:app:testDebugUnitTest --no-daemon --stacktrace
 
       - name: Restore permanent signing keystore
         shell: bash
