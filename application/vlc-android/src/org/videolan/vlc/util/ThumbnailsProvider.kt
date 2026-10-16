@@ -25,6 +25,8 @@ import org.videolan.medialibrary.interfaces.media.VideoGroup
 import org.videolan.medialibrary.media.MediaLibraryItem
 import org.videolan.resources.AppContextProvider
 import org.videolan.tools.BitmapCache
+import org.videolan.tools.Settings
+import org.videolan.vlc.R
 import org.videolan.tools.sanitizePath
 import org.videolan.vlc.BuildConfig
 import org.videolan.vlc.gui.helpers.AudioUtil.readCoverBitmap
@@ -54,6 +56,16 @@ object ThumbnailCachePolicy {
 
     fun needsResolutionUpgrade(width: Int, height: Int, targetSize: Int) =
         targetSize > 0 && maxOf(width, height) < targetSize
+
+    fun needsResolutionReduction(width: Int, height: Int, targetSize: Int) =
+        targetSize > 0 && maxOf(width, height) > targetSize
+
+    fun needsResolutionAdjustment(width: Int, height: Int, targetSize: Int) =
+        needsResolutionUpgrade(width, height, targetSize) ||
+                needsResolutionReduction(width, height, targetSize)
+
+    fun refreshTargetWidth(isTv: Boolean, mobileWidthPx: Int, tvWidthPx: Int) =
+        if (isTv) tvWidthPx else mobileWidthPx
 }
 
 object ThumbnailsProvider {
@@ -69,6 +81,15 @@ object ThumbnailsProvider {
     // One extra frame-selection attempt per dark local video, bounded in memory and work.
     private val checkedDarkVideos = LinkedHashSet<String>()
     private const val MAX_DARK_CHECKS = 256
+
+    private fun defaultRefreshWidth(): Int {
+        val resources = AppContextProvider.appContext.resources
+        return ThumbnailCachePolicy.refreshTargetWidth(
+            Settings.showTvUi,
+            resources.getDimensionPixelSize(R.dimen.audio_browser_item_size),
+            resources.getDimensionPixelSize(R.dimen.tv_grid_card_thumb_width)
+        )
+    }
 
     private data class FrameQuality(val dark: Float, val colored: Float) {
         // Colorful scene content is preferable to black fades and white intro text.
@@ -105,7 +126,7 @@ object ThumbnailsProvider {
      * shorter clips start after 25% of their runtime instead.
      * Automatic requests only inspect extra frames if the original looks poor.
      */
-    private fun betterLocalVideoFrame(media: MediaWrapper, original: Bitmap?, manual: Boolean = false): Bitmap? {
+    private fun betterLocalVideoFrame(media: MediaWrapper, original: Bitmap?, manual: Boolean = false, targetSize: Int = 384): Bitmap? {
         if (!media.uri.scheme.isSchemeFile() || Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1)
             return null
         val initialQuality = original?.let(::frameQuality)
@@ -123,9 +144,10 @@ object ThumbnailsProvider {
                 ?: return null
             if (durationMs <= 0L) return null
             val earliestMs = minOf(300_000L, durationMs / 4).coerceAtLeast(1L)
-            val referenceWidth = original?.width ?: 320
-            val referenceHeight = original?.height ?: 180
-            val scale = minOf(1f, 384f / maxOf(referenceWidth, referenceHeight))
+            val requestedSize = targetSize.coerceIn(1, 1024)
+            val referenceWidth = original?.width ?: if (manual) requestedSize else 320
+            val referenceHeight = original?.height ?: if (manual) requestedSize * 9 / 16 else 180
+            val scale = minOf(1f, requestedSize.toFloat() / maxOf(referenceWidth, referenceHeight))
             val targetWidth = (referenceWidth * scale).toInt().coerceAtLeast(1)
             val targetHeight = (referenceHeight * scale).toInt().coerceAtLeast(1)
             var best: Bitmap? = null
@@ -197,8 +219,8 @@ object ThumbnailsProvider {
      * subfolders), group or playlist, without replacing good thumbnails.
      * Paged queries and coroutine cancellation keep the work manageable.
      */
-    suspend fun refreshSelectedThumbnails(item: MediaLibraryItem, width: Int = 320): ThumbnailRefreshResult {
-        val requestedWidth = width.coerceIn(96, 512)
+    suspend fun refreshSelectedThumbnails(item: MediaLibraryItem, width: Int = defaultRefreshWidth()): ThumbnailRefreshResult {
+        val requestedWidth = width.coerceIn(1, 1024)
         var scanned = 0
         var replaced = 0
         var requested = 0
@@ -281,8 +303,8 @@ object ThumbnailsProvider {
         return ThumbnailRefreshResult(scanned, replaced, requested)
     }
 
-    suspend fun refreshSelectedThumbnails(mediaItems: List<MediaWrapper>, width: Int = 320): ThumbnailRefreshResult {
-        val requestedWidth = width.coerceIn(96, 512)
+    suspend fun refreshSelectedThumbnails(mediaItems: List<MediaWrapper>, width: Int = defaultRefreshWidth()): ThumbnailRefreshResult {
+        val requestedWidth = width.coerceIn(1, 1024)
         var scanned = 0
         var replaced = 0
         var requested = 0
@@ -332,16 +354,22 @@ object ThumbnailsProvider {
         }
         val existing = localArtworkForInspection(media, width)
         val existingQuality = existing?.let(::frameQuality)
-        if (onlyBad && existingQuality != null && !existingQuality.likelyIntroOrBlank)
+        val needsResolutionAdjustment = existing?.let {
+            ThumbnailCachePolicy.needsResolutionAdjustment(it.width, it.height, width)
+        } == true
+        if (onlyBad && existingQuality != null && !existingQuality.likelyIntroOrBlank && !needsResolutionAdjustment)
             return ThumbnailRefreshChange.UNCHANGED
 
         if (media.uri.scheme.isSchemeFile()) {
-            val selected = betterLocalVideoFrame(media, existing, manual = true)
+            val selected = betterLocalVideoFrame(media, existing, manual = true, targetSize = width)
                 ?: return ThumbnailRefreshChange.UNCHANGED
             val selectedQuality = frameQuality(selected)
             // Preserve genuinely better existing frames and do not install blank replacements.
             if (existingQuality != null &&
-                selectedQuality.score < existingQuality.score + if (onlyBad) 0.06f else -0.04f)
+                selectedQuality.score < existingQuality.score + if (onlyBad && !needsResolutionAdjustment) 0.06f else -0.04f)
+                return ThumbnailRefreshChange.UNCHANGED
+            val existingMaxDimension = existing?.let { maxOf(it.width, it.height) } ?: 0
+            if (needsResolutionAdjustment && maxOf(selected.width, selected.height) == existingMaxDimension)
                 return ThumbnailRefreshChange.UNCHANGED
             val oldKey = getMediaThumbnailPath(true, media)
             if (media.id > 0L) {
