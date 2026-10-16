@@ -160,19 +160,39 @@ private fun inspectFullBackupLibrary(
         }
         if (!entries.containsAll(required))
             throw IOException("Required backup entries missing")
-        val mediaDb = zip.getEntry("medialibrary/db/vlc_media.db")
+        val dbName = Medialibrary.VLC_MEDIA_DB_NAME.removePrefix("/")
+        val dbEntryName = "medialibrary/db/$dbName"
+        val mediaDb = zip.getEntry(dbEntryName)
             ?: throw IOException("Media database not found in backup")
-        if (mediaDb.size <= 0L || mediaDb.size > 256L * 1024 * 1024)
+        if (mediaDb.isDirectory || mediaDb.size <= 0L || mediaDb.size > 256L * 1024 * 1024)
             throw IOException("Media database has invalid size")
-        val extracted = File.createTempFile("vlc-backup-check-", ".db", verificationDirectory)
+
+        // A live SQLite database may have committed rows only in its WAL. Reading
+        // the extracted main .db alone silently reports a stale media count and
+        // can approve an incomplete replacement. Read the archived WAL as well.
+        // The -shm file is transient and SQLite recreates it in this private,
+        // writable directory rather than trusting a copied live shared-memory file.
+        val scratch = File.createTempFile("vlc-backup-check-", ".dir", verificationDirectory)
+        if (!scratch.delete() || !scratch.mkdir())
+            throw IOException("Cannot prepare isolated backup database validation")
         try {
+            val extracted = File(scratch, dbName)
             zip.getInputStream(mediaDb).use { input ->
                 extracted.outputStream().use { output -> input.copyTo(output) }
             }
+            zip.getEntry("$dbEntryName-wal")?.let { wal ->
+                if (wal.isDirectory || wal.size < 0L)
+                    throw IOException("Invalid media database WAL entry")
+                zip.getInputStream(wal).use { input ->
+                    File(scratch, "$dbName-wal").outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+            }
             return readFullBackupDatabase(extracted, artwork)
         } finally {
-            if (!extracted.delete())
-                android.util.Log.w("FullBackup", "Could not remove validation database")
+            if (!scratch.deleteRecursively())
+                android.util.Log.w("FullBackup", "Could not remove validation database directory")
         }
     }
 }
