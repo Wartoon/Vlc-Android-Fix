@@ -381,6 +381,7 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
             // Capture the live player on Main; the ZIP is written off-thread.
             val playbackState = PlaybackStateBackup.capture(requireContext())
             val success = withContext(Dispatchers.IO) {
+                var stagedBackup: File? = null
                 try {
                     val context = requireContext()
                     // Android shared-storage folders must exist before writing the ZIP.
@@ -397,7 +398,9 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                     val artworkDir = external?.let { File(it, Medialibrary.MEDIALIB_FOLDER_NAME.removePrefix("/")) }
                     val subtitlesDir = external?.let { File(it, "subtitles") }
 
-                    ZipOutputStream(BufferedOutputStream(FileOutputStream(dst))).use { zip ->
+                    val staged = createFullBackupStagingFile(dst)
+                    stagedBackup = staged
+                    ZipOutputStream(BufferedOutputStream(FileOutputStream(staged))).use { zip ->
                         val sourceVariant = dualVariantForPackage(context.packageName)
                             ?: throw IOException("Unsupported VLC Dual package")
                         val manifest = """{"format":2,"appFamily":"vlc-dual","variant":"$sourceVariant","package":"${context.packageName}","vlc":"3.7.2 Beta 2","components":["settings","mediaDb","appDb","artwork","subtitles","credentials"]}"""
@@ -428,10 +431,13 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                         if (keyStoreDir.exists())
                             addDirectoryToBackup(zip, keyStoreDir, "keystore")
                     }
+                    verifyAndReplaceFullBackup(staged, dst)
                     true
                 } catch (e: Exception) {
                     Log.e("FullBackup", "Full backup failed", e)
                     false
+                } finally {
+                    stagedBackup?.delete()
                 }
             }
             if (success)
