@@ -1,6 +1,8 @@
 package org.videolan.television.ui
 
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.videolan.medialibrary.media.DummyItem
 import org.junit.Test
 
 class FileTvItemAdapterTest {
@@ -14,6 +16,16 @@ class FileTvItemAdapterTest {
         width = 640,
         height = 360
     )
+
+    @Test
+    fun networkSectionRowsAreExcludedFromTheMediaAdapter() {
+        val rows = listOf(
+            DummyItem("Network favorites"),
+            DummyItem("Network shared folders")
+        )
+
+        assertTrue(fileTvMediaItems(rows).isEmpty())
+    }
 
     @Test
     fun widthChangeIsAContentChange() {

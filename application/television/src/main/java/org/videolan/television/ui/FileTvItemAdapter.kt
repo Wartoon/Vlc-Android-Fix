@@ -33,6 +33,9 @@ import org.videolan.vlc.gui.view.FastScroller
 import org.videolan.vlc.interfaces.IEventsHandler
 import org.videolan.vlc.util.generateResolutionClass
 
+internal fun fileTvMediaItems(items: List<*>): List<MediaWrapper> =
+    items.filterIsInstance<MediaWrapper>()
+
 internal data class FileTvItemContentSignature(
     val description: String?,
     val title: String?,
@@ -76,8 +79,7 @@ class FileTvItemAdapter(private val eventsHandler: IEventsHandler<MediaLibraryIt
     override fun submitList(pagedList: Any?) {
         latestThumbnailMedia.clear()
         if (pagedList is List<*>) {
-            @Suppress("UNCHECKED_CAST")
-            update(pagedList as List<MediaWrapper>)
+            update(fileTvMediaItems(pagedList))
         }
     }
 
