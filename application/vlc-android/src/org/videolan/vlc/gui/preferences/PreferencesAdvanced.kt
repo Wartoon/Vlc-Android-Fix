@@ -445,10 +445,26 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
         lifecycleScope.launch {
             if (!getWritePermission(Uri.fromFile(destination))) return@launch
             try {
-                AutoFullBackup.requestNow(requireContext())
-                Toast.makeText(requireContext(), R.string.full_backup_now_queued, Toast.LENGTH_LONG).show()
+                val app = requireContext().applicationContext
+                val reduction = withContext(Dispatchers.IO) {
+                    pendingFullBackupReduction(app, destination)
+                }
+                if (reduction == null) {
+                    AutoFullBackup.requestNow(app)
+                    Toast.makeText(requireContext(), R.string.full_backup_now_queued, Toast.LENGTH_LONG).show()
+                } else {
+                    // Only an explicit user action may accept a smaller library.
+                    androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                        .setTitle(R.string.full_backup_reduction_title)
+                        .setMessage(getString(R.string.full_backup_reduction_details, reduction))
+                        .setNegativeButton(R.string.cancel, null)
+                        .setPositiveButton(R.string.full_backup_reduction_accept) { _, _ ->
+                            AutoFullBackup.requestNow(app, acceptReducedLibrary = true)
+                            Toast.makeText(requireContext(), R.string.full_backup_now_queued, Toast.LENGTH_LONG).show()
+                        }.show()
+                }
             } catch (e: Exception) {
-                Log.e("FullBackup", "Could not enqueue requested backup", e)
+                Log.e("FullBackup", "Could not inspect or request complete backup", e)
                 Toast.makeText(requireContext(), R.string.full_backup_failure, Toast.LENGTH_LONG).show()
             }
         }
