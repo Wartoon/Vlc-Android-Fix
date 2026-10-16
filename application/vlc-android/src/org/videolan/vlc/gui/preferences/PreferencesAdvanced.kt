@@ -244,6 +244,7 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
             needToRestartOnResume = false
         }
         super.onResume()
+        updateAutoBackupSummary()
     }
 
     override fun onPreferenceTreeClick(preference: Preference): Boolean {
@@ -370,83 +371,36 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
         dualBackupFile(File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY), requireContext().packageName)
 
     private fun createFullBackup() {
-        val medialibrary = Medialibrary.getInstance()
-        if (medialibrary.isWorking) {
+        if (Medialibrary.getInstance().isWorking) {
             UiTools.snacker(requireActivity(), getString(R.string.settings_ml_block_scan))
             return
         }
         val dst = fullBackupFile()
         lifecycleScope.launch {
             if (!getWritePermission(Uri.fromFile(dst))) return@launch
-            // Capture the live player on Main; the ZIP is written off-thread.
-            val playbackState = PlaybackStateBackup.capture(requireContext())
-            val success = withContext(Dispatchers.IO) {
-                var stagedBackup: File? = null
-                try {
-                    val context = requireContext()
-                    // Android shared-storage folders must exist before writing the ZIP.
-                    // Leave existing backups (including legacy root backups) untouched.
-                    val backupDir = dst.parentFile ?: throw IOException("Backup directory unavailable")
-                    if (!backupDir.isDirectory && !backupDir.mkdirs())
-                        throw IOException("Cannot create backup directory: $backupDir")
-                    val dataRoot = context.getDir("db", Context.MODE_PRIVATE).parentFile
-                        ?: return@withContext false
-                    val mediaDbDir = context.getDir("db", Context.MODE_PRIVATE)
-                    val appDbDir = File(dataRoot, "databases")
-                    val keyStoreDir = File(dataRoot, "app_keystore")
-                    val external = context.getExternalFilesDir(null)
-                    val artworkDir = external?.let { File(it, Medialibrary.MEDIALIB_FOLDER_NAME.removePrefix("/")) }
-                    val subtitlesDir = external?.let { File(it, "subtitles") }
-
-                    val staged = createFullBackupStagingFile(dst)
-                    stagedBackup = staged
-                    ZipOutputStream(BufferedOutputStream(FileOutputStream(staged))).use { zip ->
-                        val sourceVariant = dualVariantForPackage(context.packageName)
-                            ?: throw IOException("Unsupported VLC Dual package")
-                        val manifest = """{"format":2,"appFamily":"vlc-dual","variant":"$sourceVariant","package":"${context.packageName}","vlc":"3.7.2 Beta 2","components":["settings","mediaDb","appDb","artwork","subtitles","credentials"]}"""
-                        zip.putNextEntry(ZipEntry("manifest.json"))
-                        zip.write(manifest.toByteArray(Charsets.UTF_8))
-                        zip.closeEntry()
-
-                        val settings = PreferenceParser.getChangedPrefsJson(context)
-                        zip.putNextEntry(ZipEntry("settings/settings.json"))
-                        zip.write(settings.toByteArray(Charsets.UTF_8))
-                        zip.closeEntry()
-
-                        zip.putNextEntry(ZipEntry(PlaybackStateBackup.ENTRY))
-                        zip.write(playbackState.toByteArray(Charsets.UTF_8))
-                        zip.closeEntry()
-
-                        mediaDbDir.listFiles()?.forEach { file ->
-                            if (file.name.startsWith(Medialibrary.VLC_MEDIA_DB_NAME.removePrefix("/")))
-                                addToBackup(zip, file, "medialibrary/db/${file.name}")
-                        }
-                        appDbDir.listFiles()?.forEach { file ->
-                            addToBackup(zip, file, "appdb/${file.name}")
-                        }
-                        if (artworkDir?.exists() == true)
-                            addDirectoryToBackup(zip, artworkDir, "artwork/medialib")
-                        if (subtitlesDir?.exists() == true)
-                            addDirectoryToBackup(zip, subtitlesDir, "external/subtitles")
-                        if (keyStoreDir.exists())
-                            addDirectoryToBackup(zip, keyStoreDir, "keystore")
-                    }
-                    verifyAndReplaceFullBackup(staged, dst)
-                    true
-                } catch (e: Exception) {
-                    Log.e("FullBackup", "Full backup failed", e)
-                    false
-                } finally {
-                    stagedBackup?.delete()
-                }
+            val success = try {
+                FullBackupEngine.create(requireContext(), automatic = false)
+                true
+            } catch (e: Exception) {
+                Log.e("FullBackup", "Manual backup failed", e)
+                false
             }
-            if (success)
-                UiTools.snackerConfirm(requireActivity(), getString(R.string.full_backup_success), confirmMessage = R.string.share, overAudioPlayer = false) {
+            if (success) {
+                UiTools.snackerConfirm(requireActivity(), getString(R.string.full_backup_success),
+                    confirmMessage = R.string.share, overAudioPlayer = false) {
                     requireActivity().share(dst)
                 }
-            else
-                Toast.makeText(requireContext(), getString(R.string.full_backup_failure), Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(requireContext(), getString(R.string.full_backup_failure),
+                    Toast.LENGTH_LONG).show()
+            }
+            updateAutoBackupSummary()
         }
+    }
+
+    private fun updateAutoBackupSummary() {
+        findPreference<CheckBoxPreference>(AUTO_FULL_BACKUP_ENABLED)?.summary =
+            AutoFullBackup.summary(requireContext())
     }
 
     private fun addDirectoryToBackup(zip: ZipOutputStream, directory: File, prefix: String) {
@@ -603,7 +557,8 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
             return
         }
         lifecycleScope.launch {
-            val success = withContext(Dispatchers.IO) {
+            val success = FullBackupEngine.withRestoreLock {
+                withContext(Dispatchers.IO) {
                 val context = requireContext()
                 val staging = File(context.cacheDir, "vlc_full_restore")
                 try {
@@ -706,11 +661,13 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                     }
 
                     staging.deleteRecursively()
+                    AutoFullBackup.deferAfterRestore(context)
                     true
                 } catch (e: Exception) {
                     Log.e("FullBackup", "Full restore failed", e)
                     staging.deleteRecursively()
                     false
+                }
                 }
             }
             if (success) {
@@ -796,6 +753,10 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
         if (sharedPreferences == null || key == null) return
         when (key) {
+            AUTO_FULL_BACKUP_ENABLED -> {
+                AutoFullBackup.configure(requireContext())
+                updateAutoBackupSummary()
+            }
             KEY_AOUT -> {
                 lifecycleScope.launch { restartLibVLC() }
                 Settings.getInstance(requireActivity()).let {

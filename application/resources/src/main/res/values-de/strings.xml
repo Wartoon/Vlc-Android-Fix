@@ -1393,6 +1393,11 @@
     <string name="full_restore_summary">Stellt die vollständige Sicherung dieser VLC-App wieder her und beendet VLC anschließend</string>
     <string name="full_backup_success">Vollständige App-Sicherung erfolgreich erstellt</string>
     <string name="full_backup_failure">Vollständige App-Sicherung konnte nicht erstellt werden</string>
+    <string name="auto_full_backup_title">Automatische vollständige Sicherung (täglich)</string>
+    <string name="auto_full_backup_waiting">Letzte automatische Sicherung: noch keine</string>
+    <string name="auto_full_backup_last_success">Letzte automatische Sicherung: %1$s</string>
+    <string name="auto_full_backup_success">Automatische vollständige Sicherung erfolgreich</string>
+    <string name="auto_full_backup_failure">Automatische vollständige Sicherung fehlgeschlagen. Vorhandene Sicherungen bleiben erhalten.</string>
     <string name="full_restore_missing">%1$s wurde im Stammordner des internen Speichers nicht gefunden</string>
     <string name="full_restore_success">Vollständige Sicherung wiederhergestellt. VLC wird jetzt beendet. Öffnen Sie die App anschließend erneut.</string>
     <string name="full_restore_failure">Die vollständige Sicherung konnte nicht wiederhergestellt werden</string>

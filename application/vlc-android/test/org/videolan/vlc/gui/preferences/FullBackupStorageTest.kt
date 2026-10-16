@@ -73,6 +73,49 @@ class FullBackupStorageTest {
         }
     }
 
+
+    @Test fun manualAndAutomaticShareThreeGenerations() = withTemporaryFolder { root ->
+        val primary = File(root, "VLC-Full-Backup.zip")
+        fun writeVersion(n: Int) {
+            val staged = createFullBackupStagingFile(primary)
+            ZipOutputStream(staged.outputStream()).use { zip ->
+                for (name in arrayOf("manifest.json", "settings/settings.json",
+                        PlaybackStateBackup.ENTRY, "medialibrary/db/vlc_media.db")) {
+                    zip.putNextEntry(ZipEntry(name))
+                    zip.write("version-$n".toByteArray())
+                    zip.closeEntry()
+                }
+            }
+            verifyRotateAndReplaceFullBackup(staged, primary)
+        }
+        fun value(file: File): String {
+            java.util.zip.ZipFile(file).use { z ->
+                return z.getInputStream(z.getEntry("manifest.json")).bufferedReader().readText()
+            }
+        }
+        (1..4).forEach(::writeVersion)
+        assertEquals("version-4", value(primary))
+        assertEquals("version-3", value(File(root, "VLC-Full-Backup - Previous 1.zip")))
+        assertEquals("version-2", value(File(root, "VLC-Full-Backup - Previous 2.zip")))
+        assertEquals(3, root.listFiles()!!.count { it.name.endsWith(".zip") })
+    }
+
+    @Test fun failedNewBackupLeavesAllPreviousGenerations() = withTemporaryFolder { root ->
+        val main = File(root, "VLC-Full-Backup.zip")
+        val historical = File(root, "VLC-Full-Backup - Previous 1.zip")
+        main.writeText("existing")
+        historical.writeText("older")
+        val staged = createFullBackupStagingFile(main)
+        staged.writeText("bad")
+        try {
+            verifyRotateAndReplaceFullBackup(staged, main)
+            fail("Invalid ZIP accepted")
+        } catch (_: IOException) {
+            assertEquals("existing", main.readText())
+            assertEquals("older", historical.readText())
+        }
+    }
+
     private fun withTemporaryFolder(run: (File) -> Unit) {
         val root = File.createTempFile("vlc-full-backup-", "-tests")
         root.delete()

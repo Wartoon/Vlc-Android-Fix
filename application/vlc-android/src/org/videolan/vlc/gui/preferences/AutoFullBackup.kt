@@ -1,0 +1,146 @@
+package org.videolan.vlc.gui.preferences
+
+import android.app.Activity
+import android.content.Context
+import android.util.Log
+import android.widget.Toast
+import androidx.core.content.edit
+import androidx.work.Constraints
+import androidx.work.CoroutineWorker
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkerParameters
+import androidx.work.WorkManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.videolan.resources.AppContextProvider
+import org.videolan.tools.Settings
+import org.videolan.vlc.R
+import java.text.DateFormat
+import java.util.Date
+import java.util.concurrent.TimeUnit
+
+internal const val AUTO_FULL_BACKUP_ENABLED = "vlc_auto_full_backup_enabled"
+private const val LAST_FULL_BACKUP_SUCCESS = "vlc_last_full_backup_success"
+private const val LAST_AUTO_FULL_BACKUP_SUCCESS = "vlc_last_auto_full_backup_success"
+private const val LAST_AUTO_FULL_BACKUP_ERROR = "vlc_last_auto_full_backup_error"
+private const val DAY_MILLIS = 24L * 60 * 60 * 1000
+
+/** Pure scheduling decision; successful manual backups reset the same 24h clock. */
+internal fun fullBackupIsDue(enabled: Boolean, lastSuccess: Long, now: Long): Boolean =
+    enabled && (lastSuccess <= 0L || (now >= lastSuccess && now - lastSuccess >= DAY_MILLIS))
+
+/**
+ * No alarm or wake-up exact-time guarantee. WorkManager schedules a daily
+ * opportunity; opening/leaving the app also requests one when overdue.
+ * All work uses the same ZIP filename and mutex as a manual backup.
+ */
+object AutoFullBackup {
+    private const val PERIODIC = "vlc_full_backup_daily"
+    private const val OPPORTUNITY = "vlc_full_backup_opportunity"
+    private fun conditions(): Constraints = Constraints.Builder()
+        .setRequiresBatteryNotLow(true)
+        .setRequiresStorageNotLow(true)
+        .build()
+
+    fun isEnabled(context: Context): Boolean =
+        Settings.getInstance(context).getBoolean(AUTO_FULL_BACKUP_ENABLED, false)
+
+    fun isDue(context: Context, now: Long = System.currentTimeMillis()): Boolean {
+        val p = Settings.getInstance(context)
+        return fullBackupIsDue(p.getBoolean(AUTO_FULL_BACKUP_ENABLED, false),
+            p.getLong(LAST_FULL_BACKUP_SUCCESS, 0L), now)
+    }
+
+    fun configure(context: Context) {
+        val app = context.applicationContext
+        val manager = WorkManager.getInstance(app)
+        if (!isEnabled(app)) {
+            manager.cancelUniqueWork(PERIODIC)
+            manager.cancelUniqueWork(OPPORTUNITY)
+            return
+        }
+        val periodic = PeriodicWorkRequestBuilder<AutoFullBackupWorker>(24, TimeUnit.HOURS)
+            .setConstraints(conditions()).build()
+        manager.enqueueUniquePeriodicWork(PERIODIC, ExistingPeriodicWorkPolicy.KEEP, periodic)
+        checkOpportunity(app)
+    }
+
+    fun checkOpportunity(context: Context) {
+        if (!isDue(context)) return
+        val request = OneTimeWorkRequestBuilder<AutoFullBackupWorker>()
+            .setConstraints(conditions())
+            .setBackoffCriteria(androidx.work.BackoffPolicy.EXPONENTIAL, 30, TimeUnit.MINUTES)
+            .build()
+        WorkManager.getInstance(context.applicationContext)
+            .enqueueUniqueWork(OPPORTUNITY, ExistingWorkPolicy.KEEP, request)
+    }
+
+    fun deferAfterRestore(context: Context) {
+        // A just-restored library must settle before its first automatic backup.
+        Settings.getInstance(context).edit {
+            putLong(LAST_FULL_BACKUP_SUCCESS, System.currentTimeMillis())
+        }
+    }
+
+    fun recordSuccess(context: Context, automatic: Boolean) {
+        val prefs = Settings.getInstance(context)
+        val time = System.currentTimeMillis()
+        prefs.edit {
+            putLong(LAST_FULL_BACKUP_SUCCESS, time)
+            if (automatic) {
+                putLong(LAST_AUTO_FULL_BACKUP_SUCCESS, time)
+                remove(LAST_AUTO_FULL_BACKUP_ERROR)
+            }
+        }
+    }
+
+    fun automaticBackupSucceeded(context: Context) {
+        val activity = AppContextProvider.currentActivity ?: return
+        activity.runOnUiThread {
+            Toast.makeText(activity, R.string.auto_full_backup_success, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun automaticBackupFailed(context: Context, error: Exception) {
+        Log.e("AutoFullBackup", "Scheduled full backup failed", error)
+        Settings.getInstance(context).edit { putBoolean(LAST_AUTO_FULL_BACKUP_ERROR, true) }
+    }
+
+    fun onActivityResumed(activity: Activity) {
+        val prefs = Settings.getInstance(activity)
+        if (prefs.getBoolean(LAST_AUTO_FULL_BACKUP_ERROR, false)) {
+            prefs.edit { remove(LAST_AUTO_FULL_BACKUP_ERROR) }
+            Toast.makeText(activity, R.string.auto_full_backup_failure, Toast.LENGTH_LONG).show()
+        }
+        checkOpportunity(activity)
+    }
+
+    fun summary(context: Context): String {
+        val last = Settings.getInstance(context).getLong(LAST_AUTO_FULL_BACKUP_SUCCESS, 0L)
+        if (last <= 0L) return context.getString(R.string.auto_full_backup_waiting)
+        val formatted = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(last))
+        return context.getString(R.string.auto_full_backup_last_success, formatted)
+    }
+}
+
+class AutoFullBackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+    override suspend fun doWork(): Result {
+        val app = applicationContext
+        if (!AutoFullBackup.isDue(app)) return Result.success()
+        return try {
+            FullBackupEngine.create(app, automatic = true)
+            AutoFullBackup.automaticBackupSucceeded(app)
+            Result.success()
+        } catch (_: FullBackupDeferred) {
+            // Playback, scanning, a concurrent manual backup, or a recent
+            // successful backup are not failures. WorkManager retries later.
+            if (AutoFullBackup.isDue(app)) Result.retry() else Result.success()
+        } catch (e: Exception) {
+            AutoFullBackup.automaticBackupFailed(app, e)
+            Result.retry()
+        }
+    }
+}

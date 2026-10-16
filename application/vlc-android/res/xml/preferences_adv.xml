@@ -47,6 +47,13 @@
                 android:summary="@string/full_backup_summary"
                 android:title="@string/full_backup"/>
 
+        <CheckBoxPreference
+                app:singleLineTitle="false"
+                android:defaultValue="false"
+                android:key="vlc_auto_full_backup_enabled"
+                android:title="@string/auto_full_backup_title"
+                android:summary="@string/auto_full_backup_waiting"/>
+
         <Preference
                 android:enabled="true"
                 android:key="full_restore"
