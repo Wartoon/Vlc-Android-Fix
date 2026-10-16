@@ -59,6 +59,9 @@ internal fun verifyAndReplaceFullBackup(staged: File, destination: File) {
     try {
         // Android's rename(2) replaces the old destination in one operation.
         Os.rename(staged.absolutePath, destination.absolutePath)
+        // Real rename(2) removes the source path. Some Android test
+        // environments emulate replacement by copying; clean up in both cases.
+        if (staged.exists()) staged.delete()
     } catch (e: Exception) {
         throw IOException("Could not safely replace previous full backup", e)
     }
