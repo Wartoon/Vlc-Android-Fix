@@ -335,8 +335,8 @@ class PlaylistManager(val service: PlaybackService) : MediaWrapperList.EventList
             val position = max(0, settings.getInt(if (audio) POSITION_IN_AUDIO_LIST else POSITION_IN_MEDIA_LIST, 0))
             savedTime = settings.getLong(if (audio) POSITION_IN_SONG else POSITION_IN_MEDIA, -1)
             if (settings.getBoolean(PlaybackStateBackup.RESTORE_PENDING, false) && position in playList.indices) {
-                // On first Play after full restore, use the captured checkpoint,
-                // which is newer than the media database's last progress update.
+                // For the first Play after restore, prefer the captured position
+                // to an older media-database checkpoint.
                 playList[position].time = savedTime.coerceAtLeast(0L)
                 settings.edit { remove(PlaybackStateBackup.RESTORE_PENDING) }
             }
@@ -368,7 +368,7 @@ class PlaylistManager(val service: PlaybackService) : MediaWrapperList.EventList
                 saveMediaList(forceVideo = playAsAudio)
             }
             // Video-as-audio has no VideoPlayerActivity lifecycle to guarantee a final progress save.
-            if (getCurrentMedia()?.isPodcast == true || playAsAudio) saveMediaMeta()
+            if (getCurrentMedia()?.type == MediaWrapper.TYPE_VIDEO || getCurrentMedia()?.isPodcast == true || playAsAudio) saveMediaMeta()
         }
     }
 
@@ -858,8 +858,9 @@ class PlaylistManager(val service: PlaybackService) : MediaWrapperList.EventList
         if (currentMedia.uri.scheme.isSchemeFD()) return
         val locations = StringBuilder()
         val isAudio = isAudioList() || forceVideo || isVideoPlayedAsAudio()
+        // Snapshot before switching dispatchers; stop() clears the shared list immediately after scheduling persistence.
+        val list = mediaList.copy.takeIf { it.isNotEmpty() } ?: return
         withContext(Dispatchers.Default) {
-            val list = mediaList.copy.takeIf { it.isNotEmpty() } ?: return@withContext
             for (mw in list) locations.append(" ").append(mw.uri.toString())
             //We save a concatenated String because putStringSet is APIv11.
             if (isAudio) {

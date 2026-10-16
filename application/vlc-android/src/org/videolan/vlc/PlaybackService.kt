@@ -387,8 +387,8 @@ class PlaybackService : MediaBrowserServiceCompat(), LifecycleOwner, CoroutineSc
                 }
                 playlistManager.videoBackground || canSwitchToVideo() && !currentMediaHasFlag(MediaWrapper.MEDIA_FORCE_AUDIO) -> {//resume video playback
                     /* Resume VideoPlayerActivity from ACTION_REMOTE_SWITCH_VIDEO intent */
-                    val notificationIntent = Intent(this, StartActivity::class.java)
-                    PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                    val notificationIntent = Intent(ACTION_REMOTE_SWITCH_VIDEO)
+                    PendingIntent.getBroadcast(this, 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
                 }
                 else -> { /* Show audio player */
                     val notificationIntent = Intent(this, StartActivity::class.java)
@@ -1050,7 +1050,7 @@ class PlaybackService : MediaBrowserServiceCompat(), LifecycleOwner, CoroutineSc
                     var cover = if (coverOnLockscreen && metaData != null)
                         metaData.getBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART) else null
                     if (coverOnLockscreen && cover == null)
-                        cover = AudioUtil.readCoverBitmap(Uri.decode(mw.artworkMrl), 1024)
+                        cover = AudioUtil.readCoverBitmap(Uri.decode(mw.artworkMrl), 256)
                     if (cover == null || cover.isRecycled)
                         cover = ctx.getBitmapFromDrawable(R.drawable.ic_no_media)
 
@@ -1241,7 +1241,7 @@ class PlaybackService : MediaBrowserServiceCompat(), LifecycleOwner, CoroutineSc
                 }
                 bob.putString(MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI, albumArtUri.toString())
                 if (!carMode) {
-                    val cover = AudioUtil.readCoverBitmap(Uri.decode(media.artworkMrl), 1024)
+                    val cover = AudioUtil.readCoverBitmap(Uri.decode(media.artworkMrl), 512)
                     val config = cover?.config
                     if (config != null)
                     //In case of format not supported
@@ -1456,8 +1456,7 @@ class PlaybackService : MediaBrowserServiceCompat(), LifecycleOwner, CoroutineSc
 
     private fun loadLastAudioPlaylist() {
         if (AndroidDevices.isAndroidTv && settings.getBoolean(PlaybackStateBackup.RESTORE_PENDING, false)) {
-            // Only after full-restore should Android TV's Play action load a
-            // recovered queue; leave normal TV playback behavior unchanged.
+            // A user Play after full restore must load the saved TV queue.
             val type = if (settings.getBoolean(KEY_CURRENT_MEDIA_IS_AUDIO, false))
                 PLAYLIST_TYPE_AUDIO else PLAYLIST_TYPE_ALL
             loadLastPlaylist(type)
