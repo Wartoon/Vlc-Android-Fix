@@ -368,6 +368,8 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
         val dst = fullBackupFile()
         lifecycleScope.launch {
             if (!getWritePermission(Uri.fromFile(dst))) return@launch
+            // Capture the live player on Main; the ZIP is written off-thread.
+            val playbackState = PlaybackStateBackup.capture(requireContext())
             val success = withContext(Dispatchers.IO) {
                 try {
                     val context = requireContext()
@@ -391,6 +393,10 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                         val settings = PreferenceParser.getChangedPrefsJson(context)
                         zip.putNextEntry(ZipEntry("settings/settings.json"))
                         zip.write(settings.toByteArray(Charsets.UTF_8))
+                        zip.closeEntry()
+
+                        zip.putNextEntry(ZipEntry(PlaybackStateBackup.ENTRY))
+                        zip.write(playbackState.toByteArray(Charsets.UTF_8))
                         zip.closeEntry()
 
                         mediaDbDir.listFiles()?.forEach { file ->
@@ -503,6 +509,7 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                             manifestText = manifestBytes.toString("UTF-8")
                         }
                         name == "settings/settings.json" -> components += "settings"
+                        name == PlaybackStateBackup.ENTRY -> components += "playback"
                         name.startsWith("medialibrary/db/") && !entry.isDirectory -> components += "mediaDb"
                         name.startsWith("appdb/") && !entry.isDirectory -> components += "appDb"
                         name.startsWith("artwork/medialib/") && !entry.isDirectory -> components += "artwork"
@@ -656,6 +663,14 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                     if (restoreMediaDb) replaceDirectoryContentsSafely(File(staging, "medialibrary/db"), mediaDbDir)
 
                     if (restoreAppDb) replaceDirectoryContentsSafely(savedAppDb, appDbDir)
+
+                    // Optional: older backups do not include playback state.
+                    // Restore it last, after settings and database restoration.
+                    if (restoreSettings) {
+                        val playbackFile = File(staging, PlaybackStateBackup.ENTRY)
+                        if (playbackFile.isFile)
+                            PlaybackStateBackup.restore(context, playbackFile.readText(Charsets.UTF_8))
+                    }
 
                     if (restoreArtwork) {
                         artworkDir?.let { replaceDirectoryContentsSafely(File(staging, "artwork/medialib"), it) }

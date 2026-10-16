@@ -178,6 +178,7 @@ import org.videolan.vlc.media.MediaSessionBrowser
 import org.videolan.vlc.media.MediaUtils
 import org.videolan.vlc.media.NO_LENGTH_PROGRESS_MAX
 import org.videolan.vlc.media.PlayerController
+import org.videolan.vlc.gui.preferences.PlaybackStateBackup
 import org.videolan.vlc.media.PlaylistManager
 import org.videolan.vlc.util.AccessControl
 import org.videolan.vlc.util.FlagSet
@@ -1454,6 +1455,14 @@ class PlaybackService : MediaBrowserServiceCompat(), LifecycleOwner, CoroutineSc
     }
 
     private fun loadLastAudioPlaylist() {
+        if (AndroidDevices.isAndroidTv && settings.getBoolean(PlaybackStateBackup.RESTORE_PENDING, false)) {
+            // Only after full-restore should Android TV's Play action load a
+            // recovered queue; leave normal TV playback behavior unchanged.
+            val type = if (settings.getBoolean(KEY_CURRENT_MEDIA_IS_AUDIO, false))
+                PLAYLIST_TYPE_AUDIO else PLAYLIST_TYPE_ALL
+            loadLastPlaylist(type)
+            return
+        }
         if (!AndroidDevices.isAndroidTv) {
             // If playback in background is enabled it should load the last media of any type
             // not only audio

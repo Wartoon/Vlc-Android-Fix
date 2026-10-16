@@ -86,6 +86,7 @@ import org.videolan.tools.putSingle
 import org.videolan.vlc.BuildConfig
 import org.videolan.vlc.PlaybackService
 import org.videolan.vlc.R
+import org.videolan.vlc.gui.preferences.PlaybackStateBackup
 import org.videolan.vlc.gui.browser.BaseBrowserFragment
 import org.videolan.vlc.gui.video.VideoPlayerActivity
 import org.videolan.vlc.util.FileUtils
@@ -333,6 +334,12 @@ class PlaylistManager(val service: PlaybackService) : MediaWrapperList.EventList
             shuffling = settings.getBoolean(if (audio) AUDIO_SHUFFLING else MEDIA_SHUFFLING, false)
             val position = max(0, settings.getInt(if (audio) POSITION_IN_AUDIO_LIST else POSITION_IN_MEDIA_LIST, 0))
             savedTime = settings.getLong(if (audio) POSITION_IN_SONG else POSITION_IN_MEDIA, -1)
+            if (settings.getBoolean(PlaybackStateBackup.RESTORE_PENDING, false) && position in playList.indices) {
+                // On first Play after full restore, use the captured checkpoint,
+                // which is newer than the media database's last progress update.
+                playList[position].time = savedTime.coerceAtLeast(0L)
+                settings.edit { remove(PlaybackStateBackup.RESTORE_PENDING) }
+            }
             if (!audio && position < playList.size && settings.getBoolean(VIDEO_PAUSED, false)) {
                 playList[position].addFlags(MediaWrapper.MEDIA_PAUSED)
             }
