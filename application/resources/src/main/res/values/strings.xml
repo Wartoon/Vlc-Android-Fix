@@ -1413,6 +1413,11 @@
     <string name="full_restore_summary">Restore the complete backup for this VLC app and close VLC afterwards</string>
     <string name="full_backup_success">Complete app backup created successfully</string>
     <string name="full_backup_failure">Complete app backup could not be created</string>
+    <string name="auto_full_backup_title">Automatic full backup (daily)</string>
+    <string name="auto_full_backup_waiting">Last automatic backup: none yet</string>
+    <string name="auto_full_backup_last_success">Last automatic backup: %1$s</string>
+    <string name="auto_full_backup_success">Automatic full backup successful</string>
+    <string name="auto_full_backup_failure">Automatic full backup failed. Existing backups were preserved.</string>
     <string name="full_restore_missing">%1$s was not found in the internal storage root</string>
     <string name="full_restore_success">Complete backup restored. VLC will now close. Open the app again afterwards.</string>
     <string name="full_restore_failure">Complete backup could not be restored</string>

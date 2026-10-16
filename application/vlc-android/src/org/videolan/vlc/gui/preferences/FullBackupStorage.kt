@@ -75,3 +75,33 @@ internal fun verifyAndReplaceFullBackup(staged: File, destination: File) {
         throw IOException("Could not safely replace previous full backup", e)
     }
 }
+
+/**
+ * Three generations in total: primary ZIP and two historical ZIPs.
+ * Save an independent copy of the previous primary before replacing it.
+ * Both manual and automatic backups use this same rotation.
+ */
+internal fun verifyRotateAndReplaceFullBackup(staged: File, destination: File) {
+    val dir = destination.parentFile ?: throw IOException("Missing full-backup folder")
+    val previous1 = File(dir, "${destination.nameWithoutExtension} - Previous 1.zip")
+    val previous2 = File(dir, "${destination.nameWithoutExtension} - Previous 2.zip")
+    var savedOld: File? = null
+    try {
+        if (destination.isFile) {
+            savedOld = File.createTempFile("vlc-previous-", ".zip.tmp", dir)
+            Files.copy(destination.toPath(), savedOld.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }
+        // This verifies all entries and atomically replaces ONLY the main ZIP.
+        // A bad staged ZIP never changes that file or existing generations.
+        verifyAndReplaceFullBackup(staged, destination)
+        if (savedOld != null) {
+            if (previous1.isFile)
+                Files.move(previous1.toPath(), previous2.toPath(),
+                    StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            Files.move(savedOld.toPath(), previous1.toPath(),
+                StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        }
+    } finally {
+        savedOld?.delete()
+    }
+}

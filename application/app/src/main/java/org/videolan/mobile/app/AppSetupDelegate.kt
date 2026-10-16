@@ -54,6 +54,7 @@ import org.videolan.tools.KEY_SET_LOCALE
 import org.videolan.tools.Settings
 import org.videolan.tools.putSingle
 import org.videolan.vlc.BuildConfig
+import org.videolan.vlc.gui.preferences.AutoFullBackup
 import org.videolan.vlc.gui.helpers.NotificationHelper
 import org.videolan.vlc.util.DialogDelegate
 import org.videolan.vlc.util.NetworkConnectionManager
@@ -83,6 +84,7 @@ class AppSetupDelegate : AppDelegate,
         System.setProperty(DEBUG_PROPERTY_NAME, DEBUG_PROPERTY_VALUE_ON)
 
         val settings = Settings.getInstance(this)
+        AutoFullBackup.configure(this)
         if (BuildConfig.DEBUG) {
             if (Settings.showTvUi) {
                 // Register movipedia to resume tv shows/movies
@@ -107,6 +109,7 @@ class AppSetupDelegate : AppDelegate,
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityResumed(activity: Activity) {
                 AppContextProvider.currentActivity = activity
+                AutoFullBackup.onActivityResumed(activity)
             }
 
             override fun onActivityPaused(activity: Activity) {
@@ -115,7 +118,9 @@ class AppSetupDelegate : AppDelegate,
 
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
             override fun onActivityStarted(activity: Activity) {}
-            override fun onActivityStopped(activity: Activity) {}
+            override fun onActivityStopped(activity: Activity) {
+                AutoFullBackup.checkOpportunity(activity)
+            }
             override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
             override fun onActivityDestroyed(activity: Activity) {}
         })
