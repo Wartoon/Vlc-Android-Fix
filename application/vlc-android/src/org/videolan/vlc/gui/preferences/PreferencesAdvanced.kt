@@ -443,6 +443,8 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
         val dst = fullBackupFile()
         lifecycleScope.launch {
             if (!getWritePermission(Uri.fromFile(dst))) return@launch
+            // Capture the live player on Main; ZIP creation runs off-thread.
+            val playbackState = PlaybackStateBackup.capture(requireContext())
             val success = withContext(Dispatchers.IO) {
                 try {
                     val context = requireContext()
@@ -464,6 +466,10 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                         val settings = PreferenceParser.getChangedPrefsJson(context)
                         zip.putNextEntry(ZipEntry("settings/settings.json"))
                         zip.write(settings.toByteArray(Charsets.UTF_8))
+                        zip.closeEntry()
+
+                        zip.putNextEntry(ZipEntry(PlaybackStateBackup.ENTRY))
+                        zip.write(playbackState.toByteArray(Charsets.UTF_8))
                         zip.closeEntry()
 
                         mediaDbDir.listFiles()?.forEach { file ->
@@ -614,6 +620,13 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                     if (restoreMediaDb) replaceDirectoryContentsSafely(File(staging, "medialibrary/db"), mediaDbDir)
 
                     if (restoreAppDb) replaceDirectoryContentsSafely(savedAppDb, appDbDir)
+
+                    // Existing backups without a playback entry remain supported.
+                    if (restoreSettings) {
+                        val playbackFile = File(staging, PlaybackStateBackup.ENTRY)
+                        if (playbackFile.isFile)
+                            PlaybackStateBackup.restore(context, playbackFile.readText(Charsets.UTF_8))
+                    }
 
                     if (restoreArtwork) {
                         artworkDir?.let {
