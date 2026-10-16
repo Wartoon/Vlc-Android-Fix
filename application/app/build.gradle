@@ -188,6 +188,7 @@ android {
 
 dependencies {
     implementation project(':application:vlc-android')
+    implementation "androidx.sqlite:sqlite-bundled:2.5.2"
     implementation project(':application:television')
     implementation project(':application:remote-access-server')
     testImplementation project(':application:television')

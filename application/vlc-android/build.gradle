@@ -210,7 +210,8 @@ dependencies {
 
     ksp ("org.xerial:sqlite-jdbc:jdbcVersion")
     ksp("androidx.room:room-compiler:$rootProject.ext.roomVersion")
-    implementation "androidx.sqlite:sqlite-bundled:2.5.2"
+    compileOnly "androidx.sqlite:sqlite-bundled:2.5.2"
+    testImplementation "androidx.sqlite:sqlite-bundled:2.5.2"
 
     api "androidx.paging:paging-runtime-ktx:$rootProject.ext.pagingVersion"
 
