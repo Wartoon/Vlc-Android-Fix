@@ -3,7 +3,7 @@ name: Build VLC TV Fix V1
 on:
   workflow_dispatch:
   push:
-    branches: [ tv-v1 ]
+    branches: [ tv-v1, work/tv-one-backup-safety-20261016 ]
 
 jobs:
   build:
