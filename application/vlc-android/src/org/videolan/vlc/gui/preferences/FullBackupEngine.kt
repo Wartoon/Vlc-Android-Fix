@@ -48,7 +48,7 @@ internal object FullBackupEngine {
         }
     }
 
-    suspend fun create(context: Context, automatic: Boolean, force: Boolean = false): File = lock.withLock {
+    suspend fun create(context: Context, automatic: Boolean, force: Boolean = false, allowReduction: Boolean = false): File = lock.withLock {
         val app = context.applicationContext
         if (automatic && !force && !AutoFullBackup.isDue(app)) throw FullBackupDeferred("Not due")
         if (Medialibrary.getInstance().isWorking) throw FullBackupDeferred("Media library busy")
@@ -103,8 +103,8 @@ internal object FullBackupEngine {
                         addDirectory(zip, subtitlesDir, "external/subtitles")
                     if (keyStoreDir.isDirectory) addDirectory(zip, keyStoreDir, "keystore")
                 }
-                // Both modes replace the SAME main file and share its 3 generations.
-                verifyRotateAndReplaceFullBackup(temporary, target)
+                // Preserve the last good archive unless structural and library checks pass.
+                verifyProtectedSingleFullBackup(temporary, target, app.cacheDir, allowReduction)
             } catch (e: Exception) {
                 Log.e("FullBackup", "Full backup failed", e)
                 throw e
