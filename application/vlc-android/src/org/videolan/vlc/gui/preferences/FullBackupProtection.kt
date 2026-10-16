@@ -2,6 +2,9 @@ package org.videolan.vlc.gui.preferences
 
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
+import android.os.Build
+import androidx.sqlite.driver.bundled.BundledSQLite
+import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import org.videolan.medialibrary.interfaces.Medialibrary
 import java.io.File
 import java.io.IOException
@@ -88,8 +91,17 @@ private fun countArtwork(directory: File?): Long {
     return count
 }
 
-/** Read-only SQLite queries avoid depending on VLC's private database model. */
+/**
+ * Read the copied database with a bundled SQLite engine so schema syntax does
+ * not depend on the Android release's system SQLite version. Android 9 ships
+ * SQLite 3.22, which cannot parse the MediaLibrary's UPDATE FROM trigger.
+ */
 private fun readFullBackupDatabase(file: File, artwork: Long): FullBackupLibrarySnapshot {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        return readWithBundledSqlite(file, artwork)
+    }
+    // sqlite-bundled supports API 21+. Keep the app installable below that API
+    // level and retain the previous validation path for those legacy devices.
     val db = try {
         SQLiteDatabase.openDatabase(file.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
     } catch (e: Exception) {
@@ -105,6 +117,32 @@ private fun readFullBackupDatabase(file: File, artwork: Long): FullBackupLibrary
         val paths = HashSet<String>()
         db.rawQuery("SELECT path FROM Folder WHERE path IS NOT NULL", null).use { cursor ->
             while (cursor.moveToNext()) paths += cursor.getString(0)
+        }
+        return FullBackupLibrarySnapshot(count("Media"), count("Folder"),
+            count("Playlist"), artwork, paths)
+    } catch (e: Exception) {
+        throw IOException("Media library tables are not readable", e)
+    } finally {
+        db.close()
+    }
+}
+
+private fun readWithBundledSqlite(file: File, artwork: Long): FullBackupLibrarySnapshot {
+    val db = try {
+        BundledSQLiteDriver().open(file.absolutePath, BundledSQLite.SQLITE_OPEN_READONLY)
+    } catch (e: Exception) {
+        throw IOException("Media database cannot be opened", e)
+    }
+    try {
+        fun count(table: String): Long {
+            db.prepare("SELECT COUNT(*) FROM $table").use { statement ->
+                if (!statement.step()) throw IOException("Cannot count $table")
+                return statement.getLong(0)
+            }
+        }
+        val paths = HashSet<String>()
+        db.prepare("SELECT path FROM Folder WHERE path IS NOT NULL").use { statement ->
+            while (statement.step()) paths += statement.getText(0)
         }
         return FullBackupLibrarySnapshot(count("Media"), count("Folder"),
             count("Playlist"), artwork, paths)
