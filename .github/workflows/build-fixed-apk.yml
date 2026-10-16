@@ -3,7 +3,7 @@ name: Build VLC Android Resume Fix
 on:
   workflow_dispatch:
   push:
-    branches: [ dual-fix, dual-db-restore ]
+    branches: [ dual-fix, dual-db-restore, work/dual-one-backup-safety-20261016 ]
 
 jobs:
   build:
