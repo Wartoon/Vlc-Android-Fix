@@ -1387,6 +1387,9 @@
     <string name="export_settings">Exporteinstellungen</string>
     <string name="restore_settings_summary">Ihre Einstellungen aus einem vorherigen Export wiederherstellen</string>
     <string name="restore_settings">Einstellungen wiederherstellen</string>
+    <string name="full_backup_now">Automatische Sicherung jetzt starten</string>
+    <string name="full_backup_now_summary">Erstellt eine vollständige Sicherung über die automatische Backup-Funktion – unabhängig von der täglichen Automatik. Startet bei geeigneten Bedingungen.</string>
+    <string name="full_backup_now_queued">Vollständige Sicherung angefordert. Sie startet, sobald die Bedingungen erfüllt sind.</string>
     <string name="full_backup">App vollständig sichern</string>
     <string name="full_backup_summary">Sichert Mediathek, Wiedergabedaten, App-Datenbank, Einstellungen, Cover, Vorschaubilder und appinterne Untertitel in eine ZIP-Datei</string>
     <string name="full_restore">App vollständig wiederherstellen</string>

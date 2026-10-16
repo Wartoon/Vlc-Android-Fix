@@ -1408,6 +1408,9 @@
     <string name="export_settings">Export settings</string>
     <string name="restore_settings_summary">Restore your settings from a previous export</string>
     <string name="restore_settings">Restore settings</string>
+    <string name="full_backup_now">Start automatic backup now</string>
+    <string name="full_backup_now_summary">Create a complete backup using the automatic backup worker, regardless of the daily schedule. Runs when device conditions allow.</string>
+    <string name="full_backup_now_queued">Full backup requested. It will run when conditions allow.</string>
     <string name="full_backup">Back up complete app</string>
     <string name="full_backup_summary">Back up media library, playback data, app database, settings, artwork, thumbnails and app-managed subtitles to one ZIP file</string>
     <string name="full_restore">Restore complete app</string>

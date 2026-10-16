@@ -48,9 +48,9 @@ internal object FullBackupEngine {
         }
     }
 
-    suspend fun create(context: Context, automatic: Boolean): File = lock.withLock {
+    suspend fun create(context: Context, automatic: Boolean, force: Boolean = false): File = lock.withLock {
         val app = context.applicationContext
-        if (automatic && !AutoFullBackup.isDue(app)) throw FullBackupDeferred("Not due")
+        if (automatic && !force && !AutoFullBackup.isDue(app)) throw FullBackupDeferred("Not due")
         if (Medialibrary.getInstance().isWorking) throw FullBackupDeferred("Media library busy")
         if (automatic && withContext(Dispatchers.Main) { PlaybackService.instance?.isPlaying == true })
             throw FullBackupDeferred("Playback active")

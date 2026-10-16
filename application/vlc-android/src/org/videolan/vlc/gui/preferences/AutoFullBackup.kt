@@ -13,6 +13,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkerParameters
 import androidx.work.WorkManager
+import androidx.work.workDataOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.videolan.resources.AppContextProvider
@@ -27,10 +28,14 @@ private const val LAST_FULL_BACKUP_SUCCESS = "vlc_last_full_backup_success"
 private const val LAST_AUTO_FULL_BACKUP_SUCCESS = "vlc_last_auto_full_backup_success"
 private const val LAST_AUTO_FULL_BACKUP_ERROR = "vlc_last_auto_full_backup_error"
 private const val DAY_MILLIS = 24L * 60 * 60 * 1000
+internal const val FORCE_FULL_BACKUP_NOW = "vlc_force_full_backup_now"
 
 /** Pure scheduling decision; successful manual backups reset the same 24h clock. */
 internal fun fullBackupIsDue(enabled: Boolean, lastSuccess: Long, now: Long): Boolean =
     enabled && (lastSuccess <= 0L || (now >= lastSuccess && now - lastSuccess >= DAY_MILLIS))
+
+/** An explicitly requested backup is independent of the daily toggle and interval. */
+internal fun shouldRunFullBackup(force: Boolean, due: Boolean): Boolean = force || due
 
 /**
  * No alarm or wake-up exact-time guarantee. WorkManager schedules a daily
@@ -40,6 +45,7 @@ internal fun fullBackupIsDue(enabled: Boolean, lastSuccess: Long, now: Long): Bo
 object AutoFullBackup {
     private const val PERIODIC = "vlc_full_backup_daily"
     private const val OPPORTUNITY = "vlc_full_backup_opportunity"
+    private const val USER_REQUEST = "vlc_full_backup_now"
     private fun conditions(): Constraints = Constraints.Builder()
         .setRequiresBatteryNotLow(true)
         .setRequiresStorageNotLow(true)
@@ -76,6 +82,17 @@ object AutoFullBackup {
             .build()
         WorkManager.getInstance(context.applicationContext)
             .enqueueUniqueWork(OPPORTUNITY, ExistingWorkPolicy.KEEP, request)
+    }
+
+    /** Same WorkManager worker as the daily backup, but on-demand even if disabled. */
+    fun requestNow(context: Context) {
+        val request = OneTimeWorkRequestBuilder<AutoFullBackupWorker>()
+            .setInputData(workDataOf(FORCE_FULL_BACKUP_NOW to true))
+            .setConstraints(conditions())
+            .setBackoffCriteria(androidx.work.BackoffPolicy.EXPONENTIAL, 30, TimeUnit.MINUTES)
+            .build()
+        WorkManager.getInstance(context.applicationContext)
+            .enqueueUniqueWork(USER_REQUEST, ExistingWorkPolicy.KEEP, request)
     }
 
     fun deferAfterRestore(context: Context) {
@@ -129,15 +146,16 @@ object AutoFullBackup {
 class AutoFullBackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val app = applicationContext
-        if (!AutoFullBackup.isDue(app)) return Result.success()
+        val forced = inputData.getBoolean(FORCE_FULL_BACKUP_NOW, false)
+        if (!shouldRunFullBackup(forced, AutoFullBackup.isDue(app))) return Result.success()
         return try {
-            FullBackupEngine.create(app, automatic = true)
+            FullBackupEngine.create(app, automatic = true, force = forced)
             AutoFullBackup.automaticBackupSucceeded(app)
             Result.success()
         } catch (_: FullBackupDeferred) {
             // Playback, scanning, a concurrent manual backup, or a recent
             // successful backup are not failures. WorkManager retries later.
-            if (AutoFullBackup.isDue(app)) Result.retry() else Result.success()
+            if (shouldRunFullBackup(forced, AutoFullBackup.isDue(app))) Result.retry() else Result.success()
         } catch (e: Exception) {
             AutoFullBackup.automaticBackupFailed(app, e)
             Result.retry()
