@@ -39,23 +39,4 @@ class AutoFullBackupTest {
         assertFalse(fullBackupIsDue(true, 50000L, 49999L))
     }
 
-    @Test fun tvForegroundDiagnosticRequiresTvUiEnabledBackupAndForegroundEntry() {
-        assertTrue(shouldRequestTvForegroundDiagnostic(true, true, true, true))
-        assertFalse(shouldRequestTvForegroundDiagnostic(false, true, true, true))
-        assertFalse(shouldRequestTvForegroundDiagnostic(true, false, true, true))
-        assertFalse(shouldRequestTvForegroundDiagnostic(true, true, false, true))
-        assertFalse(shouldRequestTvForegroundDiagnostic(true, true, true, false))
-    }
-
-    @Test fun foregroundTransitionTriggersOnceAcrossActivityNavigation() {
-        val transitions = AppForegroundTransitions()
-
-        assertTrue(transitions.onActivityStarted())
-        assertFalse(transitions.onActivityStarted())
-        transitions.onActivityStopped()
-        assertFalse(transitions.onActivityStarted())
-        transitions.onActivityStopped()
-        transitions.onActivityStopped()
-        assertTrue(transitions.onActivityStarted())
-    }
 }

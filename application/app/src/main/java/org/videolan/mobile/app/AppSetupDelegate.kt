@@ -117,11 +117,8 @@ class AppSetupDelegate : AppDelegate,
             }
 
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
-            override fun onActivityStarted(activity: Activity) {
-                AutoFullBackup.onActivityStarted(activity)
-            }
+            override fun onActivityStarted(activity: Activity) {}
             override fun onActivityStopped(activity: Activity) {
-                AutoFullBackup.onActivityStopped()
                 AutoFullBackup.checkOpportunity(activity)
             }
             override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}

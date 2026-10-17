@@ -1,6 +1,5 @@
 package org.videolan.vlc.gui.preferences
 
-import android.app.Activity
 import android.content.Context
 import android.util.Log
 import android.widget.Toast
@@ -45,32 +44,6 @@ internal fun shouldRunFullBackup(force: Boolean, due: Boolean): Boolean = force 
  */
 internal fun shouldRetryScheduledFullBackup(enabled: Boolean, due: Boolean): Boolean = enabled && !due
 
-/** TEMPORARY TV diagnostics: request a forced backup on every app foreground entry. */
-internal const val DEBUG_TV_BACKUP_ON_FOREGROUND_ENTRY = true
-private const val DEBUG_TV_FOREGROUND_REQUEST = "vlc_full_backup_tv_foreground_debug"
-
-/** True only for the first Activity start in each foreground session. */
-internal class AppForegroundTransitions {
-    private var startedActivities = 0
-
-    fun onActivityStarted(): Boolean {
-        val enteringForeground = startedActivities == 0
-        startedActivities++
-        return enteringForeground
-    }
-
-    fun onActivityStopped() {
-        if (startedActivities > 0) startedActivities--
-    }
-}
-
-internal fun shouldRequestTvForegroundDiagnostic(
-    diagnosticEnabled: Boolean,
-    isTvUi: Boolean,
-    autoBackupEnabled: Boolean,
-    enteringForeground: Boolean
-): Boolean = diagnosticEnabled && isTvUi && autoBackupEnabled && enteringForeground
-
 /**
  * No alarm or wake-up exact-time guarantee. WorkManager schedules a daily
  * opportunity; opening/leaving the app also requests one when overdue.
@@ -80,7 +53,6 @@ object AutoFullBackup {
     private const val PERIODIC = "vlc_full_backup_daily"
     private const val OPPORTUNITY = "vlc_full_backup_opportunity"
     private const val USER_REQUEST = "vlc_full_backup_now"
-    private val foregroundTransitions = AppForegroundTransitions()
     private fun conditions(): Constraints = Constraints.Builder()
         .setRequiresBatteryNotLow(true)
         .setRequiresStorageNotLow(true)
@@ -117,37 +89,6 @@ object AutoFullBackup {
             .build()
         WorkManager.getInstance(context.applicationContext)
             .enqueueUniqueWork(OPPORTUNITY, ExistingWorkPolicy.KEEP, request)
-    }
-
-    /**
-     * Temporary TV-only diagnostic. Queue one forced attempt when the app enters foreground,
-     * even if a successful backup happened less than 24 hours ago.
-     */
-    fun onActivityStarted(activity: Activity) {
-        val enteringForeground = foregroundTransitions.onActivityStarted()
-        if (!shouldRequestTvForegroundDiagnostic(
-                DEBUG_TV_BACKUP_ON_FOREGROUND_ENTRY,
-                Settings.showTvUi,
-                isEnabled(activity),
-                enteringForeground
-            )) return
-
-        val request = OneTimeWorkRequestBuilder<AutoFullBackupWorker>()
-            .setInputData(workDataOf(
-                FORCE_FULL_BACKUP_NOW to true,
-                ACCEPT_REDUCED_LIBRARY to false,
-                DEBUG_TV_FOREGROUND_REQUEST to true
-            ))
-            .setConstraints(conditions())
-            .setBackoffCriteria(androidx.work.BackoffPolicy.EXPONENTIAL, 30, TimeUnit.MINUTES)
-            .build()
-        WorkManager.getInstance(activity.applicationContext)
-            .enqueueUniqueWork(OPPORTUNITY, ExistingWorkPolicy.KEEP, request)
-        Log.i("AutoFullBackup", "TV foreground diagnostic backup requested (workId=${request.id})")
-    }
-
-    fun onActivityStopped() {
-        foregroundTransitions.onActivityStopped()
     }
 
     /** Same WorkManager worker as the daily backup, but on-demand even if disabled. */
@@ -215,7 +156,6 @@ class AutoFullBackupWorker(context: Context, params: WorkerParameters) : Corouti
         val app = applicationContext
         val forced = inputData.getBoolean(FORCE_FULL_BACKUP_NOW, false)
         val trigger = when {
-            inputData.getBoolean(DEBUG_TV_FOREGROUND_REQUEST, false) -> "tv-foreground-diagnostic"
             forced -> "manual-request"
             else -> "scheduled"
         }

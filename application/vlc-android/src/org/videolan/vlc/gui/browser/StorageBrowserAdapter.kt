@@ -25,6 +25,7 @@ package org.videolan.vlc.gui.browser
 
 import android.content.Context
 import android.net.Uri
+import android.view.KeyEvent
 import android.view.View
 import androidx.core.content.ContextCompat
 import androidx.databinding.ViewDataBinding
@@ -47,6 +48,8 @@ import org.videolan.vlc.gui.helpers.ThreeStatesCheckbox
 import org.videolan.vlc.repository.DirectoryRepository
 import org.videolan.vlc.util.getDescriptionSpan
 import org.videolan.vlc.util.isSchemeFile
+
+internal fun shouldFocusStorageCheckbox(isTv: Boolean, enabled: Boolean): Boolean = isTv && enabled
 
 class StorageBrowserAdapter(browserContainer: BrowserContainer<MediaLibraryItem>) : BaseBrowserAdapter(browserContainer) {
 
@@ -88,7 +91,24 @@ class StorageBrowserAdapter(browserContainer: BrowserContainer<MediaLibraryItem>
                 else -> vh.bindingContainer.browserCheckbox.state = ThreeStatesCheckbox.STATE_UNCHECKED
             }
             if(AndroidDevices.isTv && !browserContainer.isRootDirectory) vh.bindingContainer.banIcon.visibility = View.VISIBLE
+            val canToggleCheckbox = !browserContainer.scannedDirectory && !banned
             vh.bindingContainer.setCheckEnabled(!browserContainer.scannedDirectory)
+            val checkbox = vh.bindingContainer.browserCheckbox
+            val row = vh.bindingContainer.container
+            checkbox.isFocusable = shouldFocusStorageCheckbox(AndroidDevices.isTv, canToggleCheckbox)
+            checkbox.isFocusableInTouchMode = false
+            row.setOnKeyListener { _, keyCode, event ->
+                val moveToCheckbox = AndroidDevices.isTv && keyCode == KeyEvent.KEYCODE_DPAD_LEFT &&
+                        event.action == KeyEvent.ACTION_DOWN && checkbox.isFocusable
+                if (moveToCheckbox) checkbox.requestFocus()
+                moveToCheckbox
+            }
+            checkbox.setOnKeyListener { _, keyCode, event ->
+                val moveToRow = AndroidDevices.isTv && keyCode == KeyEvent.KEYCODE_DPAD_RIGHT &&
+                        event.action == KeyEvent.ACTION_DOWN && row.isFocusable && row.isEnabled
+                if (moveToRow) row.requestFocus()
+                moveToRow
+            }
         }
     }
 

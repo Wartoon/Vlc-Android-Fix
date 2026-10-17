@@ -755,6 +755,7 @@
     <string name="encryption_warning">Achtung, für diese Android-Version ist keine Verschlüsselung verfügbar. Das Passwort wird an einem privaten Ort gespeichert, aber nicht verschlüsselt</string>
     <string name="store_password">Passwort merken</string>
     <string name="add_to_playlist">Zur Wiedergabeliste hinzufügen</string>
+    <string name="create_playlist_from_folder">Wiedergabeliste aus diesem Ordner erstellen</string>
     <string name="popup_playback_title">Video im Pop-Up-Fenster abspielen</string>
     <string name="popup_playback">Wird in einem Pop-Up-Fenster wiedergegeben</string>
     <string name="popup_expand">Video vergrößern</string>
@@ -786,7 +787,7 @@
     <string name="ml_discovering">Entdecken</string>
     <string name="resume">Fortsetzen</string>
     <string name="length">Laufzeit</string>
-    <string name="tv_settings_hint">Langes Betätigen des OK-Buttons zur An- und Abwahl von Verzeichnissen</string>
+    <string name="tv_settings_hint">Ordner-Checkbox mit der Fernbedienung ansteuern und OK drücken. Alternativ OK lange drücken.</string>
     <string name="ml_external_storage_title">Neuen externen Speicher gefunden</string>
     <string name="ml_external_storage_msg">Möchten Sie, dass VLC das Gerät %1$s zu Ihrer Medienbibliothek hinzufügt?</string>
     <string name="ml_external_storage_accept">Ja</string>

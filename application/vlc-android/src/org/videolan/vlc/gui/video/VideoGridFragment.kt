@@ -255,6 +255,7 @@ class VideoGridFragment : MediaBrowserFragment<VideosViewModel>(), SwipeRefreshL
         menu.findItem(R.id.ungroup).isVisible = viewModel.group != null
         menu.findItem(R.id.ml_menu_sortby).isVisible = false
         menu.findItem(R.id.ml_menu_display_options).isVisible = true
+        menu.findItem(R.id.video_create_playlist_from_folder).isVisible = viewModel.folder != null
         if (requireActivity().isTalkbackIsEnabled()) menu.findItem(R.id.play_all).isVisible = true
     }
 
@@ -271,6 +272,15 @@ class VideoGridFragment : MediaBrowserFragment<VideosViewModel>(), SwipeRefreshL
             }
             R.id.play_all -> {
                 onFabPlayClick(binding.root)
+            }
+            R.id.video_create_playlist_from_folder -> {
+                val host = activity
+                viewModel.folder?.let { folder ->
+                    if (host != null) lifecycleScope.launch {
+                        val tracks = withContext(Dispatchers.IO) { folder.getAll() }
+                        if (tracks.isNotEmpty() && host.isStarted()) host.addToPlaylist(tracks)
+                    }
+                }
             }
             R.id.ml_menu_display_options -> {
                 //filter all sorts and keep only applicable ones

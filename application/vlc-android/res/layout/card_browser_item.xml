@@ -94,6 +94,7 @@
             style="@style/VLCCardView.NoShadow"
             android:contentDescription="@{TalkbackUtil.INSTANCE.getDir(context, item, favorite)}"
             app:mediaContentDescription="@{item}"
+            android:focusable="true"
             android:longClickable="@{hasContextMenu || item.getItemType() == MediaLibraryItem.TYPE_STORAGE}"
             android:onClick="@{holder::onClick}"
             android:onLongClick="@{holder::onLongClick}">
@@ -110,6 +111,9 @@
                     android:id="@+id/browser_checkbox"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:minWidth="48dp"
+                    android:minHeight="48dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
                     android:enabled="@{checkEnabled}"
                     android:focusable="false"
                     android:onClick="@{holder::onCheckBoxClick}"

@@ -775,6 +775,7 @@
     <string name="encryption_warning">Warning, encryption is not available for this Android version, password will be stored in a private space but not encrypted</string>
     <string name="store_password">Remember password</string>
     <string name="add_to_playlist">Add to playlist</string>
+    <string name="create_playlist_from_folder">Create playlist from this folder</string>
     <string name="popup_playback_title">Play video in a Pop-Up window</string>
     <string name="popup_playback">Playing in a Pop-Up window</string>
     <string name="popup_expand">Expand video</string>
@@ -806,7 +807,7 @@
     <string name="ml_discovering">Discovering</string>
     <string name="resume">Resume</string>
     <string name="length">Length</string>
-    <string name="tv_settings_hint">Long press OK button to check/uncheck directories</string>
+    <string name="tv_settings_hint">Focus a folder checkbox with the remote and press OK, or long press OK to toggle it</string>
     <string name="ml_external_storage_title">New external storage detected</string>
     <string name="ml_external_storage_msg">Do you want VLC to add device %1$s to your medialibrary?</string>
     <string name="ml_external_storage_accept">Yes</string>

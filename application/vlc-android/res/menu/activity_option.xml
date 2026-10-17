@@ -152,6 +152,13 @@
         </menu>
     </item>
     <item
+            android:id="@+id/video_create_playlist_from_folder"
+            android:icon="@drawable/ic_add_to_playlist"
+            android:orderInCategory="3"
+            android:title="@string/create_playlist_from_folder"
+            android:visible="false"
+            vlc:showAsAction="ifRoom|collapseActionView" />
+    <item
             android:id="@+id/ml_menu_add_playlist"
             android:orderInCategory="3"
             android:title="@string/add_to_playlist"
