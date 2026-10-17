@@ -1,20 +1,19 @@
 package org.videolan.television.ui.browser
 
-import android.net.Uri
+import java.net.URI
 
 internal data class TvFolderBackTarget(val uri: String, val remainingRoute: List<String>)
 
 internal fun initialTvFolderRoute(uriString: String): List<String> {
-    val uri = Uri.parse(uriString)
+    val uri = runCatching { URI(uriString) }.getOrNull() ?: return listOf(uriString)
     if (!uri.scheme.equals("smb", ignoreCase = true)) return listOf(uriString)
 
-    val segments = uri.pathSegments
+    val authority = uri.rawAuthority ?: return listOf(uriString)
+    val segments = uri.rawPath.orEmpty().split('/').filter { it.isNotEmpty() }
     if (segments.isEmpty()) return listOf(uriString)
+    val baseUri = "${uri.scheme}://$authority"
     return segments.mapIndexed { index, _ ->
-        uri.buildUpon()
-                .encodedPath("/" + segments.take(index + 1).joinToString("/") { Uri.encode(it) })
-                .build()
-                .toString()
+        "$baseUri/${segments.take(index + 1).joinToString("/")}"
     }
 }
 
