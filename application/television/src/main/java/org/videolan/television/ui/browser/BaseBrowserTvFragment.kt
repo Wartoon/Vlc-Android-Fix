@@ -239,7 +239,7 @@ abstract class BaseBrowserTvFragment<T> : Fragment(), BrowserFragmentInterface, 
     }
 
     private fun setupPlaylistCreation() {
-        val item = viewModel.currentItem
+        val item = viewModel.currentItem as? MediaLibraryItem
         val playlistable = item?.let {
             shouldShowVideoPlaylistAction(it.itemType, (it as? MediaWrapper)?.type)
         } == true
