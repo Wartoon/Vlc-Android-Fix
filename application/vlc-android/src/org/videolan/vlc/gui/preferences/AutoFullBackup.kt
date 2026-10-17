@@ -14,6 +14,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkerParameters
 import androidx.work.WorkManager
 import androidx.work.workDataOf
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.videolan.resources.AppContextProvider
@@ -135,7 +136,7 @@ object AutoFullBackup {
             .setBackoffCriteria(androidx.work.BackoffPolicy.EXPONENTIAL, 30, TimeUnit.MINUTES)
             .build()
         WorkManager.getInstance(activity.applicationContext)
-            .enqueueUniqueWork(OPPORTUNITY, ExistingWorkPolicy.REPLACE, request)
+            .enqueueUniqueWork(OPPORTUNITY, ExistingWorkPolicy.KEEP, request)
         Log.i("AutoFullBackup", "TV foreground diagnostic backup requested (workId=${request.id})")
     }
 
@@ -226,6 +227,9 @@ class AutoFullBackupWorker(context: Context, params: WorkerParameters) : Corouti
             // Playback, scanning, a concurrent manual backup, or a recent
             // successful backup are not failures. WorkManager retries later.
             if (shouldRunFullBackup(forced, AutoFullBackup.isDue(app))) Result.retry() else Result.success()
+        } catch (e: CancellationException) {
+            // WorkManager cancellation is not a backup failure; preserve cancellation semantics.
+            throw e
         } catch (e: Exception) {
             AutoFullBackup.automaticBackupFailed(app, e)
             Result.retry()
