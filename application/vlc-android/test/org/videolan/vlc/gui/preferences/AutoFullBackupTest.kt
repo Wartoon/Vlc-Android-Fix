@@ -49,6 +49,7 @@ class AutoFullBackupTest {
         transitions.onActivityStopped()
         assertFalse(transitions.onActivityStarted())
         transitions.onActivityStopped()
+        transitions.onActivityStopped()
         assertTrue(transitions.onActivityStarted())
     }
 }
