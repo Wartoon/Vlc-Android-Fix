@@ -221,8 +221,21 @@ abstract class BrowserProvider(val context: Context, val dataset: LiveDataset<Me
     }
 
     private suspend fun browseUrlImpl(url: String): List<MediaLibraryItem> {
-        val children = filesFlow(url).toList()
         val medias = ArrayList<MediaLibraryItem>()
+        try {
+            browseUrlImpl(url, medias)
+        } finally {
+            // Recursive browsing reuses one MediaBrowser. Clear its listener only after
+            // the complete traversal, otherwise a parent browse can clear a child's listener.
+            withContext(coroutineContextProvider.IO) {
+                mediabrowser?.changeEventListener(null)
+            }
+        }
+        return medias.toList()
+    }
+
+    private suspend fun browseUrlImpl(url: String, medias: MutableList<MediaLibraryItem>) {
+        val children = filesFlow(url, clearListenerOnClose = false).toList()
         val directories = ArrayList<MediaWrapper>()
         children.map { MLServiceLocator.getAbstractMediaWrapper(it) }.forEach {
             when (it.type) {
@@ -230,10 +243,7 @@ abstract class BrowserProvider(val context: Context, val dataset: LiveDataset<Me
                 MediaWrapper.TYPE_DIR -> directories.add(it)
             }
         }
-        directories.forEach {
-            medias.addAll(browseUrlImpl(it.uri.toString()))
-        }
-        return medias.toList()
+        directories.forEach { browseUrlImpl(it.uri.toString(), medias) }
     }
 
     protected open suspend fun refreshImpl() {
@@ -246,7 +256,7 @@ abstract class BrowserProvider(val context: Context, val dataset: LiveDataset<Me
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    private fun filesFlow(url: String? = this.url, interact : Boolean = true) = channelFlow<IMedia> {
+    private fun filesFlow(url: String? = this.url, interact : Boolean = true, clearListenerOnClose: Boolean = true) = channelFlow<IMedia> {
         val listener = object : EventListener {
             override fun onMediaAdded(index: Int, media: IMedia) {
                 if (!isClosedForSend) trySend(media.apply { retain() })
@@ -259,7 +269,7 @@ abstract class BrowserProvider(val context: Context, val dataset: LiveDataset<Me
             override fun onMediaRemoved(index: Int, media: IMedia) {}
         }
         requestBrowsing(url, listener, interact)
-        awaitClose { if (url != null) AppScope.launch(coroutineContextProvider.IO) {
+        awaitClose { if (url != null && clearListenerOnClose) AppScope.launch(coroutineContextProvider.IO) {
             mediabrowser?.changeEventListener(null) }
         }
     }.buffer(Channel.UNLIMITED)

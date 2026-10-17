@@ -116,10 +116,14 @@ class VerticalGridActivity : BaseTvActivity(), BrowserActivityInterface {
 
     override fun onBackPressed() {
         if (supportFragmentManager.backStackEntryCount == 0) {
+            val currentFileBrowser = supportFragmentManager.findFragmentById(R.id.tv_fragment_placeholder) as? FileBrowserTvFragment
+            if (currentFileBrowser?.backToSavedParentIfHistoryWasLost() == true) return
+
             val type = intent.getLongExtra(MainTvActivity.BROWSER_TYPE, -1)
             if (type == HEADER_DIRECTORIES || type == HEADER_NETWORK) {
                 Settings.getInstance(this).putSingle("tv_last_file_browser_category", -1L)
                 Settings.getInstance(this).putSingle("tv_last_file_browser_uri", "")
+                Settings.getInstance(this).putSingle("tv_last_file_browser_route", "")
             }
         }
         super.onBackPressed()

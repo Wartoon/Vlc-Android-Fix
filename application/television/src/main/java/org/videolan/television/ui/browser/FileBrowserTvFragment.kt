@@ -243,16 +243,39 @@ class FileBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>(), PathAda
         binding.emptyLoading.showNoMedia = false
     }
 
-    private fun persistCurrentFolderRoute(item: MediaWrapper? = currentItem as? MediaWrapper) {
+    private fun persistCurrentFolderRoute(
+            item: MediaWrapper? = currentItem as? MediaWrapper,
+            enteringFolder: Boolean = false
+    ) {
         val settings = Settings.getInstance(requireContext())
         settings.putSingle(LAST_TV_FOLDER_CATEGORY, getCategory())
-        settings.putSingle(LAST_TV_FOLDER_URI, item?.uri?.toString().orEmpty())
+        val uri = item?.uri?.toString()
+        settings.putSingle(LAST_TV_FOLDER_URI, uri.orEmpty())
+        val route = settings.getString(LAST_TV_FOLDER_ROUTE, "").orEmpty()
+                .lineSequence().filter { it.isNotBlank() }.toList()
+        val updatedRoute = updateTvFolderRoute(route, uri, enteringFolder)
+        settings.putSingle(LAST_TV_FOLDER_ROUTE, updatedRoute.joinToString("\n"))
     }
 
     private fun clearSavedFolderRoute() {
         val settings = Settings.getInstance(requireContext())
         settings.putSingle(LAST_TV_FOLDER_CATEGORY, -1L)
         settings.putSingle(LAST_TV_FOLDER_URI, "")
+        settings.putSingle(LAST_TV_FOLDER_ROUTE, "")
+    }
+
+    internal fun backToSavedParentIfHistoryWasLost(): Boolean {
+        val currentUri = (currentItem as? MediaWrapper)?.uri?.toString() ?: return false
+        val settings = Settings.getInstance(requireContext())
+        val route = settings.getString(LAST_TV_FOLDER_ROUTE, "").orEmpty()
+                .lineSequence().filter { it.isNotBlank() }.toList()
+        val target = previousTvFolder(route, currentUri) ?: return false
+        settings.putSingle(LAST_TV_FOLDER_ROUTE, target.remainingRoute.joinToString("\n"))
+        val parent = MLServiceLocator.getAbstractMediaWrapper(target.uri.toUri()).apply {
+            type = MediaWrapper.TYPE_DIR
+        }
+        browse(parent, false)
+        return true
     }
 
     override fun onResume() {
@@ -287,7 +310,7 @@ class FileBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>(), PathAda
         val ctx = activity
         if (ctx == null || !isResumed || isRemoving) return
         val ft = ctx.supportFragmentManager.beginTransaction()
-        persistCurrentFolderRoute(media)
+        persistCurrentFolderRoute(media, enteringFolder = save)
         val next = newInstance(getCategory(), media)
         (viewModel as BrowserModel).saveList(media)
         if (save) ft.addToBackStack(if (mrl == null) "root" else viewModel.currentItem?.title ?: FileUtils.getFileNameFromPath(mrl))
@@ -350,3 +373,4 @@ class FileBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>(), PathAda
 
 private const val LAST_TV_FOLDER_CATEGORY = "tv_last_file_browser_category"
 private const val LAST_TV_FOLDER_URI = "tv_last_file_browser_uri"
+private const val LAST_TV_FOLDER_ROUTE = "tv_last_file_browser_route"

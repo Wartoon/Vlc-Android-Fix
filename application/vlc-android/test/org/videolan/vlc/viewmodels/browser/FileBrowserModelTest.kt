@@ -126,6 +126,20 @@ class FileBrowserModelTest : BaseTest() {
     }
 
     @Test
+    fun browseUrlIncludesVideosInsideNestedDirectories() = runBlocking {
+        initBrowserModel(null, showHiddenFiles = false)
+        val parent = temporaryFolder.newFolder("playlist-parent")
+        val nested = File(parent, "nested").apply { mkdir() }
+        val video = File(nested, "nested-video.mp4").apply { createNewFile() }
+
+        val result = browserProvider.browseUrl(Uri.fromFile(parent).toString())
+
+        val videos = result.filterIsInstance<MediaWrapper>().filter { it.type == MediaWrapper.TYPE_VIDEO }
+        assertEquals(1, videos.size)
+        assertEquals(video.absolutePath, videos.single().uri.path)
+    }
+
+    @Test
     fun whenAtRootAndSavedList_checkPrefetchListIsFilled() {
         initBrowserModel(null, showHiddenFiles = false)
 
