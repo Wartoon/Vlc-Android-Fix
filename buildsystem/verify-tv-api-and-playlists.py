@@ -37,6 +37,23 @@ assert 'android:layout_width="56dp"' in button
 assert 'android:layout_height="56dp"' in button
 assert 'android:background="@color/transparent"' in button
 assert '@drawable/ic_tv_browser_playlist' in button
+playlist_icon = read("application/resources/src/main/res/drawable/ic_tv_browser_playlist.xml")
+assert 'android:width="30dp"' in playlist_icon
+assert 'android:height="30dp"' in playlist_icon
+
+route = read("application/television/src/main/java/org/videolan/television/ui/browser/TvFolderRoute.kt")
+assert "return listOf(uriString)" in route
+assert "initialTvFolderRoute(currentUri)" in route
+activity = read("application/television/src/main/java/org/videolan/television/ui/browser/VerticalGridActivity.kt")
+assert 'putSingle(LAST_TV_FOLDER_ROUTE, "")' in activity
+
+media_model = read("application/television/src/main/java/org/videolan/television/viewmodel/MediaBrowserViewModel.kt")
+assert "FoldersProvider(context, this, Folder.TYPE_FOLDER_VIDEO)" in media_model
+assert "VideosProvider(parent, null, context, this)" in media_model
+media_browser = read("application/television/src/main/java/org/videolan/television/ui/browser/MediaBrowserTvFragment.kt")
+assert "item is Folder" in media_browser
+assert "putExtra(ITEM, item)" in media_browser
+assert "intent.parcelable(ITEM)" in activity
 
 app_gradle = read("application/app/build.gradle")
 assert 'variantBuilder.minSdk = 30' in app_gradle

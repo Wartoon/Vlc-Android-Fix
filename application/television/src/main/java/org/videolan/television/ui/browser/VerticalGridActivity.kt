@@ -74,8 +74,13 @@ class VerticalGridActivity : BaseTvActivity(), BrowserActivityInterface {
         setContentView(binding.root)
         if (savedInstanceState == null) {
             val type = intent.getLongExtra(MainTvActivity.BROWSER_TYPE, -1)
+            if (type == HEADER_NETWORK || type == HEADER_DIRECTORIES) {
+                // A new browser launch (including a favorite shortcut) starts a
+                // fresh route. Keep ancestors added by folder clicks only.
+                Settings.getInstance(this).putSingle(LAST_TV_FOLDER_ROUTE, "")
+            }
             if (type == HEADER_VIDEO) {
-                fragment = MediaBrowserTvFragment.newInstance(CATEGORY_VIDEOS, null)
+                fragment = MediaBrowserTvFragment.newInstance(CATEGORY_VIDEOS, intent.parcelable<MediaLibraryItem>(ITEM))
             } else if (type == HEADER_CATEGORIES) {
                 val audioCategory = intent.getLongExtra(CATEGORY, CATEGORY_SONGS)
                 val item = intent.parcelable<MediaLibraryItem>(ITEM)

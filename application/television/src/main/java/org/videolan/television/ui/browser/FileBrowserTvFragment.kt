@@ -371,6 +371,6 @@ class FileBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>(), PathAda
     }
 }
 
-private const val LAST_TV_FOLDER_CATEGORY = "tv_last_file_browser_category"
-private const val LAST_TV_FOLDER_URI = "tv_last_file_browser_uri"
-private const val LAST_TV_FOLDER_ROUTE = "tv_last_file_browser_route"
+internal const val LAST_TV_FOLDER_CATEGORY = "tv_last_file_browser_category"
+internal const val LAST_TV_FOLDER_URI = "tv_last_file_browser_uri"
+internal const val LAST_TV_FOLDER_ROUTE = "tv_last_file_browser_route"

@@ -5,6 +5,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import org.videolan.medialibrary.interfaces.media.Playlist
+import org.videolan.medialibrary.interfaces.media.Folder
 import org.videolan.medialibrary.media.MediaLibraryItem
 import org.videolan.resources.CATEGORY_ALBUMS
 import org.videolan.resources.CATEGORY_ARTISTS
@@ -14,6 +15,7 @@ import org.videolan.resources.CATEGORY_VIDEOS
 import org.videolan.vlc.providers.medialibrary.AlbumsProvider
 import org.videolan.vlc.providers.medialibrary.ArtistsProvider
 import org.videolan.vlc.providers.medialibrary.GenresProvider
+import org.videolan.vlc.providers.medialibrary.FoldersProvider
 import org.videolan.vlc.providers.medialibrary.PlaylistsProvider
 import org.videolan.vlc.providers.medialibrary.TracksProvider
 import org.videolan.vlc.providers.medialibrary.VideosProvider
@@ -31,7 +33,11 @@ class MediaBrowserViewModel(context: Context, val category: Long, val parent : M
         CATEGORY_ALBUMS -> AlbumsProvider(parent, context, this)
         CATEGORY_ARTISTS -> ArtistsProvider(context, this, false)
         CATEGORY_GENRES -> GenresProvider(context, this)
-        CATEGORY_VIDEOS -> VideosProvider(null, null, context, this)
+        CATEGORY_VIDEOS -> if (parent is Folder) {
+            VideosProvider(parent, null, context, this)
+        } else {
+            FoldersProvider(context, this, Folder.TYPE_FOLDER_VIDEO)
+        }
         CATEGORY_PLAYLISTS -> PlaylistsProvider(context, this, Playlist.Type.All)
         else -> TracksProvider(null, context, this)
     }

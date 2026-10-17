@@ -2,18 +2,22 @@ package org.videolan.television.ui.browser
 
 import android.os.Bundle
 import android.os.Parcelable
+import android.content.Intent
 import android.view.View
 import androidx.core.os.bundleOf
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import org.videolan.medialibrary.interfaces.Medialibrary
 import org.videolan.medialibrary.interfaces.media.MediaWrapper
+import org.videolan.medialibrary.interfaces.media.Folder
 import org.videolan.medialibrary.media.MediaLibraryItem
 import org.videolan.resources.*
 import org.videolan.resources.util.parcelable
 import org.videolan.television.ui.MediaTvItemAdapter
 import org.videolan.television.ui.TvItemAdapter
 import org.videolan.television.ui.TvUtil
+import org.videolan.television.ui.MainTvActivity
+import org.videolan.television.ui.browser.VerticalGridActivity
 import org.videolan.television.viewmodel.MediaBrowserViewModel
 import org.videolan.television.viewmodel.getMediaBrowserModel
 import org.videolan.tools.PLAYLIST_MODE_AUDIO
@@ -107,11 +111,19 @@ class MediaBrowserTvFragment : BaseBrowserTvFragment<MediaLibraryItem>() {
     }
 
     override fun onClick(v: View, position: Int, item: MediaLibraryItem) {
+        if ((viewModel as MediaBrowserViewModel).category == CATEGORY_VIDEOS && item is Folder) {
+            startActivity(Intent(requireActivity(), VerticalGridActivity::class.java).apply {
+                putExtra(MainTvActivity.BROWSER_TYPE, HEADER_VIDEO)
+                putExtra(ITEM, item)
+            })
+            return
+        }
+        val media = item as? MediaWrapper ?: return
         lifecycleScope.launchWhenStarted {
             if ((viewModel as MediaBrowserViewModel).category == CATEGORY_VIDEOS && !Settings.getInstance(requireContext()).getBoolean(PLAYLIST_MODE_VIDEO, Settings.tvUI)) {
-                TvUtil.playMedia(requireActivity(), item as MediaWrapper)
+                TvUtil.playMedia(requireActivity(), media)
             } else if ((viewModel as MediaBrowserViewModel).category == CATEGORY_SONGS && !Settings.getInstance(requireContext()).getBoolean(PLAYLIST_MODE_AUDIO, Settings.tvUI)) {
-                TvUtil.playMedia(requireActivity(), item as MediaWrapper)
+                TvUtil.playMedia(requireActivity(), media)
             } else {
                 TvUtil.openMediaFromPaged(requireActivity(), item, viewModel.provider as MedialibraryProvider<out MediaLibraryItem>)
             }

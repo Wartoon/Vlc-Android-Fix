@@ -1,20 +1,11 @@
 package org.videolan.television.ui.browser
 
-import java.net.URI
-
 internal data class TvFolderBackTarget(val uri: String, val remainingRoute: List<String>)
 
 internal fun initialTvFolderRoute(uriString: String): List<String> {
-    val uri = runCatching { URI(uriString) }.getOrNull() ?: return listOf(uriString)
-    if (!uri.scheme.equals("smb", ignoreCase = true)) return listOf(uriString)
-
-    val authority = uri.rawAuthority ?: return listOf(uriString)
-    val segments = uri.rawPath.orEmpty().split('/').filter { it.isNotEmpty() }
-    if (segments.isEmpty()) return listOf(uriString)
-    val baseUri = "${uri.scheme}://$authority"
-    return segments.mapIndexed { index, _ ->
-        "$baseUri/${segments.take(index + 1).joinToString("/")}"
-    }
+    // A path opened from a favorite or intent is the user's starting location,
+    // not a history of folders they visited in this browser session.
+    return listOf(uriString)
 }
 
 internal fun updateTvFolderRoute(route: List<String>, currentUri: String?, enteringFolder: Boolean): List<String> {

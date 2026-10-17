@@ -12,20 +12,31 @@ class MediaBrowserTvFragmentTest {
     }
 
     @Test
-    fun restoredSmbFolderRouteContainsItsShareAndParentFolders() {
+    fun directSmbFavoriteStartsAtItsOpenedFolder() {
         assertEquals(
-                listOf("smb://server/share", "smb://server/share/series", "smb://server/share/series/season"),
+                listOf("smb://server/share/series/season"),
                 initialTvFolderRoute("smb://server/share/series/season")
         )
     }
 
     @Test
-    fun missingFragmentHistoryReturnsToPreviousSavedFolder() {
-        val route = listOf("smb://server/share", "smb://server/share/series", "smb://server/share/series/season")
+    fun directSmbFavoriteHasNoInventedParentHistory() {
+        val route = initialTvFolderRoute("smb://server/share/series/season")
 
-        val target = previousTvFolder(route, "smb://server/share/series/season")
+        assertEquals(null, previousTvFolder(route, "smb://server/share/series/season"))
+    }
 
-        assertEquals("smb://server/share/series", target?.uri)
-        assertEquals(route.take(2), target?.remainingRoute)
+    @Test
+    fun foldersVisitedAfterOpeningFavoriteRemainInBackHistory() {
+        val route = updateTvFolderRoute(
+                initialTvFolderRoute("smb://server/share/series/season"),
+                "smb://server/share/series/season/episode-subfolder",
+                enteringFolder = true
+        )
+
+        val target = previousTvFolder(route, "smb://server/share/series/season/episode-subfolder")
+
+        assertEquals("smb://server/share/series/season", target?.uri)
+        assertEquals(listOf("smb://server/share/series/season"), target?.remainingRoute)
     }
 }
