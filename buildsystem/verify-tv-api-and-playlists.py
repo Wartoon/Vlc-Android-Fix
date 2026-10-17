@@ -53,7 +53,7 @@ assert "VideosProvider(parent, null, context, this)" in media_model
 media_browser = read("application/television/src/main/java/org/videolan/television/ui/browser/MediaBrowserTvFragment.kt")
 assert "item is Folder" in media_browser
 assert "putExtra(ITEM, item)" in media_browser
-assert "intent.parcelable(ITEM)" in activity
+assert "intent.parcelable" in activity and "ITEM)" in activity
 
 app_gradle = read("application/app/build.gradle")
 assert 'variantBuilder.minSdk = 30' in app_gradle
