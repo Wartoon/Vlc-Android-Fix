@@ -136,17 +136,15 @@ open class FileBrowserProvider(
         return when {
             url == "otg://" || url.startsWith("content:") -> {
                 val result = ArrayList<MediaWrapper>()
-                launch {
-                    val files = withContext(coroutineContextProvider.IO) {
-                        @Suppress("UNCHECKED_CAST")
-                        getDocumentFiles(context, url.toUri().path?.substringAfterLast(':')
-                                ?: "") as? MutableList<MediaLibraryItem> ?: mutableListOf()
-                    }.map { it as MediaWrapper }
+                val files = withContext(coroutineContextProvider.IO) {
+                    @Suppress("UNCHECKED_CAST")
+                    getDocumentFiles(context, url.toUri().path?.substringAfterLast(':')
+                            ?: "") as? MutableList<MediaLibraryItem> ?: mutableListOf()
+                }.mapNotNull { it as? MediaWrapper }
 
-                    result.addAll(files.filter { it.itemType == MediaWrapper.TYPE_MEDIA })
-                    files.filter { it.itemType == MediaWrapper.TYPE_DIR }.forEach {
-                        result.addAll(browseByUrl(it.uri.toString()))
-                    }
+                result.addAll(files.filter { it.itemType == MediaWrapper.TYPE_MEDIA })
+                files.filter { it.itemType == MediaWrapper.TYPE_DIR }.forEach {
+                    result.addAll(browseByUrl(it.uri.toString()))
                 }
                 result.toList()
             }

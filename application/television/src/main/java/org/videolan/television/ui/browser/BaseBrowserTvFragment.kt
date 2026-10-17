@@ -68,6 +68,8 @@ import org.videolan.vlc.interfaces.BrowserFragmentInterface
 import org.videolan.vlc.interfaces.IEventsHandler
 import org.videolan.vlc.gui.helpers.UiTools.addToPlaylist
 import org.videolan.vlc.media.getAll
+import org.videolan.vlc.providers.BrowserProvider
+import org.videolan.vlc.providers.FileBrowserProvider
 import org.videolan.vlc.util.RefreshModel
 import org.videolan.vlc.util.ThumbnailsProvider
 import org.videolan.vlc.util.getScreenWidth
@@ -252,13 +254,17 @@ abstract class BaseBrowserTvFragment<T> : Fragment(), BrowserFragmentInterface, 
             binding.playlistButton.isEnabled = false
             viewLifecycleOwner.lifecycleScope.launch {
                 try {
-                    val visibleFileVideos = (adapter as? FileTvItemAdapter)?.dataset
-                        ?.filter { it.type == MediaWrapper.TYPE_VIDEO }
-                        .orEmpty()
                     val videos = withContext(Dispatchers.IO) {
                         when (selected) {
                             is Folder -> selected.getAll()
-                            is MediaWrapper -> if (selected.type == MediaWrapper.TYPE_DIR) visibleFileVideos else emptyList()
+                            is MediaWrapper -> if (selected.type == MediaWrapper.TYPE_DIR) {
+                                val provider = viewModel.provider as? BrowserProvider
+                                if (provider is FileBrowserProvider) {
+                                    provider.browseByUrl(selected.uri.toString())
+                                } else {
+                                    provider?.browseUrl(selected.uri.toString())?.filterIsInstance<MediaWrapper>().orEmpty()
+                                }
+                            } else emptyList()
                             else -> emptyList()
                         }.filter { it.type == MediaWrapper.TYPE_VIDEO }
                     }

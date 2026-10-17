@@ -136,6 +136,15 @@ class StoragePermissionsDelegate : BaseHeadlessFragment() {
             }
         }
 
+    private val allFilesAccessLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            if (activity == null) return@registerForActivityResult
+            val granted = isExternalStorageManager()
+            storageAccessGranted.value = granted
+            model.complete(granted)
+            exit()
+        }
+
     private fun requestStorageAccess(write: Boolean) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !askOnlyRead) {
             val uri = Uri.fromParts(SCHEME_PACKAGE, requireContext().packageName, null)
@@ -159,10 +168,8 @@ class StoragePermissionsDelegate : BaseHeadlessFragment() {
     }
 
     private fun askAllAccessPermission(intent: Intent) {
-        val code = android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION
         askedPermission = Permissions.MANAGE_EXTERNAL_STORAGE
-        activityResultLauncher.launch(code)
-        startActivity(intent)
+        allFilesAccessLauncher.launch(intent)
     }
 
     companion object {

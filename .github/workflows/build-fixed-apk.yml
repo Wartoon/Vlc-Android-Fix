@@ -3,7 +3,7 @@ name: Build VLC TV Fix V1
 on:
   workflow_dispatch:
   push:
-    branches: [ tv-v1, work/tv-one-backup-safety-20261016 ]
+    branches: [ tv-v1, work/tv-one-backup-safety-20261016, codex/tv-api28-31-final-build ]
 
 jobs:
   build:
@@ -122,6 +122,9 @@ jobs:
       - name: Verify media and separator ViewHolder binding
         run: python3 buildsystem/verify-browser-viewholder-bindings.py
 
+      - name: Verify Android 9/12 permission and playlist compatibility
+        run: python3 buildsystem/verify-tv-api-and-playlists.py
+
       - name: Run VLC and TV unit tests
         shell: bash
         run: gradle :application:vlc-android:testDebugUnitTest :application:television:testDebugUnitTest :application:app:testDebugUnitTest --no-daemon --stacktrace
@@ -176,6 +179,10 @@ jobs:
           expected = "org.videolan.vlc.tvfix"
           assert actual == expected, f"expected {expected}, got {actual}"
           print(f"verified APK package ID {actual}")
+          sdk_line = next(line for line in output.splitlines() if line.startswith("sdkVersion:"))
+          min_sdk = int(sdk_line.split("'", 2)[1])
+          assert min_sdk <= 28, f"APK minSdk {min_sdk} excludes the Sony Android 9 TV (API 28)"
+          print(f"verified APK minSdk {min_sdk} supports Sony API 28 and Philips API 31")
           PY
           sha256sum out/VLC-TV-Fix-all.apk
 
