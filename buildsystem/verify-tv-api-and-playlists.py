@@ -35,7 +35,7 @@ button_end = layout.index("/>", button_start)
 button = layout[button_start:button_end]
 assert 'android:layout_width="56dp"' in button
 assert 'android:layout_height="56dp"' in button
-assert '@drawable/tv_playlist_action_background' in button
+assert 'android:background="@color/transparent"' in button
 assert '@drawable/ic_tv_browser_playlist' in button
 
 app_gradle = read("application/app/build.gradle")
