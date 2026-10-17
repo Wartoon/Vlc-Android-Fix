@@ -1,6 +1,5 @@
 package org.videolan.vlc.gui.preferences
 
-import androidx.sqlite.driver.bundled.BundledSQLite
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -29,8 +28,7 @@ class BundledBackupDatabaseReaderTest {
 
     private fun createDatabaseWithUpdateFromTrigger(database: File) {
         BundledSQLiteDriver().open(
-            database.absolutePath,
-            BundledSQLite.SQLITE_OPEN_READWRITE or BundledSQLite.SQLITE_OPEN_CREATE
+            database.absolutePath
         ).use { connection ->
             listOf(
                 "CREATE TABLE Media(id_media INTEGER PRIMARY KEY, play_count INTEGER)",
