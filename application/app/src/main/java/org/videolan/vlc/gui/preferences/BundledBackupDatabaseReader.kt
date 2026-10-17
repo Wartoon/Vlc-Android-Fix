@@ -1,6 +1,5 @@
 package org.videolan.vlc.gui.preferences
 
-import androidx.sqlite.driver.bundled.BundledSQLite
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import java.io.File
 
@@ -8,7 +7,7 @@ import java.io.File
 object BundledBackupDatabaseReader {
     @JvmStatic
     fun read(file: File, artwork: Long): FullBackupLibrarySnapshot {
-        val db = BundledSQLiteDriver().open(file.absolutePath, BundledSQLite.SQLITE_OPEN_READONLY)
+        val db = BundledSQLiteDriver().open(file.absolutePath, 0x00000001)
         try {
             fun count(table: String): Long {
                 db.prepare("SELECT COUNT(*) FROM $table").use { statement ->
