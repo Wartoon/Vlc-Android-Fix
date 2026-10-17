@@ -112,6 +112,20 @@
             android:elevation="6dp"
             android:contentDescription="@string/refresh_thumbnails"
             app:srcCompat="@drawable/ic_tv_browser_refresh"
+            app:layout_constraintEnd_toStartOf="@+id/playlistButton"
+            app:layout_constraintTop_toTopOf="parent" />
+
+    <androidx.appcompat.widget.AppCompatImageButton
+            android:id="@+id/playlistButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/tv_overscan_vertical"
+            android:layout_marginEnd="8dp"
+            android:background="@color/transparent"
+            android:elevation="6dp"
+            android:contentDescription="@string/add_to_playlist"
+            android:visibility="gone"
+            app:srcCompat="@drawable/ic_tv_list_addtoplaylist"
             app:layout_constraintEnd_toStartOf="@+id/headerButton"
             app:layout_constraintTop_toTopOf="parent" />
 
@@ -136,7 +150,7 @@
                 android:layout_marginStart="@dimen/tv_overscan_horizontal"
                 android:layout_marginEnd="@dimen/tv_overscan_horizontal"
                 android:visibility="visible"
-                app:constraint_referenced_ids="sortButton,title,headerButton,thumbnailRefreshButton,thumbnailRefreshDescription" />
+                app:constraint_referenced_ids="sortButton,title,headerButton,thumbnailRefreshButton,thumbnailRefreshDescription,playlistButton,playlistDescription" />
 
         <org.videolan.television.ui.FocusableRecyclerView
                 android:id="@+id/list"
@@ -269,6 +283,24 @@
                 app:layout_constraintEnd_toEndOf="@+id/thumbnailRefreshButton"
                 app:layout_constraintStart_toStartOf="@+id/thumbnailRefreshButton"
                 app:layout_constraintTop_toBottomOf="@+id/thumbnailRefreshButton" />
+
+        <TextView
+                android:id="@+id/playlistDescription"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:alpha="0"
+                android:background="@drawable/rounded_corners"
+                android:paddingStart="8dp"
+                android:paddingTop="4dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="4dp"
+                android:text="@string/add_to_playlist"
+                android:visibility="gone"
+                app:layout_constraintEnd_toEndOf="@+id/playlistButton"
+                app:layout_constraintStart_toStartOf="@+id/playlistButton"
+                app:layout_constraintTop_toBottomOf="@+id/playlistButton" />
 
         <TextView
                 android:id="@+id/sortDescription"

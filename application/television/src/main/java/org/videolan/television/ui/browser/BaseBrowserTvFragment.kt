@@ -66,6 +66,8 @@ import org.videolan.vlc.gui.view.EmptyLoadingState
 import org.videolan.vlc.gui.view.RecyclerSectionItemGridDecoration
 import org.videolan.vlc.interfaces.BrowserFragmentInterface
 import org.videolan.vlc.interfaces.IEventsHandler
+import org.videolan.vlc.gui.helpers.UiTools.addToPlaylist
+import org.videolan.vlc.media.getAll
 import org.videolan.vlc.util.RefreshModel
 import org.videolan.vlc.util.ThumbnailsProvider
 import org.videolan.vlc.util.getScreenWidth
@@ -187,6 +189,7 @@ abstract class BaseBrowserTvFragment<T> : Fragment(), BrowserFragmentInterface, 
         })
         setAnimator(view as ConstraintLayout)
         setupThumbnailRefresh()
+        setupPlaylistCreation()
         binding.list.adapter = adapter as RecyclerView.Adapter<*>
         EventTools.getInstance().lastThumb.observe(viewLifecycleOwner) { media ->
             adapter.thumbnailReady(media)
@@ -230,6 +233,42 @@ abstract class BaseBrowserTvFragment<T> : Fragment(), BrowserFragmentInterface, 
                     ).show()
                 } finally {
                     if (isAdded) binding.thumbnailRefreshButton.isEnabled = true
+                }
+            }
+        }
+    }
+
+    private fun setupPlaylistCreation() {
+        val item = viewModel.currentItem
+        val playlistable = item?.let {
+            shouldShowVideoPlaylistAction(it.itemType, (it as? MediaWrapper)?.type)
+        } == true
+        val visibility = if (playlistable) View.VISIBLE else View.GONE
+        animationDelegate.setVisibility(binding.playlistButton, visibility)
+        animationDelegate.setVisibility(binding.playlistDescription, visibility)
+        binding.playlistButton.contentDescription = getString(org.videolan.resources.R.string.add_to_playlist)
+        binding.playlistButton.setOnClickListener {
+            val selected = viewModel.currentItem as? MediaLibraryItem ?: return@setOnClickListener
+            binding.playlistButton.isEnabled = false
+            viewLifecycleOwner.lifecycleScope.launch {
+                try {
+                    val visibleFileVideos = (adapter as? FileTvItemAdapter)?.dataset
+                        ?.filter { it.type == MediaWrapper.TYPE_VIDEO }
+                        .orEmpty()
+                    val videos = withContext(Dispatchers.IO) {
+                        when (selected) {
+                            is Folder -> selected.getAll()
+                            is MediaWrapper -> if (selected.type == MediaWrapper.TYPE_DIR) visibleFileVideos else emptyList()
+                            else -> emptyList()
+                        }.filter { it.type == MediaWrapper.TYPE_VIDEO }
+                    }
+                    if (videos.isEmpty()) {
+                        Toast.makeText(requireContext(), org.videolan.resources.R.string.no_video, Toast.LENGTH_SHORT).show()
+                    } else if (isAdded) {
+                        requireActivity().addToPlaylist(videos)
+                    }
+                } finally {
+                    if (isAdded) binding.playlistButton.isEnabled = true
                 }
             }
         }

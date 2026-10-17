@@ -112,6 +112,7 @@ internal class MediaBrowserAnimatorDelegate(val binding: SongBrowserBinding, pri
             binding.sortButton -> binding.sortDescription
             binding.favoriteButton -> binding.favoriteDescription
             binding.thumbnailRefreshButton -> binding.thumbnailRefreshDescription
+            binding.playlistButton -> binding.playlistDescription
             else -> null
         }
 
@@ -229,6 +230,7 @@ internal class MediaBrowserAnimatorDelegate(val binding: SongBrowserBinding, pri
         scrolledDownFABCollapsedConstraintSet.connect(R.id.favoriteDescription, ConstraintSet.TOP, R.id.imageButtonFavorite, ConstraintSet.TOP)
         scrolledDownFABCollapsedConstraintSet.connect(R.id.favoriteDescription, ConstraintSet.BOTTOM, R.id.imageButtonFavorite, ConstraintSet.BOTTOM)
         scrolledDownFABCollapsedConstraintSet.clear(R.id.thumbnailRefreshDescription, ConstraintSet.START)
+        scrolledDownFABCollapsedConstraintSet.clear(R.id.playlistDescription, ConstraintSet.START)
 
         // Title escapes by the top of the screen
         scrolledDownFABCollapsedConstraintSet.connect(R.id.title, ConstraintSet.BOTTOM, ConstraintSet.PARENT_ID, ConstraintSet.TOP)
@@ -258,6 +260,7 @@ internal class MediaBrowserAnimatorDelegate(val binding: SongBrowserBinding, pri
         scrolledDownFABExpandedConstraintSet.setAlpha(R.id.headerDescription, 1f)
         scrolledDownFABExpandedConstraintSet.setAlpha(R.id.favoriteDescription, 1f)
         scrolledDownFABExpandedConstraintSet.setAlpha(R.id.thumbnailRefreshDescription, 1f)
+        scrolledDownFABExpandedConstraintSet.setAlpha(R.id.playlistDescription, 1f)
 
         /* See MediaBrowserState.HEADER_VISIBLE */
         //We clone the scrolledDownFABCollapsedConstraintSet state
@@ -311,5 +314,6 @@ fun BaseBrowserTvFragment<*>.setAnimator(cl: ConstraintLayout) {
     binding.imageButtonHeader.onFocusChangeListener = animationDelegate
     binding.imageButtonSettings.onFocusChangeListener = animationDelegate
     binding.thumbnailRefreshButton.onFocusChangeListener = animationDelegate
+    binding.playlistButton.onFocusChangeListener = animationDelegate
     binding.list.addOnScrollListener(animationDelegate)
 }

@@ -24,6 +24,7 @@ package org.videolan.television.viewmodel
 
 import android.app.Application
 import android.content.Intent
+import android.net.Uri
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.AndroidViewModel
@@ -47,6 +48,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.videolan.medialibrary.interfaces.Medialibrary
+import org.videolan.medialibrary.interfaces.media.Folder
 import org.videolan.medialibrary.interfaces.media.MediaWrapper
 import org.videolan.medialibrary.interfaces.media.Playlist
 import org.videolan.medialibrary.media.DummyItem
@@ -197,19 +199,18 @@ class MainTvModel(app: Application) : AndroidViewModel(app), Medialibrary.OnMedi
         val allMovies = withContext(Dispatchers.IO) { mediaMetadataRepository.getMovieCount() }
         val allTvshows = withContext(Dispatchers.IO) { mediaMetadataRepository.getTvshowsCount() }
         val videoNb = context.getFromMl { videoCount }
-        context.getFromMl {
-            getPagedVideos(Medialibrary.SORT_INSERTIONDATE, true, true, false, NUM_ITEMS_PREVIEW, 0)
-        }.let {
-            (videos as MutableLiveData).value = mutableListOf<MediaLibraryItem>().apply {
-                add(DummyItem(HEADER_VIDEO, context.getString(R.string.videos_all), context.resources.getQuantityString(R.plurals.videos_quantity, videoNb, videoNb)))
-                if (allMovies > 0) {
-                    add(DummyItem(HEADER_MOVIES, context.getString(R.string.header_movies), context.resources.getQuantityString(R.plurals.movies_quantity, allMovies, allMovies)))
-                }
-                if (allTvshows > 0) {
-                    add(DummyItem(HEADER_TV_SHOW, context.getString(R.string.header_tvshows), context.resources.getQuantityString(R.plurals.tvshow_quantity, allTvshows, allTvshows)))
-                }
-                addAll(it)
+        val videoFolders = context.getFromMl {
+            getFolders(Folder.TYPE_FOLDER_VIDEO, Medialibrary.SORT_ALPHA, false, Settings.includeMissing, false, NUM_ITEMS_PREVIEW - 1, 0)
+        }
+        (videos as MutableLiveData).value = mutableListOf<MediaLibraryItem>().apply {
+            add(DummyItem(HEADER_VIDEO, context.getString(R.string.videos_all), context.resources.getQuantityString(R.plurals.videos_quantity, videoNb, videoNb)))
+            if (allMovies > 0) {
+                add(DummyItem(HEADER_MOVIES, context.getString(R.string.header_movies), context.resources.getQuantityString(R.plurals.movies_quantity, allMovies, allMovies)))
             }
+            if (allTvshows > 0) {
+                add(DummyItem(HEADER_TV_SHOW, context.getString(R.string.header_tvshows), context.resources.getQuantityString(R.plurals.tvshow_quantity, allTvshows, allTvshows)))
+            }
+            addAll(videoFolders)
         }
     }
 
@@ -332,6 +333,17 @@ class MainTvModel(app: Application) : AndroidViewModel(app), Medialibrary.OnMedi
 
     fun open(activity: FragmentActivity, item: Any?) {
         when (item) {
+            is Folder -> {
+                val uri = Uri.parse(item.mMrl).let { parsed ->
+                    if (parsed.scheme.isNullOrEmpty()) Uri.fromFile(java.io.File(item.mMrl)) else parsed
+                }
+                val intent = Intent(activity, VerticalGridActivity::class.java)
+                intent.putExtra(MainTvActivity.BROWSER_TYPE, if (uri.scheme == "file") HEADER_DIRECTORIES else HEADER_NETWORK)
+                intent.putExtra(FAVORITE_TITLE, item.title)
+                intent.data = uri
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
+                activity.startActivity(intent)
+            }
             is MediaWrapper -> when (item.type) {
                 MediaWrapper.TYPE_DIR -> {
                     val intent = Intent(activity, VerticalGridActivity::class.java)
