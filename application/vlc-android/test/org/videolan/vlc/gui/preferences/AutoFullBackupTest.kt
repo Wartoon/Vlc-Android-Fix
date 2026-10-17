@@ -29,6 +29,12 @@ class AutoFullBackupTest {
         assertTrue(shouldRunFullBackup(false, true))
     }
 
+    @Test fun enabledScheduledBackupRetriesWhenPeriodicRunIsEarly() {
+        assertTrue(shouldRetryScheduledFullBackup(true, false))
+        assertFalse(shouldRetryScheduledFullBackup(true, true))
+        assertFalse(shouldRetryScheduledFullBackup(false, false))
+    }
+
     @Test fun aClockSetBackwardsDoesNotTriggerRepeatedBackups() {
         assertFalse(fullBackupIsDue(true, 50000L, 49999L))
     }

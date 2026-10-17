@@ -39,6 +39,12 @@ internal fun fullBackupIsDue(enabled: Boolean, lastSuccess: Long, now: Long): Bo
 /** An explicitly requested backup is independent of the daily toggle and interval. */
 internal fun shouldRunFullBackup(force: Boolean, due: Boolean): Boolean = force || due
 
+/**
+ * A periodic attempt before the full interval elapses must retry, otherwise
+ * WorkManager consumes that day's period without creating a backup.
+ */
+internal fun shouldRetryScheduledFullBackup(enabled: Boolean, due: Boolean): Boolean = enabled && !due
+
 /** TEMPORARY TV diagnostics: request a forced backup on every app foreground entry. */
 internal const val DEBUG_TV_BACKUP_ON_FOREGROUND_ENTRY = true
 private const val DEBUG_TV_FOREGROUND_REQUEST = "vlc_full_backup_tv_foreground_debug"
@@ -214,7 +220,15 @@ class AutoFullBackupWorker(context: Context, params: WorkerParameters) : Corouti
             else -> "scheduled"
         }
         Log.i("AutoFullBackup", "Backup worker started (trigger=$trigger, workId=${id})")
-        if (!shouldRunFullBackup(forced, AutoFullBackup.isDue(app))) return Result.success()
+        val enabled = AutoFullBackup.isEnabled(app)
+        val due = AutoFullBackup.isDue(app)
+        if (!shouldRunFullBackup(forced, due)) {
+            if (shouldRetryScheduledFullBackup(enabled, due)) {
+                Log.i("AutoFullBackup", "Scheduled backup checked before 24h interval elapsed; retrying (workId=${id})")
+                return Result.retry()
+            }
+            return Result.success()
+        }
         return try {
             FullBackupEngine.create(app, automatic = true, force = forced,
                 allowReduction = forced && inputData.getBoolean(ACCEPT_REDUCED_LIBRARY, false))
