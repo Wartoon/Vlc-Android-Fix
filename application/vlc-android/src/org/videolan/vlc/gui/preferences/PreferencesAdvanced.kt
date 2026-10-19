@@ -624,9 +624,8 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                     val savedAppDb = File(staging, "appdb")
                     if (restoreAppDb && (savedAppDb.listFiles()?.none { it.isFile && it.length() > 0L } != false))
                         throw IOException("App database missing")
-
-                    if (restoreSettings)
-                        PreferenceParser.restoreSettings(requireActivity(), Uri.fromFile(settingsFile))
+                    if (restoreMediaDb) validateRestoreDatabase(mediaDb)
+                    if (restoreAppDb) validateRestoreDatabaseDirectory(savedAppDb)
 
                     val dataRoot = context.getDir("db", Context.MODE_PRIVATE).parentFile
                         ?: throw IOException("No app data directory")
@@ -637,28 +636,37 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                     val artworkDir = external?.let { File(it, Medialibrary.MEDIALIB_FOLDER_NAME.removePrefix("/")) }
                     val subtitlesDir = external?.let { File(it, "subtitles") }
 
-                    if (restoreMediaDb) replaceDirectoryContentsSafely(File(staging, "medialibrary/db"), mediaDbDir)
-
-                    if (restoreAppDb) replaceDirectoryContentsSafely(savedAppDb, appDbDir)
-
-                    // Optional: older backups do not include playback state.
-                    // Restore it last, after settings and database restoration.
-                    if (restoreSettings) {
-                        val playbackFile = File(staging, PlaybackStateBackup.ENTRY)
-                        if (playbackFile.isFile)
-                            PlaybackStateBackup.restore(context, playbackFile.readText(Charsets.UTF_8))
-                    }
-
+                    val restoreTargets = mutableListOf<Pair<File, File>>()
+                    if (restoreMediaDb) restoreTargets += File(staging, "medialibrary/db") to mediaDbDir
+                    if (restoreAppDb) restoreTargets += savedAppDb to appDbDir
                     if (restoreArtwork) {
-                        artworkDir?.let { replaceDirectoryContentsSafely(File(staging, "artwork/medialib"), it) }
+                        artworkDir?.let {
+                            val savedArtwork = File(staging, "artwork/medialib")
+                            if (savedArtwork.isDirectory) restoreTargets += savedArtwork to it
+                        }
                     }
 
                     if (restoreSubtitles) {
-                        subtitlesDir?.let { replaceDirectoryContentsSafely(File(staging, "external/subtitles"), it) }
+                        subtitlesDir?.let {
+                            val savedSubtitles = File(staging, "external/subtitles")
+                            if (savedSubtitles.isDirectory) restoreTargets += savedSubtitles to it
+                        }
                     }
 
                     if (restoreCredentials) {
-                        replaceDirectoryContentsSafely(File(staging, "keystore"), keyStoreDir)
+                        val savedKeyStore = File(staging, "keystore")
+                        if (savedKeyStore.isDirectory) restoreTargets += savedKeyStore to keyStoreDir
+                    }
+
+                    FullBackupRestoreTransaction.replace(restoreTargets) {
+                        if (restoreSettings)
+                            PreferenceParser.restoreSettings(requireActivity(), Uri.fromFile(settingsFile))
+                        // Optional: older backups do not include playback state.
+                        if (restoreSettings) {
+                            val playbackFile = File(staging, PlaybackStateBackup.ENTRY)
+                            if (playbackFile.isFile)
+                                PlaybackStateBackup.restore(context, playbackFile.readText(Charsets.UTF_8))
+                        }
                     }
 
                     staging.deleteRecursively()

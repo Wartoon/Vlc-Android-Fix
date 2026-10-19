@@ -5,8 +5,6 @@ import android.system.Os
 import java.io.File
 import java.io.IOException
 import java.io.RandomAccessFile
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import java.util.zip.CRC32
 import java.util.zip.ZipFile
 
@@ -60,19 +58,35 @@ internal fun verifyAndReplaceFullBackup(staged: File, destination: File) {
     // Ensure the fully-written archive reaches storage before replacing the old copy.
     RandomAccessFile(staged, "rw").use { it.fd.sync() }
     try {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // An atomic same-directory move replaces the existing ZIP only once
-            // its replacement has been completely checked. Also works in JVM tests.
-            Files.move(
-                staged.toPath(), destination.toPath(),
-                StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING
-            )
-        } else {
-            // java.nio.file is unavailable below API 26.
-            Os.rename(staged.absolutePath, destination.absolutePath)
-        }
+        replaceBySameDirectoryRename(staged, destination)
     } catch (e: Exception) {
         throw IOException("Could not safely replace previous full backup", e)
+    }
+}
+
+/** Atomic on one filesystem on Android and JVMs; preserve the old file if fallback moves fail. */
+private fun replaceBySameDirectoryRename(staged: File, destination: File) {
+    if (staged.parentFile != destination.parentFile)
+        throw IOException("Staged backup must share the destination directory")
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        Os.rename(staged.absolutePath, destination.absolutePath)
+        return
+    }
+    // API 17–20 do not provide android.system.Os. Keep a rollback copy while
+    // using File.renameTo, which is same-filesystem and atomic on Android's FS.
+    val previous = File(destination.parentFile, destination.name + ".previous-tmp")
+    if (previous.exists() && !previous.delete()) throw IOException("Cannot clear prior backup rollback")
+    val movedOld = destination.exists()
+    if (movedOld && !destination.renameTo(previous)) throw IOException("Cannot stage previous backup")
+    try {
+        if (!staged.renameTo(destination)) throw IOException("Cannot install staged backup")
+        if (previous.exists() && !previous.delete())
+            android.util.Log.w("FullBackup", "Could not remove temporary previous backup")
+    } catch (e: Exception) {
+        if (destination.exists()) destination.delete()
+        if (movedOld && previous.exists() && !previous.renameTo(destination))
+            e.addSuppressed(IOException("Could not restore previous backup"))
+        throw e
     }
 }
 
@@ -88,18 +102,16 @@ internal fun verifyRotateAndReplaceFullBackup(staged: File, destination: File) {
     var savedOld: File? = null
     try {
         if (destination.isFile) {
-            savedOld = File.createTempFile("vlc-previous-", ".zip.tmp", dir)
-            Files.copy(destination.toPath(), savedOld.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            val previousCopy = File.createTempFile("vlc-previous-", ".zip.tmp", dir)
+            savedOld = previousCopy
+            destination.inputStream().use { input -> previousCopy.outputStream().use { output -> input.copyTo(output) } }
         }
         // This verifies all entries and atomically replaces ONLY the main ZIP.
         // A bad staged ZIP never changes that file or existing generations.
         verifyAndReplaceFullBackup(staged, destination)
         if (savedOld != null) {
-            if (previous1.isFile)
-                Files.move(previous1.toPath(), previous2.toPath(),
-                    StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
-            Files.move(savedOld.toPath(), previous1.toPath(),
-                StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            if (previous1.isFile) replaceBySameDirectoryRename(previous1, previous2)
+            replaceBySameDirectoryRename(savedOld, previous1)
         }
     } finally {
         savedOld?.delete()

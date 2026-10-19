@@ -56,14 +56,15 @@ jobs:
           # Restore guards remain in PreferencesAdvanced; the shared writer and
           # format-2 manifest were intentionally moved into FullBackupEngine.
           s = (Path('application/vlc-android/src/org/videolan/vlc/gui/preferences/PreferencesAdvanced.kt').read_text()
-               + '\n' + Path('application/vlc-android/src/org/videolan/vlc/gui/preferences/FullBackupEngine.kt').read_text())
+               + '\n' + Path('application/vlc-android/src/org/videolan/vlc/gui/preferences/FullBackupEngine.kt').read_text()
+               + '\n' + Path('application/vlc-android/src/org/videolan/vlc/gui/preferences/FullBackupRestoreTransaction.kt').read_text()
+               + '\n' + Path('application/vlc-android/src/org/videolan/vlc/gui/preferences/RestoreDatabaseValidation.kt').read_text())
           xml = Path('application/vlc-android/res/xml/preferences_adv.xml').read_text()
           required = [
-              'replaceDirectoryContentsSafely(File(staging, "medialibrary/db"), mediaDbDir)',
-              'replaceDirectoryContentsSafely(savedAppDb, appDbDir)',
-              'replaceDirectoryContentsSafely(File(staging, "artwork/medialib"), it)',
-              'replaceDirectoryContentsSafely(File(staging, "external/subtitles"), it)',
-              'replaceDirectoryContentsSafely(File(staging, "keystore"), keyStoreDir)',
+              'FullBackupRestoreTransaction.replace(restoreTargets)',
+              'validateRestoreDatabase(mediaDb)',
+              'validateRestoreDatabaseDirectory(savedAppDb)',
+              'replacementInstalled', 'previousMoved', 'Cannot roll back',
               '\"format\":2', '\"appFamily\":\"vlc-dual\"',
               '"org.videolan.vlc.internalstorage" -> "internal"',
               '"org.videolan.vlc.smb" -> "smb"',
@@ -95,7 +96,15 @@ jobs:
               if key not in xml: raise SystemExit(f'missing complete backup UI: {key}')
           for key in ('dump_media_db', 'restore_media_db', 'restore_app_db', 'dump_app_db', 'export_settings', 'restore_settings'):
               if f'android:key="{key}"' in xml: raise SystemExit(f'legacy backup UI remains: {key}')
-          print('dual backup contract, transactional selective restore and legacy cleanup verified')
+          manifest = Path('application/app/src/main/AndroidManifest.xml').read_text()
+          extraction = Path('application/vlc-android/res/xml/data_extraction_rules.xml').read_text()
+          if 'android:dataExtractionRules="@xml/data_extraction_rules"' not in manifest:
+              raise SystemExit('Android 12+ data extraction rules are not declared')
+          for destination in ('cloud-backup', 'device-transfer'):
+              section = extraction.split(f'<{destination}>', 1)[1].split(f'</{destination}>', 1)[0]
+              if 'domain="root" path="app_keystore"' not in section:
+                  raise SystemExit(f'app_keystore is not excluded for {destination}')
+          print('dual backup contract, database validation, transactional selective restore, and system backup exclusions verified')
           PY
 
       - name: Verify build inputs
