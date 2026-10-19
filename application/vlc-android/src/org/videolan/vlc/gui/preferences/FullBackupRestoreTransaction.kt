@@ -14,7 +14,7 @@ object FullBackupRestoreTransaction {
         var replacementInstalled: Boolean = false
     )
 
-    fun replace(targets: List<Pair<File, File>>, afterInstall: () -> Unit = {}) {
+    suspend fun replace(targets: List<Pair<File, File>>, afterInstall: suspend () -> Unit = {}) {
         if (targets.isEmpty()) {
             afterInstall()
             return

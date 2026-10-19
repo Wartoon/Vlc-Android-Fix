@@ -1,7 +1,5 @@
 package org.videolan.vlc.gui.preferences
 
-import android.os.Build
-import android.system.Os
 import java.io.File
 import java.io.IOException
 import java.io.RandomAccessFile
@@ -68,28 +66,12 @@ internal fun verifyAndReplaceFullBackup(staged: File, destination: File) {
 private fun replaceBySameDirectoryRename(staged: File, destination: File) {
     if (staged.parentFile != destination.parentFile)
         throw IOException("Staged backup must share the destination directory")
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-        Os.rename(staged.absolutePath, destination.absolutePath)
-        return
-    }
-    // API 17–20 do not provide android.system.Os. Keep a rollback copy while
-    // using File.renameTo, which is same-filesystem and atomic on Android's FS.
-    val previous = File(destination.parentFile, destination.name + ".previous-tmp")
-    if (previous.exists() && !previous.delete()) throw IOException("Cannot clear prior backup rollback")
-    val movedOld = destination.exists()
-    if (movedOld && !destination.renameTo(previous)) throw IOException("Cannot stage previous backup")
-    try {
-        if (!staged.renameTo(destination)) throw IOException("Cannot install staged backup")
-        if (previous.exists() && !previous.delete())
-            android.util.Log.w("FullBackup", "Could not remove temporary previous backup")
-    } catch (e: Exception) {
-        if (destination.exists()) destination.delete()
-        if (movedOld && previous.exists() && !previous.renameTo(destination))
-            e.addSuppressed(IOException("Could not restore previous backup"))
-        throw e
-    }
+    // Both files are in the same directory, so Android's filesystem rename
+    // replaces the destination atomically on supported filesystems and also
+    // keeps this path usable on API 17–20 without android.system.Os.
+    if (!staged.renameTo(destination))
+        throw IOException("Could not rename staged backup into place")
 }
-
 /**
  * Three generations in total: primary ZIP and two historical ZIPs.
  * Save an independent copy of the previous primary before replacing it.
