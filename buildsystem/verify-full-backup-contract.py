@@ -9,6 +9,8 @@ state_text = state.read_text() if state.exists() else ""
 settings = Path("application/tools/src/main/java/org/videolan/tools/Settings.kt").read_text()
 parser = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/search/PreferenceParser.kt").read_text()
 worker = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/AutoFullBackup.kt").read_text()
+engine = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/FullBackupEngine.kt").read_text()
+protection = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/FullBackupProtection.kt").read_text()
 dual = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/PreferencesAdvanced.kt").read_text()
 tv = Path("application/television/src/main/java/org/videolan/television/ui/preferences/PreferencesAdvanced.kt").read_text()
 dual_uses_transaction = "FullBackupRestoreTransaction.replace" in dual
@@ -18,11 +20,15 @@ checks = {
     "restore transaction invokes state rollback": "rollbackAfterInstall" in transaction,
     "legacy trailing callback still maps to afterInstall": transaction_signature.index("rollbackAfterInstall") < transaction_signature.index("afterInstall"),
     "staging operation is recorded before copy": transaction.find("operations += operation") < transaction.find("copy(source, operation.staged)"),
+    "unreadable restore directories fail closed": "source.listFiles()" in transaction and "Cannot list restore source" in transaction,
     "preference and equalizer snapshots are implemented": "FullBackupAppStateSnapshot" in state_text and "EqualizerUtil.getEqualizerExport" in state_text,
-    "TV module can access its restore snapshot": not tv_uses_transaction or "internal class FullBackupAppStateSnapshot" not in state_text,
     "status keys are excluded from preference import/export": all(key in settings for key in (
-        "vlc_last_full_backup_success", "vlc_last_auto_full_backup_success", "vlc_last_auto_full_backup_error"
+        "vlc_last_full_backup_success", "vlc_last_auto_full_backup_success", "vlc_last_auto_full_backup_error",
+        "vlc_full_backup_playback_pending"
     )) and "filter { it.key !in Settings.getRestoreBlacklist() }" in parser,
+    "candidate backups include and validate app databases": "validateAppDbBackupEntries(appDbEntries)" in protection and "validateRestoreDatabaseDirectory(appDbDirectory)" in protection and "listBackupChildren(appDbDir)" in engine,
+    "TV shared screen defers backup actions to TV preferences": "sharedBackupActionsVisible" in dual and 'findPreference<Preference>("full_restore")?.isVisible = false' in dual,
+    "Dual manifest only declares optional components with files": all(f"if (has{component})" in engine for component in ("Artwork", "Subtitles", "Credentials")),
     "Dual restore snapshots and defers auto-backup": not dual_uses_transaction or (
         "FullBackupAppStateSnapshot.capture(context)" in dual and "rollbackAfterInstall" in dual and "AutoFullBackup.deferAfterRestore(context)" in dual
     ),

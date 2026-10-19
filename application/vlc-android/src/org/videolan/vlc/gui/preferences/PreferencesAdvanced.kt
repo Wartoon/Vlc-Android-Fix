@@ -105,7 +105,6 @@ import org.videolan.vlc.providers.PickerType
 import org.videolan.vlc.util.AutoUpdate
 import org.videolan.vlc.util.FileUtils
 import org.videolan.vlc.util.Permissions
-import org.videolan.vlc.util.share
 import java.io.File
 import java.io.IOException
 import java.io.BufferedInputStream
@@ -115,6 +114,22 @@ import java.io.FileOutputStream
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import java.util.zip.ZipEntry
+
+/**
+ * Each VLC Dual application owns one directory under shared internal storage.
+ * The device-storage root is injected so directory selection can be tested
+ * without creating files in the real phone storage.
+ */
+internal fun dualBackupFile(storageRoot: File, packageName: String): File {
+    val (folder, name) = when (packageName) {
+        "org.videolan.vlc.internalstorage" ->
+            "VLC Internal Storage App Backup" to "VLC Complete Backup - Internal Storage.zip"
+        "org.videolan.vlc.smb" ->
+            "VLC SMB App Backup" to "VLC Complete Backup - SMB.zip"
+        else -> throw IllegalStateException("Unsupported VLC Dual package")
+    }
+    return File(File(File(storageRoot, "VLC"), folder), name)
+}
 
 private const val FILE_PICKER_RESULT_CODE = 10000
 private const val RESULT_VALUE_CLEAR_HISTORY = 1
@@ -131,6 +146,13 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // TV has a separate preferences screen with TV-format backup support.
+        // This shared screen only understands VLC Dual archives.
+        if (!sharedBackupActionsVisible(requireContext().packageName)) {
+            findPreference<Preference>("full_backup")?.isVisible = false
+            findPreference<Preference>("full_restore")?.isVisible = false
+        }
 
         findPreference<EditTextPreference>("network_caching")?.setOnBindEditTextListener {
             it.inputType = InputType.TYPE_CLASS_NUMBER
@@ -314,74 +336,15 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                 return true
             }
             "full_restore" -> {
-                showFullRestoreSelection()
-                return true
-            }
-            "dump_media_db" -> {
-                if (Medialibrary.getInstance().isWorking)
-                    UiTools.snacker(requireActivity(), getString(R.string.settings_ml_block_scan))
-                else {
-                    val dst = File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY + Medialibrary.VLC_MEDIA_DB_NAME)
-                    lifecycleScope.launch {
-                        if (getWritePermission(Uri.fromFile(dst))) {
-                            val copied = withContext(Dispatchers.IO) {
-                                val db = File(requireContext().getDir("db", Context.MODE_PRIVATE).toString() + Medialibrary.VLC_MEDIA_DB_NAME)
-
-                                FileUtils.copyFile(db, dst)
-                            }
-                            if (copied)
-                                UiTools.snackerConfirm(requireActivity(), getString(R.string.dump_db_succes), confirmMessage = R.string.share, overAudioPlayer = false) {
-                                    requireActivity().share(dst)
-                                } else {
-                                Toast.makeText(context, getString(R.string.dump_db_failure), Toast.LENGTH_LONG).show()
-                            }
-                        }
-                    }
+                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "application/zip"
                 }
-                return true
-            }
-            "restore_media_db" -> {
-                restoreMediaDatabase()
-                return true
-            }
-            "restore_app_db" -> {
-                restoreAppDatabase()
-                return true
-            }
-            "dump_app_db" -> {
-                val dst = File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY + ROOM_DATABASE)
-                lifecycleScope.launch {
-                    if (getWritePermission(Uri.fromFile(dst))) {
-                        val copied = withContext(Dispatchers.IO) {
-                            val db = File(requireContext().getDir("db", Context.MODE_PRIVATE).parent!! + "/databases")
-
-                            val files = db.listFiles()?.map { it.path }?.toTypedArray()
-
-                            if (files == null) false else
-                                FileUtils.zip(files, dst.path)
-
-                        }
-                        if (copied)
-                            UiTools.snackerConfirm(requireActivity(), getString(R.string.dump_db_succes), confirmMessage = R.string.share, overAudioPlayer = false) {
-                                requireActivity().share(dst)
-                            } else {
-                            Toast.makeText(context, getString(R.string.dump_db_failure), Toast.LENGTH_LONG).show()
-                        }
-                    }
-                }
+                startActivityForResult(intent, 4242)
                 return true
             }
             "optional_features" -> {
                 loadFragment(PreferencesOptional())
-                return true
-            }
-            "export_settings" -> {
-                val dst = File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY + EXPORT_SETTINGS_FILE)
-                lifecycleScope.launch(Dispatchers.IO) {
-                    if (getWritePermission(Uri.fromFile(dst))) {
-                        PreferenceParser.exportPreferences(requireActivity(), dst)
-                    }
-                }
                 return true
             }
             KEY_QUICK_PLAY -> {
@@ -392,15 +355,6 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                 }
                 return true
             }
-            "restore_settings" -> {
-                val filePickerIntent = Intent(requireContext(), FilePickerActivity::class.java)
-                filePickerIntent.putExtra(KEY_PICKER_TYPE, PickerType.SETTINGS.ordinal)
-                startActivityForResult(filePickerIntent, FILE_PICKER_RESULT_CODE)
-
-
-
-                return true
-            }
         }
         return super.onPreferenceTreeClick(preference)
     }
@@ -408,37 +362,19 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (data == null) return
-        if (requestCode == FILE_PICKER_RESULT_CODE) {
-            if (data.hasExtra(EXTRA_MRL)) {
-                lifecycleScope.launch {
-                    try {
-                        PreferenceParser.restoreSettings(
-                            requireActivity(),
-                                data.getStringExtra(EXTRA_MRL)!!.toUri()
-                        )
-                        var continueRestart = true
-                        if (Settings.getInstance(requireActivity()).getBoolean(POPUP_FORCE_LEGACY, false) && !Permissions.canDrawOverlays(requireActivity()))
-                            continueRestart = !Permissions.checkDrawOverlaysPermission(requireActivity())
-                        if (continueRestart) {
-                            VLCInstance.restart()
-                            UiTools.restartDialog(requireActivity())
-                        } else needToRestartOnResume = true
-                    } catch (e: Exception) {
-                        Log.e("EqualizerSettings", "onActivityResult: ${e.message}", e)
-                        UiTools.snacker(requireActivity(), getString(R.string.invalid_settings_file))
-                    }
-                }
-            }
+        if (requestCode == 4242) {
+            data.data?.let { showFullRestoreSelection(it) }
         }
     }
 
-    private fun fullBackupFile(): File =
-        tvFullBackupFile(File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY))
+    private fun dualVariantForPackage(packageName: String): String? = when (packageName) {
+        "org.videolan.vlc.internalstorage" -> "internal"
+        "org.videolan.vlc.smb" -> "smb"
+        else -> null
+    }
 
-    // Keep the pre-folder TV backup restorable without migrating or deleting it.
-    private fun backupFileForRestore(): File =
-        fullBackupFile().takeIf { it.isFile }
-            ?: File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY, "VLC-Full-Backup.zip")
+    private fun fullBackupFile(): File =
+        dualBackupFile(File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY), requireContext().packageName)
 
     private fun requestFullBackupNow() {
         val destination = fullBackupFile()
@@ -490,43 +426,133 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
         zip.closeEntry()
     }
 
-    private fun showFullRestoreSelection() {
-        val src = backupFileForRestore()
-        if (!src.isFile) {
-            Toast.makeText(requireContext(), getString(R.string.full_restore_missing, src.name), Toast.LENGTH_LONG).show()
-            return
+    private data class BackupInspection(val sourcePackage: String, val components: Set<String>)
+
+    private fun validateDualManifest(manifestText: String): String {
+        // Parse the manifest as JSON; substring matching can accept forged metadata.
+        val manifest = try {
+            org.json.JSONObject(manifestText)
+        } catch (e: org.json.JSONException) {
+            throw IOException("Invalid backup manifest", e)
         }
-        val labels = arrayOf(
-            getString(R.string.full_restore_item_settings),
-            getString(R.string.full_restore_item_media_db),
-            getString(R.string.full_restore_item_app_db),
-            getString(R.string.full_restore_item_artwork),
-            getString(R.string.full_restore_item_subtitles),
-            getString(R.string.full_restore_item_credentials)
-        )
-        val selected = booleanArrayOf(true, true, true, true, true, false)
-        android.app.AlertDialog.Builder(requireActivity())
-            .setTitle(R.string.full_restore_choose)
-            .setMultiChoiceItems(labels, selected) { _, which, checked -> selected[which] = checked }
-            .setPositiveButton(R.string.full_restore_start) { _, _ ->
-                if (selected.none { it }) {
-                    Toast.makeText(requireContext(), R.string.full_restore_nothing_selected, Toast.LENGTH_LONG).show()
-                } else {
-                    restoreFullBackup(
-                        restoreSettings = selected[0],
-                        restoreMediaDb = selected[1],
-                        restoreAppDb = selected[2],
-                        restoreArtwork = selected[3],
-                        restoreSubtitles = selected[4],
-                        restoreCredentials = selected[5]
-                    )
+        val sourcePackage = manifest.optString("package")
+        val sourceVariant = dualVariantForPackage(sourcePackage)
+            ?: throw IOException("Backup package is not part of VLC Dual")
+        if (manifest.optInt("format", -1) != 2 ||
+            manifest.optString("appFamily") != "vlc-dual" ||
+            manifest.optString("variant") != sourceVariant)
+            throw IOException("Unsupported or incompatible backup")
+        return sourcePackage
+    }
+
+    private fun inspectFullBackup(src: Uri): BackupInspection {
+        var manifestText: String? = null
+        val components = mutableSetOf<String>()
+        requireContext().contentResolver.openInputStream(src)?.use { input ->
+            ZipInputStream(BufferedInputStream(input)).use { zip ->
+                var entry = zip.nextEntry
+                var entryCount = 0
+                val inspectedNames = HashSet<String>()
+                var totalDeclaredSize = 0L
+                var totalActualSize = 0L
+                val maxUncompressedSize = 4L * 1024 * 1024 * 1024
+                while (entry != null) {
+                    entryCount++
+                    if (entryCount > 100000) throw IOException("Backup contains too many entries")
+                    // ZIP headers may omit sizes; this is an early rejection only,
+                    // not a substitute for bounded streaming during extraction.
+                    if (entry.size > 0L) {
+                        if (entry.size > 4L * 1024 * 1024 * 1024 ||
+                            totalDeclaredSize > 4L * 1024 * 1024 * 1024 - entry.size)
+                            throw IOException("Backup declares excessive uncompressed data")
+                        totalDeclaredSize += entry.size
+                    }
+                    val name = entry.name
+                    if (!inspectedNames.add(name.trimEnd('/')))
+                        throw IOException("Duplicate backup entry")
+                    if (name.startsWith("/") || name.contains(92.toChar()) ||
+                        name.split('/').any { it.isEmpty() || it == "." || it == ".." })
+                        throw IOException("Invalid backup entry")
+                    when {
+                        name == "manifest.json" -> {
+                            if (manifestText != null) throw IOException("Duplicate backup manifest")
+                            // Reject oversized manifests before allocating their full contents.
+                            val manifestBytes = java.io.ByteArrayOutputStream()
+                            val buffer = ByteArray(4096)
+                            var total = 0
+                            while (true) {
+                                val count = zip.read(buffer)
+                                if (count < 0) break
+                                total += count
+                                totalActualSize += count.toLong()
+                                if (totalActualSize > maxUncompressedSize) throw IOException("Backup exceeds 4 GiB uncompressed")
+                                if (total > 65536) throw IOException("Backup manifest exceeds 64 KiB")
+                                manifestBytes.write(buffer, 0, count)
+                            }
+                            manifestText = manifestBytes.toString("UTF-8")
+                        }
+                        name == "settings/settings.json" -> components += "settings"
+                        name == PlaybackStateBackup.ENTRY -> components += "playback"
+                        name.startsWith("medialibrary/db/") && !entry.isDirectory -> components += "mediaDb"
+                        name.startsWith("appdb/") && !entry.isDirectory -> components += "appDb"
+                        name.startsWith("artwork/medialib/") && !entry.isDirectory -> components += "artwork"
+                        name.startsWith("external/subtitles/") && !entry.isDirectory -> components += "subtitles"
+                        name.startsWith("keystore/") && !entry.isDirectory -> components += "credentials"
+                    }
+                    // Drain every entry with a running limit: ZIP size headers can be unknown.
+                    val drainBuffer = ByteArray(8192)
+                    while (true) {
+                        val count = zip.read(drainBuffer)
+                        if (count < 0) break
+                        totalActualSize += count.toLong()
+                        if (totalActualSize > maxUncompressedSize) throw IOException("Backup exceeds 4 GiB uncompressed")
+                    }
+                    zip.closeEntry()
+                    entry = zip.nextEntry
                 }
             }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
+        } ?: throw IOException("Cannot open backup")
+        val sourcePackage = validateDualManifest(manifestText ?: throw IOException("Backup manifest missing"))
+        if (components.isEmpty()) throw IOException("Backup contains no restorable components")
+        return BackupInspection(sourcePackage, components)
+    }
+
+    private fun showFullRestoreSelection(src: Uri) {
+        lifecycleScope.launch {
+            val inspection = withContext(Dispatchers.IO) {
+                try { inspectFullBackup(src) } catch (e: Exception) {
+                    Log.e("FullBackup", "Backup inspection failed", e)
+                    null
+                }
+            }
+            if (inspection == null) {
+                Toast.makeText(requireContext(), getString(R.string.full_restore_failure), Toast.LENGTH_LONG).show()
+                return@launch
+            }
+            val options = mutableListOf<Triple<String, String, Boolean>>()
+            if ("settings" in inspection.components) options += Triple("settings", getString(R.string.full_restore_item_settings), true)
+            if ("mediaDb" in inspection.components) options += Triple("mediaDb", getString(R.string.full_restore_item_media_db), true)
+            if ("appDb" in inspection.components) options += Triple("appDb", getString(R.string.full_restore_item_app_db), true)
+            if ("artwork" in inspection.components) options += Triple("artwork", getString(R.string.full_restore_item_artwork), true)
+            if ("subtitles" in inspection.components) options += Triple("subtitles", getString(R.string.full_restore_item_subtitles), true)
+            if ("credentials" in inspection.components && inspection.sourcePackage == requireContext().packageName)
+                options += Triple("credentials", getString(R.string.full_restore_item_credentials), false)
+            val selected = BooleanArray(options.size) { options[it].third }
+            android.app.AlertDialog.Builder(requireActivity())
+                .setTitle(R.string.full_restore_choose)
+                .setMultiChoiceItems(options.map { it.second }.toTypedArray(), selected) { _, which, checked -> selected[which] = checked }
+                .setPositiveButton(R.string.full_restore_start) { _, _ ->
+                    val chosen = options.indices.filter { selected[it] }.map { options[it].first }.toSet()
+                    if (chosen.isEmpty()) Toast.makeText(requireContext(), R.string.full_restore_nothing_selected, Toast.LENGTH_LONG).show()
+                    else restoreFullBackup(src, "settings" in chosen, "mediaDb" in chosen, "appDb" in chosen, "artwork" in chosen, "subtitles" in chosen, "credentials" in chosen)
+                }
+                .setNegativeButton(R.string.cancel, null)
+                .show()
+        }
     }
 
     private fun restoreFullBackup(
+        src: Uri,
         restoreSettings: Boolean,
         restoreMediaDb: Boolean,
         restoreAppDb: Boolean,
@@ -534,7 +560,6 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
         restoreSubtitles: Boolean,
         restoreCredentials: Boolean
     ) {
-        val src = backupFileForRestore()
         if (Medialibrary.getInstance().isWorking) {
             UiTools.snacker(requireActivity(), getString(R.string.settings_ml_block_scan))
             return
@@ -545,12 +570,29 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                 val context = requireContext()
                 val staging = File(context.cacheDir, "vlc_full_restore")
                 try {
+                    val targetVariant = dualVariantForPackage(context.packageName)
+                        ?: throw IOException("Unsupported VLC Dual target package")
                     staging.deleteRecursively()
                     staging.mkdirs()
 
-                    ZipInputStream(BufferedInputStream(FileInputStream(src))).use { zip ->
+                    val backupInput = context.contentResolver.openInputStream(src)
+                        ?: throw IOException("Cannot open backup")
+                    ZipInputStream(BufferedInputStream(backupInput)).use { zip ->
                         var entry = zip.nextEntry
+                        var entryCount = 0
+                        val extractedNames = HashSet<String>()
+                        var totalExtracted = 0L
+                        val maxExtracted = 4L * 1024 * 1024 * 1024
                         while (entry != null) {
+                            entryCount++
+                            if (entryCount > 100000) throw IOException("Backup contains too many entries")
+                            val normalizedName = entry.name.trimEnd('/')
+                            if (entry.name.startsWith("/") || entry.name.contains(92.toChar()) ||
+                                normalizedName.isEmpty() ||
+                                normalizedName.split('/').any { it.isEmpty() || it == "." || it == ".." })
+                                throw IOException("Invalid backup entry path")
+                            if (!extractedNames.add(normalizedName))
+                                throw IOException("Duplicate backup entry")
                             val outFile = File(staging, entry.name)
                             val safeRoot = staging.canonicalPath + File.separator
                             if (!outFile.canonicalPath.startsWith(safeRoot))
@@ -558,7 +600,17 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                             if (entry.isDirectory) outFile.mkdirs()
                             else {
                                 outFile.parentFile?.mkdirs()
-                                FileOutputStream(outFile).use { output -> zip.copyTo(output) }
+                                FileOutputStream(outFile).use { output ->
+                                    val buffer = ByteArray(8192)
+                                    while (true) {
+                                        val count = zip.read(buffer)
+                                        if (count < 0) break
+                                        totalExtracted += count.toLong()
+                                        if (totalExtracted > maxExtracted)
+                                            throw IOException("Backup exceeds 4 GiB uncompressed")
+                                        output.write(buffer, 0, count)
+                                    }
+                                }
                             }
                             zip.closeEntry()
                             entry = zip.nextEntry
@@ -568,9 +620,9 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                     val manifest = File(staging, "manifest.json")
                     if (!manifest.isFile) throw IOException("Backup manifest missing")
                     val manifestText = manifest.readText()
-                    if (!manifestText.contains("\"format\":1") ||
-                        !manifestText.contains("\"package\":\"${context.packageName}\""))
-                        throw IOException("Unsupported or incompatible backup")
+                    val backupSourcePackage = validateDualManifest(manifestText)
+                    if (restoreCredentials && backupSourcePackage != context.packageName)
+                        throw IOException("Credentials cannot be restored across VLC Dual variants")
 
                     val settingsFile = File(staging, "settings/settings.json")
                     val mediaDb = File(staging, "medialibrary/db/${Medialibrary.VLC_MEDIA_DB_NAME.removePrefix("/")}")
@@ -579,9 +631,8 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                     val savedAppDb = File(staging, "appdb")
                     if (restoreAppDb && (savedAppDb.listFiles()?.none { it.isFile && it.length() > 0L } != false))
                         throw IOException("App database missing")
-
-                    if (restoreSettings)
-                        PreferenceParser.restoreSettings(requireActivity(), Uri.fromFile(settingsFile))
+                    if (restoreMediaDb) validateRestoreDatabase(mediaDb)
+                    if (restoreAppDb) validateRestoreDatabaseDirectory(savedAppDb)
 
                     val dataRoot = context.getDir("db", Context.MODE_PRIVATE).parentFile
                         ?: throw IOException("No app data directory")
@@ -592,44 +643,46 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                     val artworkDir = external?.let { File(it, Medialibrary.MEDIALIB_FOLDER_NAME.removePrefix("/")) }
                     val subtitlesDir = external?.let { File(it, "subtitles") }
 
-                    if (restoreMediaDb) replaceDirectoryContentsSafely(File(staging, "medialibrary/db"), mediaDbDir)
-
-                    if (restoreAppDb) replaceDirectoryContentsSafely(savedAppDb, appDbDir)
-
-                    // Existing backups without a playback entry remain supported.
-                    if (restoreSettings) {
-                        val playbackFile = File(staging, PlaybackStateBackup.ENTRY)
-                        if (playbackFile.isFile)
-                            PlaybackStateBackup.restore(context, playbackFile.readText(Charsets.UTF_8))
-                    }
-
+                    val restoreTargets = mutableListOf<Pair<File, File>>()
+                    if (restoreMediaDb) restoreTargets += File(staging, "medialibrary/db") to mediaDbDir
+                    if (restoreAppDb) restoreTargets += savedAppDb to appDbDir
                     if (restoreArtwork) {
                         artworkDir?.let {
-                            it.deleteRecursively()
-                            copyDirectoryContents(File(staging, "artwork/medialib"), it)
+                            val savedArtwork = File(staging, "artwork/medialib")
+                            if (savedArtwork.isDirectory) restoreTargets += savedArtwork to it
                         }
                     }
 
                     if (restoreSubtitles) {
                         subtitlesDir?.let {
-                            val saved = File(staging, "external/subtitles")
-                            if (saved.exists()) {
-                                it.deleteRecursively()
-                                copyDirectoryContents(saved, it)
-                            }
+                            val savedSubtitles = File(staging, "external/subtitles")
+                            if (savedSubtitles.isDirectory) restoreTargets += savedSubtitles to it
                         }
                     }
 
                     if (restoreCredentials) {
                         val savedKeyStore = File(staging, "keystore")
-                        if (savedKeyStore.exists()) {
-                            keyStoreDir.deleteRecursively()
-                            copyDirectoryContents(savedKeyStore, keyStoreDir)
-                        }
+                        if (savedKeyStore.isDirectory) restoreTargets += savedKeyStore to keyStoreDir
                     }
 
+                    val appStateBeforeRestore = FullBackupAppStateSnapshot.capture(context)
+                    FullBackupRestoreTransaction.replace(
+                        targets = restoreTargets,
+                        afterInstall = {
+                            if (restoreSettings)
+                                PreferenceParser.restoreSettings(requireActivity(), Uri.fromFile(settingsFile))
+                            // Optional: older backups do not include playback state.
+                            if (restoreSettings) {
+                                val playbackFile = File(staging, PlaybackStateBackup.ENTRY)
+                                if (playbackFile.isFile)
+                                    PlaybackStateBackup.restore(context, playbackFile.readText(Charsets.UTF_8))
+                            }
+                            AutoFullBackup.deferAfterRestore(context)
+                        },
+                        rollbackAfterInstall = { appStateBeforeRestore.restore(context, restoreEqualizers = !restoreAppDb) }
+                    )
+
                     staging.deleteRecursively()
-                    AutoFullBackup.deferAfterRestore(context)
                     true
                 } catch (e: Exception) {
                     Log.e("FullBackup", "Full restore failed", e)
@@ -674,7 +727,8 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
         val staged = File(parent, destination.name + ".restore-new")
         val previous = File(parent, destination.name + ".restore-old")
         staged.deleteRecursively()
-        previous.deleteRecursively()
+        // Preserve an interrupted restore rollback instead of silently deleting it.
+        if (previous.exists()) throw IOException("Previous restore backup still exists")
         copyDirectoryContents(source, staged)
         var movedOld = false
         try {
@@ -714,85 +768,6 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
             backups.asReversed().forEach { (live, backup) -> if (backup.exists()) backup.renameTo(live) }
             staged.delete()
             throw e
-        }
-    }
-
-    private fun restoreMediaDatabase() {
-        val src = File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY + Medialibrary.VLC_MEDIA_DB_NAME)
-        if (!src.isFile) {
-            Toast.makeText(requireContext(), getString(R.string.restore_media_db_missing), Toast.LENGTH_LONG).show()
-            return
-        }
-        lifecycleScope.launch {
-            val restored = withContext(Dispatchers.IO) {
-                try {
-                    val db = File(requireContext().getDir("db", Context.MODE_PRIVATE).toString() + Medialibrary.VLC_MEDIA_DB_NAME)
-                    replaceDatabaseFileSafely(src, db)
-                    true
-                } catch (e: Exception) {
-                    Log.e("DatabaseRestore", "Media database restore failed", e)
-                    false
-                }
-            }
-            if (restored) {
-                Toast.makeText(requireContext(), getString(R.string.restore_db_success_restart), Toast.LENGTH_LONG).show()
-                requireActivity().window.decorView.postDelayed({
-                    android.os.Process.killProcess(android.os.Process.myPid())
-                }, 1200L)
-            } else {
-                Toast.makeText(requireContext(), getString(R.string.restore_db_failure), Toast.LENGTH_LONG).show()
-            }
-        }
-    }
-
-    private fun restoreAppDatabase() {
-        val src = File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY + ROOM_DATABASE)
-        if (!src.isFile) {
-            Toast.makeText(requireContext(), getString(R.string.restore_app_db_missing), Toast.LENGTH_LONG).show()
-            return
-        }
-        lifecycleScope.launch {
-            val restored = withContext(Dispatchers.IO) {
-                try {
-                    val dbDir = File(requireContext().getDir("db", Context.MODE_PRIVATE).parent!!, "databases")
-                    val stagedAppDb = File(requireContext().cacheDir, "vlc_appdb_restore")
-                    stagedAppDb.deleteRecursively()
-                    if (!stagedAppDb.mkdirs()) return@withContext false
-
-                    val extracted = ZipInputStream(BufferedInputStream(FileInputStream(src))).use { zip ->
-                        var entry = zip.nextEntry
-                        var extracted = false
-                        while (entry != null) {
-                            if (!entry.isDirectory) {
-                                val safeName = File(entry.name).name
-                                if (safeName.isNotEmpty()) {
-                                    val outFile = File(stagedAppDb, safeName)
-                                    FileOutputStream(outFile).use { output -> zip.copyTo(output) }
-                                    extracted = true
-                                }
-                            }
-                            zip.closeEntry()
-                            entry = zip.nextEntry
-                        }
-                        extracted
-                    }
-                    if (!extracted) throw IOException("App database backup is empty")
-                    replaceDirectoryContentsSafely(stagedAppDb, dbDir)
-                    stagedAppDb.deleteRecursively()
-                    true
-                } catch (e: Exception) {
-                    Log.e("DatabaseRestore", "App database restore failed", e)
-                    false
-                }
-            }
-            if (restored) {
-                Toast.makeText(requireContext(), getString(R.string.restore_db_success_restart), Toast.LENGTH_LONG).show()
-                requireActivity().window.decorView.postDelayed({
-                    android.os.Process.killProcess(android.os.Process.myPid())
-                }, 1200L)
-            } else {
-                Toast.makeText(requireContext(), getString(R.string.restore_db_failure), Toast.LENGTH_LONG).show()
-            }
         }
     }
 

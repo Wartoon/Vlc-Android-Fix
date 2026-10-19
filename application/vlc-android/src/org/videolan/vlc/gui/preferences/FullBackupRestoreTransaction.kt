@@ -84,7 +84,9 @@ object FullBackupRestoreTransaction {
     private fun copy(source: File, destination: File) {
         if (source.isDirectory) {
             if (!destination.mkdirs()) throw IOException("Cannot stage restore component: ${source.name}")
-            source.listFiles()?.forEach { child -> copy(child, File(destination, child.name)) }
+            val children = source.listFiles()
+                ?: throw IOException("Cannot list restore source: ${source.name}")
+            children.forEach { child -> copy(child, File(destination, child.name)) }
         } else {
             val parent = destination.parentFile ?: throw IOException("Restore staging has no parent")
             if (!parent.isDirectory && !parent.mkdirs()) throw IOException("Cannot create restore staging")

@@ -2,18 +2,16 @@ package org.videolan.vlc.gui.preferences
 
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
-import android.os.Build
 import org.videolan.medialibrary.interfaces.Medialibrary
 import java.io.File
 import java.io.IOException
-import java.lang.reflect.InvocationTargetException
 import java.util.zip.CRC32
 import java.util.zip.ZipFile
 
 /** A valid ZIP can still contain a library that silently lost its media sources. */
 internal class FullBackupLibraryReduced(message: String) : IOException(message)
 
-data class FullBackupLibrarySnapshot(
+internal data class FullBackupLibrarySnapshot(
     val media: Long,
     val folders: Long,
     val playlists: Long,
@@ -34,6 +32,16 @@ internal fun fullBackupReduction(
     val missingSources = previous.folderPaths - candidate.folderPaths
     if (missingSources.isNotEmpty()) problems += "Missing media folders: ${missingSources.size}"
     return problems.takeIf { it.isNotEmpty() }?.joinToString("; ")
+}
+
+/** Every complete archive must contain at least one non-empty SQLite app database. */
+internal fun validateAppDbBackupEntries(entries: Collection<Pair<String, Long>>) {
+    val hasDatabase = entries.any { (name, size) ->
+        val fileName = name.substringAfterLast('/')
+        name.startsWith("appdb/") && fileName.isNotEmpty() && size > 0L &&
+            (fileName.endsWith(".db") || fileName.endsWith(".sqlite"))
+    }
+    if (!hasDatabase) throw IOException("App database missing from backup")
 }
 
 /**
@@ -90,17 +98,8 @@ private fun countArtwork(directory: File?): Long {
     return count
 }
 
-/**
- * Read the copied database with a bundled SQLite engine so schema syntax does
- * not depend on the Android release's system SQLite version. Android 9 ships
- * SQLite 3.22, which cannot parse the MediaLibrary's UPDATE FROM trigger.
- */
+/** Read-only SQLite queries avoid depending on VLC's private database model. */
 private fun readFullBackupDatabase(file: File, artwork: Long): FullBackupLibrarySnapshot {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-        return readWithBundledSqlite(file, artwork)
-    }
-    // sqlite-bundled supports API 21+. Keep the app installable below that API
-    // level and retain the previous validation path for those legacy devices.
     val db = try {
         SQLiteDatabase.openDatabase(file.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
     } catch (e: Exception) {
@@ -126,20 +125,6 @@ private fun readFullBackupDatabase(file: File, artwork: Long): FullBackupLibrary
     }
 }
 
-private fun readWithBundledSqlite(file: File, artwork: Long): FullBackupLibrarySnapshot {
-    return try {
-        val reader = Class.forName("org.videolan.vlc.gui.preferences.BundledBackupDatabaseReader")
-        reader.getMethod("read", File::class.java, java.lang.Long.TYPE)
-            .invoke(null, file, artwork) as FullBackupLibrarySnapshot
-    } catch (e: InvocationTargetException) {
-        throw IOException("Media library tables are not readable", e.targetException)
-    } catch (e: LinkageError) {
-        throw IOException("Bundled SQLite validator is unavailable", e)
-    } catch (e: Exception) {
-        throw IOException("Bundled SQLite validator is unavailable", e)
-    }
-}
-
 /** Verify CRC/size for every entry, required records, and the actual DB tables. */
 private fun inspectFullBackupLibrary(
     archive: File, verificationDirectory: File, requirePlayback: Boolean
@@ -150,6 +135,7 @@ private fun inspectFullBackupLibrary(
         val required = hashSetOf("manifest.json", "settings/settings.json")
         if (requirePlayback) required += PlaybackStateBackup.ENTRY
         val entries = HashSet<String>()
+        val appDbEntries = ArrayList<Pair<String, Long>>()
         var artwork = 0L
         var uncompressed = 0L
         val buffer = ByteArray(65536)
@@ -176,6 +162,7 @@ private fun inspectFullBackupLibrary(
             }
             if (length != entry.size || crc.value != entry.crc)
                 throw IOException("Backup ZIP entry corrupted")
+            if (name.startsWith("appdb/")) appDbEntries += name to length
             if (name in required && length == 0L)
                 throw IOException("Required backup entry is empty")
             if (name.startsWith("artwork/medialib/")) artwork++
@@ -185,6 +172,7 @@ private fun inspectFullBackupLibrary(
         }
         if (!entries.containsAll(required))
             throw IOException("Required backup entries missing")
+        if (requirePlayback) validateAppDbBackupEntries(appDbEntries)
         val dbName = Medialibrary.VLC_MEDIA_DB_NAME.removePrefix("/")
         val dbEntryName = "medialibrary/db/$dbName"
         val mediaDb = zip.getEntry(dbEntryName)
@@ -213,6 +201,27 @@ private fun inspectFullBackupLibrary(
                         input.copyTo(output)
                     }
                 }
+            }
+            if (requirePlayback) {
+                val appDbDirectory = File(scratch, "appdb")
+                if (!appDbDirectory.mkdirs()) throw IOException("Cannot prepare app database validation")
+                appDbEntries.forEach { (name, _) ->
+                    val entry = zip.getEntry(name) ?: throw IOException("App database entry missing")
+                    val relativeName = name.removePrefix("appdb/")
+                    if (relativeName.isEmpty() || relativeName.split('/').any { it.isEmpty() || it == "." || it == ".." })
+                        throw IOException("Invalid app database entry")
+                    val outputFile = File(appDbDirectory, relativeName)
+                    val safeRoot = appDbDirectory.canonicalPath + File.separator
+                    if (!outputFile.canonicalPath.startsWith(safeRoot))
+                        throw IOException("Invalid app database entry")
+                    val parent = outputFile.parentFile ?: throw IOException("Invalid app database entry")
+                    if (!parent.isDirectory && !parent.mkdirs())
+                        throw IOException("Cannot create app database validation directory")
+                    zip.getInputStream(entry).use { input ->
+                        outputFile.outputStream().use { output -> input.copyTo(output) }
+                    }
+                }
+                validateRestoreDatabaseDirectory(appDbDirectory)
             }
             return readFullBackupDatabase(extracted, artwork)
         } finally {

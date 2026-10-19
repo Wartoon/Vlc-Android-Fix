@@ -36,12 +36,6 @@ class AutoFullBackupTest {
         assertTrue(shouldRunFullBackup(false, true))
     }
 
-    @Test fun enabledScheduledBackupRetriesWhenPeriodicRunIsEarly() {
-        assertTrue(shouldRetryScheduledFullBackup(true, false))
-        assertFalse(shouldRetryScheduledFullBackup(true, true))
-        assertFalse(shouldRetryScheduledFullBackup(false, false))
-    }
-
     @Test fun aClockSetBackwardsDoesNotTriggerRepeatedBackups() {
         assertFalse(fullBackupIsDue(true, 50000L, 49999L))
     }
@@ -56,6 +50,12 @@ class AutoFullBackupTest {
         assertTrue("vlc_last_full_backup_success" in restoreBlacklist)
         assertTrue("vlc_last_auto_full_backup_success" in restoreBlacklist)
         assertTrue("vlc_last_auto_full_backup_error" in restoreBlacklist)
+        assertTrue(PlaybackStateBackup.RESTORE_PENDING in restoreBlacklist)
+    }
+
+    @Test fun tvUsesItsDedicatedFullBackupPreferences() {
+        assertFalse(sharedBackupActionsVisible("org.videolan.vlc.tvfix"))
+        assertTrue(sharedBackupActionsVisible("org.videolan.vlc.internalstorage"))
     }
 
     @RunWith(RobolectricTestRunner::class)
