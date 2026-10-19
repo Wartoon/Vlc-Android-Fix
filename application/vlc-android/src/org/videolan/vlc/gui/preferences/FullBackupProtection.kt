@@ -34,6 +34,16 @@ internal fun fullBackupReduction(
     return problems.takeIf { it.isNotEmpty() }?.joinToString("; ")
 }
 
+/** Every complete archive must contain at least one non-empty SQLite app database. */
+internal fun validateAppDbBackupEntries(entries: Collection<Pair<String, Long>>) {
+    val hasDatabase = entries.any { (name, size) ->
+        val fileName = name.substringAfterLast('/')
+        name.startsWith("appdb/") && fileName.isNotEmpty() && size > 0L &&
+            (fileName.endsWith(".db") || fileName.endsWith(".sqlite"))
+    }
+    if (!hasDatabase) throw IOException("App database missing from backup")
+}
+
 /**
  * Evaluates the live library before a user-triggered backup so the user can
  * explicitly accept a legitimately reduced library. Background backups never
@@ -125,6 +135,7 @@ private fun inspectFullBackupLibrary(
         val required = hashSetOf("manifest.json", "settings/settings.json")
         if (requirePlayback) required += PlaybackStateBackup.ENTRY
         val entries = HashSet<String>()
+        val appDbEntries = ArrayList<Pair<String, Long>>()
         var artwork = 0L
         var uncompressed = 0L
         val buffer = ByteArray(65536)
@@ -151,6 +162,7 @@ private fun inspectFullBackupLibrary(
             }
             if (length != entry.size || crc.value != entry.crc)
                 throw IOException("Backup ZIP entry corrupted")
+            if (name.startsWith("appdb/")) appDbEntries += name to length
             if (name in required && length == 0L)
                 throw IOException("Required backup entry is empty")
             if (name.startsWith("artwork/medialib/")) artwork++
@@ -160,6 +172,7 @@ private fun inspectFullBackupLibrary(
         }
         if (!entries.containsAll(required))
             throw IOException("Required backup entries missing")
+        if (requirePlayback) validateAppDbBackupEntries(appDbEntries)
         val dbName = Medialibrary.VLC_MEDIA_DB_NAME.removePrefix("/")
         val dbEntryName = "medialibrary/db/$dbName"
         val mediaDb = zip.getEntry(dbEntryName)
@@ -188,6 +201,27 @@ private fun inspectFullBackupLibrary(
                         input.copyTo(output)
                     }
                 }
+            }
+            if (requirePlayback) {
+                val appDbDirectory = File(scratch, "appdb")
+                if (!appDbDirectory.mkdirs()) throw IOException("Cannot prepare app database validation")
+                appDbEntries.forEach { (name, _) ->
+                    val entry = zip.getEntry(name) ?: throw IOException("App database entry missing")
+                    val relativeName = name.removePrefix("appdb/")
+                    if (relativeName.isEmpty() || relativeName.split('/').any { it.isEmpty() || it == "." || it == ".." })
+                        throw IOException("Invalid app database entry")
+                    val outputFile = File(appDbDirectory, relativeName)
+                    val safeRoot = appDbDirectory.canonicalPath + File.separator
+                    if (!outputFile.canonicalPath.startsWith(safeRoot))
+                        throw IOException("Invalid app database entry")
+                    val parent = outputFile.parentFile ?: throw IOException("Invalid app database entry")
+                    if (!parent.isDirectory && !parent.mkdirs())
+                        throw IOException("Cannot create app database validation directory")
+                    zip.getInputStream(entry).use { input ->
+                        outputFile.outputStream().use { output -> input.copyTo(output) }
+                    }
+                }
+                validateRestoreDatabaseDirectory(appDbDirectory)
             }
             return readFullBackupDatabase(extracted, artwork)
         } finally {

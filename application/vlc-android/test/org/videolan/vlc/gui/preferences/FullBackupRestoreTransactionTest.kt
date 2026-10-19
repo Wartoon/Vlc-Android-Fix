@@ -10,6 +10,24 @@ import java.io.IOException
 import java.nio.file.Files
 
 class FullBackupRestoreTransactionTest {
+    @Test fun unreadableSourceDirectoryFailsWithoutReplacingExistingTarget() = withTemporaryFolder { root ->
+        val backingSource = File(root, "source").apply { mkdirs(); resolve("value").writeText("new") }
+        val source = object : File(backingSource.path) {
+            override fun listFiles(): Array<File>? = null
+        }
+        val target = File(root, "target").apply { mkdirs(); resolve("value").writeText("old") }
+
+        try {
+            runBlocking { FullBackupRestoreTransaction.replace(listOf(source to target)) }
+            throw AssertionError("Expected unreadable source directory to fail")
+        } catch (expected: IOException) {
+            assertTrue(expected.message.orEmpty().contains("Cannot list restore source"))
+        }
+
+        assertEquals("old", File(target, "value").readText())
+        assertFalse(root.listFiles()!!.any { it.name.contains("restore-new-") || it.name.contains("restore-old-") })
+    }
+
     @Test fun failureAfterInstallRestoresEveryPreviousComponent() = withTemporaryFolder { root ->
         val sourceA = File(root, "source-a").apply { mkdirs(); resolve("value").writeText("new-a") }
         val sourceB = File(root, "source-b").apply { mkdirs(); resolve("value").writeText("new-b") }

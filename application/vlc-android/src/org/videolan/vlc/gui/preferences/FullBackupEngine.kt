@@ -22,6 +22,9 @@ import java.util.zip.ZipOutputStream
 
 internal class FullBackupDeferred(message: String) : IOException(message)
 
+internal fun sharedBackupActionsVisible(packageName: String): Boolean =
+    packageName != "org.videolan.vlc.tvfix"
+
 /**
  * One shared implementation for user-triggered and scheduled FULL backups.
  * Runs only after storage permission was previously granted; never requests UI
@@ -71,6 +74,9 @@ object FullBackupEngine {
                 val external = app.getExternalFilesDir(null)
                 val artworkDir = external?.let { File(it, Medialibrary.MEDIALIB_FOLDER_NAME.removePrefix("/")) }
                 val subtitlesDir = external?.let { File(it, "subtitles") }
+                val hasArtwork = artworkDir?.isDirectory == true && containsBackupFiles(artworkDir)
+                val hasSubtitles = subtitlesDir?.isDirectory == true && containsBackupFiles(subtitlesDir)
+                val hasCredentials = keyStoreDir.isDirectory && containsBackupFiles(keyStoreDir)
                 val temporary = createFullBackupStagingFile(target)
                 staged = temporary
                 ZipOutputStream(BufferedOutputStream(FileOutputStream(temporary))).use { zip ->
@@ -78,7 +84,15 @@ object FullBackupEngine {
                         """{"format":1,"package":"${app.packageName}","vlc":"3.7.2 Beta 2"}"""
                     else {
                         val variant = if (app.packageName == "org.videolan.vlc.smb") "smb" else "internal"
-                        """{"format":2,"appFamily":"vlc-dual","variant":"$variant","package":"${app.packageName}","vlc":"3.7.2 Beta 2","components":["settings","mediaDb","appDb","artwork","subtitles","credentials"]}"""
+                        val components = buildList {
+                            add("\"settings\"")
+                            add("\"mediaDb\"")
+                            add("\"appDb\"")
+                            if (hasArtwork) add("\"artwork\"")
+                            if (hasSubtitles) add("\"subtitles\"")
+                            if (hasCredentials) add("\"credentials\"")
+                        }.joinToString(",")
+                        """{"format":2,"appFamily":"vlc-dual","variant":"$variant","package":"${app.packageName}","vlc":"3.7.2 Beta 2","components":[$components]}"""
                     }
                     zip.putNextEntry(ZipEntry("manifest.json"))
                     zip.write(manifest.toByteArray(Charsets.UTF_8))
@@ -92,16 +106,14 @@ object FullBackupEngine {
                     zip.write(playback.toByteArray(Charsets.UTF_8))
                     zip.closeEntry()
 
-                    mediaDbDir.listFiles()?.forEach { file ->
+                    listBackupChildren(mediaDbDir).forEach { file ->
                         if (file.name.startsWith(Medialibrary.VLC_MEDIA_DB_NAME.removePrefix("/")))
                             addFile(zip, file, "medialibrary/db/${file.name}")
                     }
-                    appDbDir.listFiles()?.forEach { addFile(zip, it, "appdb/${it.name}") }
-                    if (artworkDir?.isDirectory == true)
-                        addDirectory(zip, artworkDir, "artwork/medialib")
-                    if (subtitlesDir?.isDirectory == true)
-                        addDirectory(zip, subtitlesDir, "external/subtitles")
-                    if (keyStoreDir.isDirectory) addDirectory(zip, keyStoreDir, "keystore")
+                    listBackupChildren(appDbDir).forEach { addFile(zip, it, "appdb/${it.name}") }
+                    artworkDir?.takeIf { hasArtwork }?.let { addDirectory(zip, it, "artwork/medialib") }
+                    subtitlesDir?.takeIf { hasSubtitles }?.let { addDirectory(zip, it, "external/subtitles") }
+                    if (hasCredentials) addDirectory(zip, keyStoreDir, "keystore")
                 }
                 // Preserve the last good archive unless structural and library checks pass.
                 verifyProtectedSingleFullBackup(temporary, target, app.cacheDir, allowReduction)
@@ -117,11 +129,17 @@ object FullBackupEngine {
     }
 
     private fun addDirectory(zip: ZipOutputStream, dir: File, prefix: String) {
-        dir.listFiles()?.forEach {
+        listBackupChildren(dir).forEach {
             if (it.isDirectory) addDirectory(zip, it, "$prefix/${it.name}")
             else addFile(zip, it, "$prefix/${it.name}")
         }
     }
+
+    private fun containsBackupFiles(directory: File): Boolean =
+        listBackupChildren(directory).any { it.isFile || it.isDirectory && containsBackupFiles(it) }
+
+    private fun listBackupChildren(directory: File): Array<File> =
+        directory.listFiles() ?: throw IOException("Cannot list backup directory: ${directory.name}")
 
     private fun addFile(zip: ZipOutputStream, file: File, name: String) {
         if (!file.isFile) return

@@ -147,6 +147,13 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // TV has a separate preferences screen with TV-format backup support.
+        // This shared screen only understands VLC Dual archives.
+        if (!sharedBackupActionsVisible(requireContext().packageName)) {
+            findPreference<Preference>("full_backup")?.isVisible = false
+            findPreference<Preference>("full_restore")?.isVisible = false
+        }
+
         findPreference<EditTextPreference>("network_caching")?.setOnBindEditTextListener {
             it.inputType = InputType.TYPE_CLASS_NUMBER
             it.filters = arrayOf<InputFilter>(InputFilter.LengthFilter(5))

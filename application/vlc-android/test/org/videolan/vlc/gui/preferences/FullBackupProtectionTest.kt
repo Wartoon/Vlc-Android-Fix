@@ -3,10 +3,25 @@ package org.videolan.vlc.gui.preferences
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
+import java.io.IOException
 
 /** Regression guards for protecting the only retained full backup. */
 class FullBackupProtectionTest {
+    @Test fun backupCannotBeAcceptedWithoutAppDatabaseEntries() {
+        try {
+            validateAppDbBackupEntries(emptyList())
+            fail("Expected missing app database to be rejected")
+        } catch (expected: IOException) {
+            assertTrue(expected.message.orEmpty().contains("App database missing"))
+        }
+    }
+
+    @Test fun backupAcceptsNonEmptyAppDatabaseEntry() {
+        validateAppDbBackupEntries(listOf("appdb/favorites.db" to 1L))
+    }
+
     private fun snapshot(
         media: Long = 100L,
         folders: Long = 3L,

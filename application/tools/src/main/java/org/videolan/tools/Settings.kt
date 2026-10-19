@@ -109,7 +109,8 @@ object Settings : SingletonHolder<SharedPreferences, Context>({ init(it.applicat
         KEYSTORE_PASSWORD_IV, KEY_COOKIE_ENCRYPT_KEY, KEY_COOKIE_SIGN_KEY, KEYSTORE_PASSWORD, ENCRYPTED_KEY_NAME,
         //Others
         KEY_NAVIGATOR_SCREEN_UNSTABLE, KEY_FRAGMENT_ID, KEY_DEBLOCKING, KEY_LAST_SESSION_CRASHED, KEY_METERED_CONNECTION, KEY_MEDIALIBRARY_SCAN,
-        "vlc_last_full_backup_success", "vlc_last_auto_full_backup_success", "vlc_last_auto_full_backup_error"
+        "vlc_last_full_backup_success", "vlc_last_auto_full_backup_success", "vlc_last_auto_full_backup_error",
+        "vlc_full_backup_playback_pending"
 
     )
 
