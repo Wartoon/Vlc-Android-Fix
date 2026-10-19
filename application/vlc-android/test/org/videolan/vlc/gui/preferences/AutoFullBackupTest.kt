@@ -8,6 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
 import org.junit.runner.RunWith
 import org.junit.Test
+import org.robolectric.annotation.Config
 import org.robolectric.RobolectricTestRunner
 
 class AutoFullBackupTest {
@@ -52,6 +53,7 @@ class AutoFullBackupTest {
     }
 
     @RunWith(RobolectricTestRunner::class)
+    @Config(manifest = Config.NONE, sdk = [28])
     class BackupSuccessStateTest {
         @Test fun manualSuccessDoesNotChangeAutomaticBackupTimestamp() {
             val context = ApplicationProvider.getApplicationContext<Context>()
