@@ -41,7 +41,7 @@ internal fun validateAppDbBackupEntries(entries: Collection<Pair<String, Long>>)
     val hasDatabase = entries.any { (name, size) ->
         val fileName = name.substringAfterLast('/')
         name.startsWith("appdb/") && fileName.isNotEmpty() && size > 0L &&
-            (fileName.endsWith(".db") || fileName.endsWith(".sqlite"))
+            isRestoreDatabaseFileName(fileName)
     }
     if (!hasDatabase) throw IOException("App database missing from backup")
 }
