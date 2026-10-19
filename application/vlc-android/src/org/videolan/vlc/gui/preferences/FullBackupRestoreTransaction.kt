@@ -2,6 +2,8 @@ package org.videolan.vlc.gui.preferences
 
 import java.io.File
 import java.io.IOException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 
 /** Installs all selected restore components as one rollback-capable filesystem transaction. */
 object FullBackupRestoreTransaction {
@@ -14,28 +16,33 @@ object FullBackupRestoreTransaction {
         var replacementInstalled: Boolean = false
     )
 
-    suspend fun replace(targets: List<Pair<File, File>>, afterInstall: suspend () -> Unit = {}) {
-        if (targets.isEmpty()) {
-            afterInstall()
-            return
-        }
+    suspend fun replace(
+        targets: List<Pair<File, File>>,
+        afterInstall: suspend () -> Unit = {},
+        rollbackAfterInstall: suspend () -> Unit = {}
+    ) {
         val destinations = targets.map { it.second.canonicalPath }
         if (destinations.toSet().size != destinations.size)
             throw IOException("Restore contains duplicate destinations")
 
-        val operations = targets.map { (source, destination) ->
-            if (!source.exists()) throw IOException("Restore source is missing: ${source.name}")
-            val parent = destination.parentFile ?: throw IOException("Restore destination has no parent")
-            if (!parent.isDirectory && !parent.mkdirs()) throw IOException("Cannot create restore destination")
-            val token = System.nanoTime().toString()
-            val staged = File(parent, "${destination.name}.restore-new-$token")
-            val previous = File(parent, "${destination.name}.restore-old-$token")
-            copy(source, staged)
-            Operation(source, destination, staged, previous)
-        }
-
+        val operations = mutableListOf<Operation>()
         var committed = false
+        var afterInstallStarted = false
         try {
+            targets.forEach { (source, destination) ->
+                if (!source.exists()) throw IOException("Restore source is missing: ${source.name}")
+                val parent = destination.parentFile ?: throw IOException("Restore destination has no parent")
+                if (!parent.isDirectory && !parent.mkdirs()) throw IOException("Cannot create restore destination")
+                val token = System.nanoTime().toString()
+                val operation = Operation(
+                    source,
+                    destination,
+                    File(parent, "${destination.name}.restore-new-$token"),
+                    File(parent, "${destination.name}.restore-old-$token")
+                )
+                operations += operation
+                copy(source, operation.staged)
+            }
             operations.forEach { operation ->
                 if (operation.destination.exists()) {
                     if (!operation.destination.renameTo(operation.previous))
@@ -46,6 +53,7 @@ object FullBackupRestoreTransaction {
                     throw IOException("Cannot install ${operation.destination.name}")
                 operation.replacementInstalled = true
             }
+            afterInstallStarted = true
             afterInstall()
             committed = true
         } catch (failure: Exception) {
@@ -56,6 +64,13 @@ object FullBackupRestoreTransaction {
                 if (operation.previousMoved && operation.previous.exists() &&
                     !operation.previous.renameTo(operation.destination))
                     failure.addSuppressed(IOException("Cannot roll back ${operation.destination.name}"))
+            }
+            if (afterInstallStarted) {
+                try {
+                    withContext(NonCancellable) { rollbackAfterInstall() }
+                } catch (rollbackFailure: Exception) {
+                    failure.addSuppressed(rollbackFailure)
+                }
             }
             throw failure
         } finally {

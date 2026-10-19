@@ -80,7 +80,7 @@ jobs:
               "application/tools/src/main/java/org/videolan/tools/BitmapCache.kt": ['fun replaceBitmapInMemCache', 'fun removeBitmapFromMemCache', 'fun removeBitmapKeysStartingWith'],
               "application/vlc-android/src/org/videolan/vlc/gui/helpers/ImageLoader.kt": ['allowNetworkThumbnailGeneration', 'allowNetworkRequests = !tv || allowNetworkThumbnailGeneration', 'if (imageWidth > 0) imageWidth else defaultImageWidthTV'],
               "application/vlc-android/src/org/videolan/vlc/StartActivity.kt": ['tv_last_file_browser_category', 'VerticalGridActivity', 'Intent.FLAG_ACTIVITY_REORDER_TO_FRONT'],
-              "application/television/src/main/java/org/videolan/television/ui/preferences/PreferencesAdvanced.kt": ['"full_backup" ->', 'createFullBackup()', '"full_restore" ->', 'showFullRestoreSelection()', 'Toast.makeText(activity, getString(R.string.full_backup_success), Toast.LENGTH_LONG).show()', 'FullBackupEngine.create(activity.applicationContext, automatic = false)', 'FullBackupEngine.withRestoreLock', 'FullBackupRestoreTransaction.replace(restoreTargets)', 'validateRestoreDatabase(mediaDb)', 'validateRestoreDatabaseDirectory(savedAppDb)', 'replaceDatabaseFileSafely(src, db)', 'val manifestText = manifest.readText()'],
+              "application/television/src/main/java/org/videolan/television/ui/preferences/PreferencesAdvanced.kt": ['"full_backup" ->', 'createFullBackup()', '"full_restore" ->', 'showFullRestoreSelection()', 'Toast.makeText(activity, getString(R.string.full_backup_success), Toast.LENGTH_LONG).show()', 'FullBackupEngine.create(activity.applicationContext, automatic = false)', 'FullBackupEngine.withRestoreLock', 'FullBackupRestoreTransaction.replace(', 'validateRestoreDatabase(mediaDb)', 'validateRestoreDatabaseDirectory(savedAppDb)', 'replaceDatabaseFileSafely(src, db)', 'val manifestText = manifest.readText()'],
           }
           for filename, needles in checks.items():
               text = Path(filename).read_text()
@@ -137,6 +137,9 @@ jobs:
 
       - name: Verify Android 9/12 permission and playlist compatibility
         run: python3 buildsystem/verify-tv-api-and-playlists.py
+
+      - name: Verify full-backup transaction and worker contract
+        run: python3 buildsystem/verify-full-backup-contract.py
 
       - name: Run VLC and TV unit tests
         shell: bash

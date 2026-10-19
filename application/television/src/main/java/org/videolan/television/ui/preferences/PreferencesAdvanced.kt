@@ -85,7 +85,9 @@ import org.videolan.vlc.MediaParsingService
 import org.videolan.vlc.R
 import org.videolan.vlc.gui.DebugLogActivity
 import org.videolan.vlc.gui.preferences.FullBackupEngine
+import org.videolan.vlc.gui.preferences.FullBackupAppStateSnapshot
 import org.videolan.vlc.gui.preferences.FullBackupRestoreTransaction
+import org.videolan.vlc.gui.preferences.AutoFullBackup
 import org.videolan.vlc.gui.preferences.PlaybackStateBackup
 import org.videolan.vlc.gui.preferences.validateRestoreDatabase
 import org.videolan.vlc.gui.preferences.validateRestoreDatabaseDirectory
@@ -575,16 +577,22 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                         if (savedKeyStore.isDirectory) restoreTargets += savedKeyStore to keyStoreDir
                     }
 
-                    FullBackupRestoreTransaction.replace(restoreTargets) {
-                        if (restoreSettings)
-                            PreferenceParser.restoreSettings(activity, Uri.fromFile(settingsFile))
-                        // Older TV archives have no playback entry; they remain restorable.
-                        if (restoreSettings) {
-                            val playbackFile = File(staging, PlaybackStateBackup.ENTRY)
-                            if (playbackFile.isFile)
-                                PlaybackStateBackup.restore(context, playbackFile.readText(Charsets.UTF_8))
-                        }
-                    }
+                    val appStateBeforeRestore = FullBackupAppStateSnapshot.capture(context)
+                    FullBackupRestoreTransaction.replace(
+                        targets = restoreTargets,
+                        afterInstall = {
+                            if (restoreSettings)
+                                PreferenceParser.restoreSettings(activity, Uri.fromFile(settingsFile))
+                            // Older TV archives have no playback entry; they remain restorable.
+                            if (restoreSettings) {
+                                val playbackFile = File(staging, PlaybackStateBackup.ENTRY)
+                                if (playbackFile.isFile)
+                                    PlaybackStateBackup.restore(context, playbackFile.readText(Charsets.UTF_8))
+                            }
+                            AutoFullBackup.deferAfterRestore(context)
+                        },
+                        rollbackAfterInstall = { appStateBeforeRestore.restore(context, restoreEqualizers = !restoreAppDb) }
+                    )
 
                     staging.deleteRecursively()
                     true

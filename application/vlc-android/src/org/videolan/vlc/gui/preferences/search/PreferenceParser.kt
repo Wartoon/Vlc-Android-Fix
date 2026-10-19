@@ -489,7 +489,8 @@ object PreferenceParser {
             val restoringPrefs = activity.getSharedPreferences(restorePrefsName, Context.MODE_PRIVATE)
 
             restoringPrefs.edit {
-                savedSettings.settings.forEach { settingEntry ->
+                clear()
+                savedSettings.settings.filter { it.key !in Settings.getRestoreBlacklist() }.forEach { settingEntry ->
                     when (settingEntry.type) {
                         SettingType.BOOLEAN -> putBoolean(settingEntry.key, settingEntry.value as Boolean)
                         SettingType.INT -> putInt(settingEntry.key, (settingEntry.value as Double).toInt())
