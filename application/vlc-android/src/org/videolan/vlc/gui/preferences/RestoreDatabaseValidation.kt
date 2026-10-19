@@ -4,6 +4,11 @@ import android.database.sqlite.SQLiteDatabase
 import java.io.File
 import java.io.IOException
 
+private val extensionlessRoomDatabaseNames = setOf("vlc_database", "moviepedia_database")
+
+internal fun isRestoreDatabaseFileName(name: String): Boolean =
+    name in extensionlessRoomDatabaseNames || name.endsWith(".db") || name.endsWith(".sqlite")
+
 /** Reject corrupt or non-SQLite databases before any live restore target is changed. */
 fun validateRestoreDatabase(file: File) {
     if (!file.isFile || file.length() == 0L) throw IOException("Restore database is missing or empty: ${file.name}")
@@ -32,8 +37,7 @@ fun validateRestoreDatabase(file: File) {
 fun validateRestoreDatabaseDirectory(directory: File) {
     if (!directory.isDirectory) throw IOException("Restore database directory is missing")
     val databases = directory.walkTopDown().filter {
-        it.isFile && !it.name.endsWith("-wal") && !it.name.endsWith("-shm") &&
-            !it.name.endsWith("-journal") && (it.name.endsWith(".db") || it.name.endsWith(".sqlite"))
+        it.isFile && isRestoreDatabaseFileName(it.name)
     }.toList()
     if (databases.isEmpty()) throw IOException("Restore database directory contains no databases")
     databases.forEach(::validateRestoreDatabase)

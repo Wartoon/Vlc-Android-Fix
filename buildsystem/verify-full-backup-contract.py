@@ -11,6 +11,8 @@ parser = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/sear
 worker = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/AutoFullBackup.kt").read_text()
 engine = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/FullBackupEngine.kt").read_text()
 protection = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/FullBackupProtection.kt").read_text()
+restore_validation = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/RestoreDatabaseValidation.kt").read_text()
+protection_tests = Path("application/vlc-android/test/org/videolan/vlc/gui/preferences/FullBackupProtectionTest.kt").read_text()
 dual = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/PreferencesAdvanced.kt").read_text()
 tv = Path("application/television/src/main/java/org/videolan/television/ui/preferences/PreferencesAdvanced.kt").read_text()
 dual_uses_transaction = "FullBackupRestoreTransaction.replace" in dual
@@ -27,6 +29,7 @@ checks = {
         "vlc_full_backup_playback_pending"
     )) and "filter { it.key !in Settings.getRestoreBlacklist() }" in parser,
     "candidate backups include and validate app databases": "validateAppDbBackupEntries(appDbEntries)" in protection and "validateRestoreDatabaseDirectory(appDbDirectory)" in protection and "listBackupChildren(appDbDir)" in engine,
+    "Dual Room database names without extensions are accepted and restored": all(name in restore_validation for name in ("vlc_database", "moviepedia_database")) and "isRestoreDatabaseFileName(fileName)" in protection and "isRestoreDatabaseFileName(it.name)" in restore_validation and "backupAcceptsDualRoomDatabaseNamesWithoutExtensions" in protection_tests and "restoreRecognizesDualRoomDatabaseNamesWithoutExtensions" in protection_tests,
     "TV shared screen defers backup actions to TV preferences": "sharedBackupActionsVisible" in dual and 'findPreference<Preference>("full_restore")?.isVisible = false' in dual,
     "Dual manifest only declares optional components with files": all(f"if (has{component})" in engine for component in ("Artwork", "Subtitles", "Credentials")),
     "Dual restore snapshots and defers auto-backup": not dual_uses_transaction or (

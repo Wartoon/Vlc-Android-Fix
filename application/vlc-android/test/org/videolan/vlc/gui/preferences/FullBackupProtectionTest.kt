@@ -1,6 +1,7 @@
 package org.videolan.vlc.gui.preferences
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -20,6 +21,20 @@ class FullBackupProtectionTest {
 
     @Test fun backupAcceptsNonEmptyAppDatabaseEntry() {
         validateAppDbBackupEntries(listOf("appdb/favorites.db" to 1L))
+    }
+
+    @Test fun backupAcceptsDualRoomDatabaseNamesWithoutExtensions() {
+        validateAppDbBackupEntries(listOf(
+            "appdb/vlc_database" to 1L,
+            "appdb/moviepedia_database" to 1L
+        ))
+    }
+
+    @Test fun restoreRecognizesDualRoomDatabaseNamesWithoutExtensions() {
+        assertTrue(isRestoreDatabaseFileName("vlc_database"))
+        assertTrue(isRestoreDatabaseFileName("moviepedia_database"))
+        assertFalse(isRestoreDatabaseFileName("vlc_database-wal"))
+        assertFalse(isRestoreDatabaseFileName("vlc_database-shm"))
     }
 
     private fun snapshot(
