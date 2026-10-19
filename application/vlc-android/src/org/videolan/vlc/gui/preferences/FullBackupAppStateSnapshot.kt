@@ -8,7 +8,7 @@ import org.videolan.vlc.util.JsonUtil
 import java.io.IOException
 
 /** Captures app state changed by the settings and playback restore callbacks. */
-internal class FullBackupAppStateSnapshot private constructor(
+class FullBackupAppStateSnapshot private constructor(
     private val preferences: Map<String, Any>,
     private val equalizersJson: String
 ) {

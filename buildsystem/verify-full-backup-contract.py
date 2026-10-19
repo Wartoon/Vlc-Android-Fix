@@ -19,6 +19,7 @@ checks = {
     "legacy trailing callback still maps to afterInstall": transaction_signature.index("rollbackAfterInstall") < transaction_signature.index("afterInstall"),
     "staging operation is recorded before copy": transaction.find("operations += operation") < transaction.find("copy(source, operation.staged)"),
     "preference and equalizer snapshots are implemented": "FullBackupAppStateSnapshot" in state_text and "EqualizerUtil.getEqualizerExport" in state_text,
+    "TV module can access its restore snapshot": not tv_uses_transaction or "internal class FullBackupAppStateSnapshot" not in state_text,
     "status keys are excluded from preference import/export": all(key in settings for key in (
         "vlc_last_full_backup_success", "vlc_last_auto_full_backup_success", "vlc_last_auto_full_backup_error"
     )) and "filter { it.key !in Settings.getRestoreBlacklist() }" in parser,
