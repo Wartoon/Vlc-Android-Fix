@@ -80,7 +80,7 @@ jobs:
               "application/tools/src/main/java/org/videolan/tools/BitmapCache.kt": ['fun replaceBitmapInMemCache', 'fun removeBitmapFromMemCache', 'fun removeBitmapKeysStartingWith'],
               "application/vlc-android/src/org/videolan/vlc/gui/helpers/ImageLoader.kt": ['allowNetworkThumbnailGeneration', 'allowNetworkRequests = !tv || allowNetworkThumbnailGeneration', 'if (imageWidth > 0) imageWidth else defaultImageWidthTV'],
               "application/vlc-android/src/org/videolan/vlc/StartActivity.kt": ['tv_last_file_browser_category', 'VerticalGridActivity', 'Intent.FLAG_ACTIVITY_REORDER_TO_FRONT'],
-              "application/television/src/main/java/org/videolan/television/ui/preferences/PreferencesAdvanced.kt": ['"full_backup" ->', 'createFullBackup()', '"full_restore" ->', 'showFullRestoreSelection()', 'Toast.makeText(activity, getString(R.string.full_backup_success), Toast.LENGTH_LONG).show()', 'replaceDirectoryContentsSafely(savedAppDb, appDbDir)', 'replaceDatabaseFileSafely(src, db)', 'val manifestText = manifest.readText()'],
+              "application/television/src/main/java/org/videolan/television/ui/preferences/PreferencesAdvanced.kt": ['"full_backup" ->', 'createFullBackup()', '"full_restore" ->', 'showFullRestoreSelection()', 'Toast.makeText(activity, getString(R.string.full_backup_success), Toast.LENGTH_LONG).show()', 'FullBackupEngine.create(activity.applicationContext, automatic = false)', 'FullBackupEngine.withRestoreLock', 'FullBackupRestoreTransaction.replace(restoreTargets)', 'validateRestoreDatabase(mediaDb)', 'validateRestoreDatabaseDirectory(savedAppDb)', 'replaceDatabaseFileSafely(src, db)', 'val manifestText = manifest.readText()'],
           }
           for filename, needles in checks.items():
               text = Path(filename).read_text()
@@ -105,13 +105,26 @@ jobs:
               'if (entryCount > 100000)',
               'org.json.JSONObject(manifestText)',
               'if (previous.exists()) throw IOException("Previous restore backup still exists")',
-              'replaceDirectoryContentsSafely(savedArtwork, it)',
+              'if (savedArtwork.isDirectory) restoreTargets += savedArtwork to it',
           ):
               if required not in tv_prefs:
                   raise SystemExit(f"Regression: safe full-restore guard is missing: {required}")
           if 'it.deleteRecursively()\n                            copyDirectoryContents' in tv_prefs:
               raise SystemExit("Regression: destructive artwork pre-delete remains")
           print("verified TV backup/restore regression guards")
+          manifest = Path("application/app/src/main/AndroidManifest.xml").read_text()
+          extraction = Path("application/vlc-android/res/xml/data_extraction_rules.xml").read_text()
+          if 'android:dataExtractionRules="@xml/data_extraction_rules"' not in manifest:
+              raise SystemExit("Android 12+ data extraction rules are not declared")
+          for destination in ("cloud-backup", "device-transfer"):
+              section = extraction.split(f"<{destination}>", 1)[1].split(f"</{destination}>", 1)[0]
+              if 'domain="root" path="app_keystore"' not in section:
+                  raise SystemExit(f"Android system backup does not exclude app_keystore for {destination}")
+          restore_transaction = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/FullBackupRestoreTransaction.kt").read_text()
+          for needle in ("replacementInstalled", "previousMoved", "Cannot roll back"):
+              if needle not in restore_transaction:
+                  raise SystemExit(f"Full restore rollback guard missing: {needle}")
+          print("verified Android 12+ exclusions and cross-component restore rollback")
           PY
           git diff --check
 

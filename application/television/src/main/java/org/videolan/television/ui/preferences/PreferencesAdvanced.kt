@@ -84,6 +84,11 @@ import org.videolan.vlc.BuildConfig
 import org.videolan.vlc.MediaParsingService
 import org.videolan.vlc.R
 import org.videolan.vlc.gui.DebugLogActivity
+import org.videolan.vlc.gui.preferences.FullBackupEngine
+import org.videolan.vlc.gui.preferences.FullBackupRestoreTransaction
+import org.videolan.vlc.gui.preferences.PlaybackStateBackup
+import org.videolan.vlc.gui.preferences.validateRestoreDatabase
+import org.videolan.vlc.gui.preferences.validateRestoreDatabaseDirectory
 import org.videolan.vlc.gui.browser.EXTRA_MRL
 import org.videolan.vlc.gui.browser.FilePickerActivity
 import org.videolan.vlc.gui.browser.KEY_PICKER_TYPE
@@ -385,57 +390,12 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
         val dst = fullBackupFile()
         launch {
             if (!(activity as FragmentActivity).getWritePermission(Uri.fromFile(dst))) return@launch
-            val success = withContext(Dispatchers.IO) {
-                var staged: File? = null
-                try {
-                    val context = activity
-                    val dataRoot = context.getDir("db", Context.MODE_PRIVATE).parentFile
-                        ?: return@withContext false
-                    val mediaDbDir = context.getDir("db", Context.MODE_PRIVATE)
-                    val appDbDir = File(dataRoot, "databases")
-                    val keyStoreDir = File(dataRoot, "app_keystore")
-                    val external = context.getExternalFilesDir(null)
-                    val artworkDir = external?.let { File(it, Medialibrary.MEDIALIB_FOLDER_NAME.removePrefix("/")) }
-                    val subtitlesDir = external?.let { File(it, "subtitles") }
-
-                    val outputDirectory = dst.parentFile ?: throw IOException("Backup directory missing")
-                    if (!outputDirectory.isDirectory && !outputDirectory.mkdirs())
-                        throw IOException("Cannot create TV backup directory")
-                    val temporary = File.createTempFile("vlc-tv-full-backup-", ".zip.tmp", outputDirectory)
-                    staged = temporary
-                    ZipOutputStream(BufferedOutputStream(FileOutputStream(temporary))).use { zip ->
-                        val manifest = """{"format":1,"package":"${context.packageName}","vlc":"3.7.2 Beta 2"}"""
-                        zip.putNextEntry(ZipEntry("manifest.json"))
-                        zip.write(manifest.toByteArray(Charsets.UTF_8))
-                        zip.closeEntry()
-
-                        val settings = PreferenceParser.getChangedPrefsJson(context)
-                        zip.putNextEntry(ZipEntry("settings/settings.json"))
-                        zip.write(settings.toByteArray(Charsets.UTF_8))
-                        zip.closeEntry()
-
-                        mediaDbDir.listFiles()?.forEach { file ->
-                            if (file.name.startsWith(Medialibrary.VLC_MEDIA_DB_NAME.removePrefix("/")))
-                                addToBackup(zip, file, "medialibrary/db/${file.name}")
-                        }
-                        appDbDir.listFiles()?.forEach { file ->
-                            addToBackup(zip, file, "appdb/${file.name}")
-                        }
-                        if (artworkDir?.exists() == true)
-                            addDirectoryToBackup(zip, artworkDir, "artwork/medialib")
-                        if (subtitlesDir?.exists() == true)
-                            addDirectoryToBackup(zip, subtitlesDir, "external/subtitles")
-                        if (keyStoreDir.exists())
-                            addDirectoryToBackup(zip, keyStoreDir, "keystore")
-                    }
-                    Os.rename(temporary.absolutePath, dst.absolutePath)
-                    true
-                } catch (e: Exception) {
-                    Log.e("FullBackup", "Full backup failed", e)
-                    false
-                } finally {
-                    staged?.delete()
-                }
+            val success = try {
+                FullBackupEngine.create(activity.applicationContext, automatic = false)
+                true
+            } catch (e: Exception) {
+                Log.e("FullBackup", "Full backup failed", e)
+                false
             }
             if (success)
                 Toast.makeText(activity, getString(R.string.full_backup_success), Toast.LENGTH_LONG).show()
@@ -509,7 +469,7 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
             return
         }
         launch {
-            val success = withContext(Dispatchers.IO) {
+            val success = FullBackupEngine.withRestoreLock { withContext(Dispatchers.IO) {
                 val context = activity
                 val staging = File(context.cacheDir, "vlc_full_restore")
                 try {
@@ -581,9 +541,8 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                     val savedAppDb = File(staging, "appdb")
                     if (restoreAppDb && (savedAppDb.listFiles()?.none { it.isFile && it.length() > 0L } != false))
                         throw IOException("App database missing")
-
-                    if (restoreSettings)
-                        PreferenceParser.restoreSettings(activity, Uri.fromFile(settingsFile))
+                    if (restoreMediaDb) validateRestoreDatabase(mediaDb)
+                    if (restoreAppDb) validateRestoreDatabaseDirectory(savedAppDb)
 
                     val dataRoot = context.getDir("db", Context.MODE_PRIVATE).parentFile
                         ?: throw IOException("No app data directory")
@@ -594,27 +553,37 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                     val artworkDir = external?.let { File(it, Medialibrary.MEDIALIB_FOLDER_NAME.removePrefix("/")) }
                     val subtitlesDir = external?.let { File(it, "subtitles") }
 
-                    if (restoreMediaDb) replaceDirectoryContentsSafely(File(staging, "medialibrary/db"), mediaDbDir)
-
-                    if (restoreAppDb) replaceDirectoryContentsSafely(savedAppDb, appDbDir)
-
+                    val restoreTargets = mutableListOf<Pair<File, File>>()
+                    if (restoreMediaDb) restoreTargets += File(staging, "medialibrary/db") to mediaDbDir
+                    if (restoreAppDb) restoreTargets += savedAppDb to appDbDir
                     if (restoreArtwork) {
                         artworkDir?.let {
                             val savedArtwork = File(staging, "artwork/medialib")
-                            if (savedArtwork.isDirectory) replaceDirectoryContentsSafely(savedArtwork, it)
+                            if (savedArtwork.isDirectory) restoreTargets += savedArtwork to it
                         }
                     }
 
                     if (restoreSubtitles) {
                         subtitlesDir?.let {
                             val saved = File(staging, "external/subtitles")
-                            if (saved.isDirectory) replaceDirectoryContentsSafely(saved, it)
+                            if (saved.isDirectory) restoreTargets += saved to it
                         }
                     }
 
                     if (restoreCredentials) {
                         val savedKeyStore = File(staging, "keystore")
-                        if (savedKeyStore.isDirectory) replaceDirectoryContentsSafely(savedKeyStore, keyStoreDir)
+                        if (savedKeyStore.isDirectory) restoreTargets += savedKeyStore to keyStoreDir
+                    }
+
+                    FullBackupRestoreTransaction.replace(restoreTargets) {
+                        if (restoreSettings)
+                            PreferenceParser.restoreSettings(activity, Uri.fromFile(settingsFile))
+                        // Older TV archives have no playback entry; they remain restorable.
+                        if (restoreSettings) {
+                            val playbackFile = File(staging, PlaybackStateBackup.ENTRY)
+                            if (playbackFile.isFile)
+                                PlaybackStateBackup.restore(context, playbackFile.readText(Charsets.UTF_8))
+                        }
                     }
 
                     staging.deleteRecursively()
@@ -624,7 +593,7 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                     staging.deleteRecursively()
                     false
                 }
-            }
+            } }
             if (success) {
                 Toast.makeText(activity, getString(R.string.full_restore_success), Toast.LENGTH_LONG).show()
                 activity.window.decorView.postDelayed({

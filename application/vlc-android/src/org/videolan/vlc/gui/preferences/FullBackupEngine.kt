@@ -28,7 +28,7 @@ internal class FullBackupDeferred(message: String) : IOException(message)
  * permissions from a background worker. One in-process lock prevents concurrent
  * jobs from overwriting each other's destination.
  */
-internal object FullBackupEngine {
+object FullBackupEngine {
     private val lock = Mutex()
 
     suspend fun <T> withRestoreLock(action: suspend () -> T): T =

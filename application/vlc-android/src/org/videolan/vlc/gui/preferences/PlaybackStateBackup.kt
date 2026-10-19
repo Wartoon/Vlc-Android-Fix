@@ -25,7 +25,7 @@ import org.videolan.tools.VIDEO_PAUSED
 import org.videolan.vlc.PlaybackService
 
 /** Full-backup-only state. Do not expose excluded playback keys in normal settings exports. */
-internal object PlaybackStateBackup {
+object PlaybackStateBackup {
     const val ENTRY = "playback/state.json"
     const val RESTORE_PENDING = "vlc_full_backup_playback_pending"
 

@@ -1,0 +1,49 @@
+package org.videolan.vlc.gui.preferences
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.io.File
+import java.io.IOException
+
+class FullBackupRestoreTransactionTest {
+    @Test fun failureAfterInstallRestoresEveryPreviousComponent() = withTemporaryFolder { root ->
+        val sourceA = File(root, "source-a").apply { mkdirs(); resolve("value").writeText("new-a") }
+        val sourceB = File(root, "source-b").apply { mkdirs(); resolve("value").writeText("new-b") }
+        val targetA = File(root, "target-a").apply { mkdirs(); resolve("value").writeText("old-a") }
+        val targetB = File(root, "target-b").apply { mkdirs(); resolve("value").writeText("old-b") }
+
+        try {
+            FullBackupRestoreTransaction.replace(listOf(sourceA to targetA, sourceB to targetB)) {
+                throw IOException("simulate settings restore failure")
+            }
+            throw AssertionError("Expected transaction failure")
+        } catch (expected: IOException) {
+            assertEquals("simulate settings restore failure", expected.message)
+        }
+
+        assertEquals("old-a", File(targetA, "value").readText())
+        assertEquals("old-b", File(targetB, "value").readText())
+        assertFalse(root.listFiles()!!.any { it.name.contains("restore-new-") || it.name.contains("restore-old-") })
+    }
+
+    @Test fun successfulTransactionInstallsAllComponents() = withTemporaryFolder { root ->
+        val source = File(root, "source").apply { mkdirs(); resolve("value").writeText("new") }
+        val target = File(root, "target").apply { mkdirs(); resolve("value").writeText("old") }
+
+        var callbackRan = false
+        FullBackupRestoreTransaction.replace(listOf(source to target)) { callbackRan = true }
+
+        assertTrue(callbackRan)
+        assertEquals("new", File(target, "value").readText())
+        assertFalse(root.listFiles()!!.any { it.name.contains("restore-new-") || it.name.contains("restore-old-") })
+    }
+
+    private fun withTemporaryFolder(run: (File) -> Unit) {
+        val root = File.createTempFile("vlc-restore-transaction-", "-tests")
+        root.delete()
+        check(root.mkdirs())
+        try { run(root) } finally { root.deleteRecursively() }
+    }
+}
