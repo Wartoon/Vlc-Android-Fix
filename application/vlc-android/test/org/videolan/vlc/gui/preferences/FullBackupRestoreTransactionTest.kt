@@ -3,6 +3,7 @@ package org.videolan.vlc.gui.preferences
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import java.io.File
 import java.io.IOException
@@ -15,8 +16,10 @@ class FullBackupRestoreTransactionTest {
         val targetB = File(root, "target-b").apply { mkdirs(); resolve("value").writeText("old-b") }
 
         try {
-            FullBackupRestoreTransaction.replace(listOf(sourceA to targetA, sourceB to targetB)) {
-                throw IOException("simulate settings restore failure")
+            runBlocking {
+                FullBackupRestoreTransaction.replace(listOf(sourceA to targetA, sourceB to targetB)) {
+                    throw IOException("simulate settings restore failure")
+                }
             }
             throw AssertionError("Expected transaction failure")
         } catch (expected: IOException) {
@@ -33,7 +36,9 @@ class FullBackupRestoreTransactionTest {
         val target = File(root, "target").apply { mkdirs(); resolve("value").writeText("old") }
 
         var callbackRan = false
-        FullBackupRestoreTransaction.replace(listOf(source to target)) { callbackRan = true }
+        runBlocking {
+            FullBackupRestoreTransaction.replace(listOf(source to target)) { callbackRan = true }
+        }
 
         assertTrue(callbackRan)
         assertEquals("new", File(target, "value").readText())
