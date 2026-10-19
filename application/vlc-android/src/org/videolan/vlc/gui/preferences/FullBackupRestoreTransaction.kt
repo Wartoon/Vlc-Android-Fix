@@ -18,8 +18,8 @@ object FullBackupRestoreTransaction {
 
     suspend fun replace(
         targets: List<Pair<File, File>>,
-        afterInstall: suspend () -> Unit = {},
-        rollbackAfterInstall: suspend () -> Unit = {}
+        rollbackAfterInstall: suspend () -> Unit = {},
+        afterInstall: suspend () -> Unit = {}
     ) {
         val destinations = targets.map { it.second.canonicalPath }
         if (destinations.toSet().size != destinations.size)
