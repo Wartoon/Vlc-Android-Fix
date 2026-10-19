@@ -30,6 +30,7 @@ private const val LAST_AUTO_FULL_BACKUP_ERROR = "vlc_last_auto_full_backup_error
 private const val DAY_MILLIS = 24L * 60 * 60 * 1000
 internal const val FORCE_FULL_BACKUP_NOW = "vlc_force_full_backup_now"
 internal const val ACCEPT_REDUCED_LIBRARY = "vlc_accept_reduced_library"
+internal fun isAutomaticBackupRequest(forced: Boolean) = !forced
 
 /** Pure scheduling decision; successful manual backups reset the same 24h clock. */
 internal fun fullBackupIsDue(enabled: Boolean, lastSuccess: Long, now: Long): Boolean =
@@ -128,6 +129,23 @@ object AutoFullBackup {
         Settings.getInstance(context).edit { putBoolean(LAST_AUTO_FULL_BACKUP_ERROR, true) }
     }
 
+    fun manualBackupSucceeded() {
+        AppContextProvider.currentActivity?.let { activity ->
+            activity.runOnUiThread {
+                Toast.makeText(activity, R.string.full_backup_success, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    fun manualBackupFailed(error: Exception) {
+        Log.e("AutoFullBackup", "Manually requested full backup failed", error)
+        AppContextProvider.currentActivity?.let { activity ->
+            activity.runOnUiThread {
+                Toast.makeText(activity, R.string.full_backup_failure, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     fun onActivityResumed(activity: Activity) {
         val prefs = Settings.getInstance(activity)
         if (prefs.getBoolean(LAST_AUTO_FULL_BACKUP_ERROR, false)) {
@@ -151,20 +169,25 @@ class AutoFullBackupWorker(context: Context, params: WorkerParameters) : Corouti
         val forced = inputData.getBoolean(FORCE_FULL_BACKUP_NOW, false)
         if (!shouldRunFullBackup(forced, AutoFullBackup.isDue(app))) return Result.success()
         return try {
-            FullBackupEngine.create(app, automatic = true, force = forced,
+            FullBackupEngine.create(app, automatic = isAutomaticBackupRequest(forced), force = forced,
                 allowReduction = forced && inputData.getBoolean(ACCEPT_REDUCED_LIBRARY, false))
-            AutoFullBackup.automaticBackupSucceeded(app)
+            if (forced) AutoFullBackup.manualBackupSucceeded() else AutoFullBackup.automaticBackupSucceeded(app)
             Result.success()
         } catch (e: FullBackupLibraryReduced) {
-            AutoFullBackup.automaticBackupFailed(app, e)
+            if (forced) AutoFullBackup.manualBackupFailed(e) else AutoFullBackup.automaticBackupFailed(app, e)
             Result.failure()
         } catch (_: FullBackupDeferred) {
             // Playback, scanning, a concurrent manual backup, or a recent
             // successful backup are not failures. WorkManager retries later.
             if (shouldRunFullBackup(forced, AutoFullBackup.isDue(app))) Result.retry() else Result.success()
         } catch (e: Exception) {
-            AutoFullBackup.automaticBackupFailed(app, e)
-            Result.retry()
+            if (forced) {
+                AutoFullBackup.manualBackupFailed(e)
+                Result.failure()
+            } else {
+                AutoFullBackup.automaticBackupFailed(app, e)
+                Result.retry()
+            }
         }
     }
 }

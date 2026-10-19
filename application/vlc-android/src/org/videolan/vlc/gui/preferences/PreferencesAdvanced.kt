@@ -658,19 +658,24 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                         if (savedKeyStore.isDirectory) restoreTargets += savedKeyStore to keyStoreDir
                     }
 
-                    FullBackupRestoreTransaction.replace(restoreTargets) {
-                        if (restoreSettings)
-                            PreferenceParser.restoreSettings(requireActivity(), Uri.fromFile(settingsFile))
-                        // Optional: older backups do not include playback state.
-                        if (restoreSettings) {
-                            val playbackFile = File(staging, PlaybackStateBackup.ENTRY)
-                            if (playbackFile.isFile)
-                                PlaybackStateBackup.restore(context, playbackFile.readText(Charsets.UTF_8))
-                        }
-                    }
+                    val appStateBeforeRestore = FullBackupAppStateSnapshot.capture(context)
+                    FullBackupRestoreTransaction.replace(
+                        targets = restoreTargets,
+                        afterInstall = {
+                            if (restoreSettings)
+                                PreferenceParser.restoreSettings(requireActivity(), Uri.fromFile(settingsFile))
+                            // Optional: older backups do not include playback state.
+                            if (restoreSettings) {
+                                val playbackFile = File(staging, PlaybackStateBackup.ENTRY)
+                                if (playbackFile.isFile)
+                                    PlaybackStateBackup.restore(context, playbackFile.readText(Charsets.UTF_8))
+                            }
+                            AutoFullBackup.deferAfterRestore(context)
+                        },
+                        rollbackAfterInstall = { appStateBeforeRestore.restore(context, restoreEqualizers = !restoreAppDb) }
+                    )
 
                     staging.deleteRecursively()
-                    AutoFullBackup.deferAfterRestore(context)
                     true
                 } catch (e: Exception) {
                     Log.e("FullBackup", "Full restore failed", e)

@@ -51,6 +51,7 @@ jobs:
       - name: Verify dual backup contract and restore safety
         shell: bash
         run: |
+          python3 buildsystem/verify-full-backup-contract.py
           python3 - <<'PY'
           from pathlib import Path
           # Restore guards remain in PreferencesAdvanced; the shared writer and
@@ -61,7 +62,7 @@ jobs:
                + '\n' + Path('application/vlc-android/src/org/videolan/vlc/gui/preferences/RestoreDatabaseValidation.kt').read_text())
           xml = Path('application/vlc-android/res/xml/preferences_adv.xml').read_text()
           required = [
-              'FullBackupRestoreTransaction.replace(restoreTargets)',
+              'FullBackupRestoreTransaction.replace(',
               'validateRestoreDatabase(mediaDb)',
               'validateRestoreDatabaseDirectory(savedAppDb)',
               'replacementInstalled', 'previousMoved', 'Cannot roll back',

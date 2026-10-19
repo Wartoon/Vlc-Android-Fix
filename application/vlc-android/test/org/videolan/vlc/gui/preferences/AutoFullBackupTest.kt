@@ -1,8 +1,14 @@
 package org.videolan.vlc.gui.preferences
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
+import org.videolan.tools.Settings
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
+import org.junit.runner.RunWith
 import org.junit.Test
+import org.robolectric.RobolectricTestRunner
 
 class AutoFullBackupTest {
     private val day = 24L * 60 * 60 * 1000
@@ -31,5 +37,45 @@ class AutoFullBackupTest {
 
     @Test fun aClockSetBackwardsDoesNotTriggerRepeatedBackups() {
         assertFalse(fullBackupIsDue(true, 50000L, 49999L))
+    }
+
+    @Test fun forcedRequestIsManualAndScheduledRequestIsAutomatic() {
+        assertFalse(isAutomaticBackupRequest(forced = true))
+        assertTrue(isAutomaticBackupRequest(forced = false))
+    }
+
+    @Test fun internalBackupWorkerStateIsExcludedFromSettingsRestore() {
+        val restoreBlacklist = Settings.getRestoreBlacklist()
+        assertTrue("vlc_last_full_backup_success" in restoreBlacklist)
+        assertTrue("vlc_last_auto_full_backup_success" in restoreBlacklist)
+        assertTrue("vlc_last_auto_full_backup_error" in restoreBlacklist)
+    }
+
+    @RunWith(RobolectricTestRunner::class)
+    class BackupSuccessStateTest {
+        @Test fun manualSuccessDoesNotChangeAutomaticBackupTimestamp() {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val prefs = Settings.getInstance(context)
+            prefs.edit().clear()
+                .putLong("vlc_last_auto_full_backup_success", 1234L)
+                .commit()
+
+            AutoFullBackup.recordSuccess(context, automatic = false)
+
+            assertEquals(1234L, prefs.getLong("vlc_last_auto_full_backup_success", 0L))
+            assertTrue(prefs.getLong("vlc_last_full_backup_success", 0L) > 0L)
+        }
+
+        @Test fun automaticSuccessUpdatesAutomaticBackupTimestamp() {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val prefs = Settings.getInstance(context)
+            prefs.edit().clear()
+                .putLong("vlc_last_auto_full_backup_success", 1234L)
+                .commit()
+
+            AutoFullBackup.recordSuccess(context, automatic = true)
+
+            assertTrue(prefs.getLong("vlc_last_auto_full_backup_success", 0L) > 1234L)
+        }
     }
 }
