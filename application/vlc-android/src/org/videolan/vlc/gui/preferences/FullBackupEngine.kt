@@ -66,6 +66,9 @@ object FullBackupEngine {
         withContext(Dispatchers.IO) {
             var staged: File? = null
             try {
+                val legacyTvBackup = if (app.packageName == "org.videolan.vlc.tvfix")
+                    stageLegacyTvBackup(File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY))
+                else null
                 val dataRoot = app.getDir("db", Context.MODE_PRIVATE).parentFile
                     ?: throw IOException("App database root missing")
                 val mediaDbDir = app.getDir("db", Context.MODE_PRIVATE)
@@ -117,6 +120,11 @@ object FullBackupEngine {
                 }
                 // Preserve the last good archive unless structural and library checks pass.
                 verifyProtectedSingleFullBackup(temporary, target, app.cacheDir, allowReduction)
+                // The nested replacement is now durable; only now remove a legacy root copy.
+                legacyTvBackup?.let {
+                    if (it.exists() && !it.delete())
+                        Log.w("FullBackup", "Could not remove the legacy root-level TV backup")
+                }
             } catch (e: Exception) {
                 Log.e("FullBackup", "Full backup failed", e)
                 throw e

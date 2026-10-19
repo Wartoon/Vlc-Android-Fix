@@ -22,12 +22,13 @@ checks = {
     "staging operation is recorded before copy": transaction.find("operations += operation") < transaction.find("copy(source, operation.staged)"),
     "unreadable restore directories fail closed": "source.listFiles()" in transaction and "Cannot list restore source" in transaction,
     "preference and equalizer snapshots are implemented": "FullBackupAppStateSnapshot" in state_text and "EqualizerUtil.getEqualizerExport" in state_text,
+    "TV module can access its restore snapshot": not tv_uses_transaction or "internal class FullBackupAppStateSnapshot" not in state_text,
     "status keys are excluded from preference import/export": all(key in settings for key in (
         "vlc_last_full_backup_success", "vlc_last_auto_full_backup_success", "vlc_last_auto_full_backup_error",
         "vlc_full_backup_playback_pending"
     )) and "filter { it.key !in Settings.getRestoreBlacklist() }" in parser,
     "candidate backups include and validate app databases": "validateAppDbBackupEntries(appDbEntries)" in protection and "validateRestoreDatabaseDirectory(appDbDirectory)" in protection and "listBackupChildren(appDbDir)" in engine,
-    "TV shared screen defers backup actions to TV preferences": "sharedBackupActionsVisible" in dual and 'findPreference<Preference>("full_restore")?.isVisible = false' in dual,
+    "TV shared screen hides its legacy full-restore route": "sharedBackupActionsVisible" in dual and 'findPreference<Preference>("full_restore")?.isVisible = false' in dual,
     "Dual manifest only declares optional components with files": all(f"if (has{component})" in engine for component in ("Artwork", "Subtitles", "Credentials")),
     "Dual restore snapshots and defers auto-backup": not dual_uses_transaction or (
         "FullBackupAppStateSnapshot.capture(context)" in dual and "rollbackAfterInstall" in dual and "AutoFullBackup.deferAfterRestore(context)" in dual

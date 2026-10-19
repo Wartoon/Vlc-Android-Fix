@@ -2,16 +2,18 @@ package org.videolan.vlc.gui.preferences
 
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
+import android.os.Build
 import org.videolan.medialibrary.interfaces.Medialibrary
 import java.io.File
 import java.io.IOException
+import java.lang.reflect.InvocationTargetException
 import java.util.zip.CRC32
 import java.util.zip.ZipFile
 
 /** A valid ZIP can still contain a library that silently lost its media sources. */
 internal class FullBackupLibraryReduced(message: String) : IOException(message)
 
-internal data class FullBackupLibrarySnapshot(
+data class FullBackupLibrarySnapshot(
     val media: Long,
     val folders: Long,
     val playlists: Long,
@@ -98,8 +100,17 @@ private fun countArtwork(directory: File?): Long {
     return count
 }
 
-/** Read-only SQLite queries avoid depending on VLC's private database model. */
+/**
+ * Read the copied database with a bundled SQLite engine so schema syntax does
+ * not depend on the Android release's system SQLite version. Android 9 ships
+ * SQLite 3.22, which cannot parse the MediaLibrary's UPDATE FROM trigger.
+ */
 private fun readFullBackupDatabase(file: File, artwork: Long): FullBackupLibrarySnapshot {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        return readWithBundledSqlite(file, artwork)
+    }
+    // sqlite-bundled supports API 21+. Keep the app installable below that API
+    // level and retain the previous validation path for those legacy devices.
     val db = try {
         SQLiteDatabase.openDatabase(file.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
     } catch (e: Exception) {
@@ -122,6 +133,20 @@ private fun readFullBackupDatabase(file: File, artwork: Long): FullBackupLibrary
         throw IOException("Media library tables are not readable", e)
     } finally {
         db.close()
+    }
+}
+
+private fun readWithBundledSqlite(file: File, artwork: Long): FullBackupLibrarySnapshot {
+    return try {
+        val reader = Class.forName("org.videolan.vlc.gui.preferences.BundledBackupDatabaseReader")
+        reader.getMethod("read", File::class.java, java.lang.Long.TYPE)
+            .invoke(null, file, artwork) as FullBackupLibrarySnapshot
+    } catch (e: InvocationTargetException) {
+        throw IOException("Media library tables are not readable", e.targetException)
+    } catch (e: LinkageError) {
+        throw IOException("Bundled SQLite validator is unavailable", e)
+    } catch (e: Exception) {
+        throw IOException("Bundled SQLite validator is unavailable", e)
     }
 }
 

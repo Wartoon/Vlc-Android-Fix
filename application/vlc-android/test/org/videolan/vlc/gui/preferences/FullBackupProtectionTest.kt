@@ -80,4 +80,5 @@ class FullBackupProtectionTest {
         ) ?: throw AssertionError("Expected reduction")
         assertEquals(5, reason.split("; ").size)
     }
+
 }
