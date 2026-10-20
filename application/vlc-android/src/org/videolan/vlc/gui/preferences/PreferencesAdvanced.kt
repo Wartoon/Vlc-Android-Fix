@@ -557,15 +557,44 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
 
                     ZipInputStream(BufferedInputStream(FileInputStream(src))).use { zip ->
                         var entry = zip.nextEntry
+                        var entryCount = 0
+                        var totalExtracted = 0L
+                        val extractedNames = HashSet<String>()
+                        val maxExtracted = 4L * 1024 * 1024 * 1024
                         while (entry != null) {
+                            entryCount++
+                            if (entryCount > 100000) throw IOException("Backup contains too many entries")
+                            val normalizedName = entry.name.trimEnd('/')
+                            if (entry.name.startsWith("/") || entry.name.contains(92.toChar()) ||
+                                normalizedName.isEmpty() ||
+                                normalizedName.split('/').any { it.isEmpty() || it == "." || it == ".." })
+                                throw IOException("Invalid backup entry path")
+                            if (!extractedNames.add(normalizedName)) throw IOException("Duplicate backup entry")
                             val outFile = File(staging, entry.name)
                             val safeRoot = staging.canonicalPath + File.separator
                             if (!outFile.canonicalPath.startsWith(safeRoot))
                                 throw IOException("Invalid backup entry")
-                            if (entry.isDirectory) outFile.mkdirs()
+                            if (entry.isDirectory) {
+                                if (!outFile.mkdirs() && !outFile.isDirectory)
+                                    throw IOException("Cannot create restore directory")
+                            }
                             else {
-                                outFile.parentFile?.mkdirs()
-                                FileOutputStream(outFile).use { output -> zip.copyTo(output) }
+                                if (outFile.exists()) throw IOException("Duplicate backup entry")
+                                val parent = outFile.parentFile ?: throw IOException("Invalid backup entry path")
+                                if (!parent.exists() && !parent.mkdirs())
+                                    throw IOException("Cannot create restore directory")
+                                if (!parent.isDirectory) throw IOException("Invalid restore directory")
+                                FileOutputStream(outFile).use { output ->
+                                    val buffer = ByteArray(8192)
+                                    while (true) {
+                                        val count = zip.read(buffer)
+                                        if (count < 0) break
+                                        totalExtracted += count.toLong()
+                                        if (totalExtracted > maxExtracted)
+                                            throw IOException("Backup exceeds 4 GiB uncompressed")
+                                        output.write(buffer, 0, count)
+                                    }
+                                }
                             }
                             zip.closeEntry()
                             entry = zip.nextEntry
@@ -574,9 +603,13 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
 
                     val manifest = File(staging, "manifest.json")
                     if (!manifest.isFile) throw IOException("Backup manifest missing")
-                    val manifestText = manifest.readText()
-                    if (!manifestText.contains("\"format\":1") ||
-                        !manifestText.contains("\"package\":\"${context.packageName}\""))
+                    val manifestJson = try {
+                        org.json.JSONObject(readFullBackupManifest(manifest))
+                    } catch (e: org.json.JSONException) {
+                        throw IOException("Invalid backup manifest", e)
+                    }
+                    if (manifestJson.optInt("format", -1) != 1 ||
+                        manifestJson.optString("package") != context.packageName)
                         throw IOException("Unsupported or incompatible backup")
 
                     val settingsFile = File(staging, "settings/settings.json")
@@ -586,9 +619,8 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                     val savedAppDb = File(staging, "appdb")
                     if (restoreAppDb && (savedAppDb.listFiles()?.none { it.isFile && it.length() > 0L } != false))
                         throw IOException("App database missing")
-
-                    if (restoreSettings)
-                        PreferenceParser.restoreSettings(requireActivity(), Uri.fromFile(settingsFile))
+                    if (restoreMediaDb) validateRestoreDatabase(mediaDb)
+                    if (restoreAppDb) validateRestoreDatabaseDirectory(savedAppDb)
 
                     val dataRoot = context.getDir("db", Context.MODE_PRIVATE).parentFile
                         ?: throw IOException("No app data directory")
@@ -599,44 +631,46 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                     val artworkDir = external?.let { File(it, Medialibrary.MEDIALIB_FOLDER_NAME.removePrefix("/")) }
                     val subtitlesDir = external?.let { File(it, "subtitles") }
 
-                    if (restoreMediaDb) replaceDirectoryContentsSafely(File(staging, "medialibrary/db"), mediaDbDir)
-
-                    if (restoreAppDb) replaceDirectoryContentsSafely(savedAppDb, appDbDir)
-
-                    // Existing backups without a playback entry remain supported.
-                    if (restoreSettings) {
-                        val playbackFile = File(staging, PlaybackStateBackup.ENTRY)
-                        if (playbackFile.isFile)
-                            PlaybackStateBackup.restore(context, playbackFile.readText(Charsets.UTF_8))
-                    }
-
+                    val restoreTargets = mutableListOf<Pair<File, File>>()
+                    if (restoreMediaDb) restoreTargets += File(staging, "medialibrary/db") to mediaDbDir
+                    if (restoreAppDb) restoreTargets += savedAppDb to appDbDir
                     if (restoreArtwork) {
                         artworkDir?.let {
-                            it.deleteRecursively()
-                            copyDirectoryContents(File(staging, "artwork/medialib"), it)
+                            val savedArtwork = File(staging, "artwork/medialib")
+                            if (savedArtwork.isDirectory) restoreTargets += savedArtwork to it
                         }
                     }
-
                     if (restoreSubtitles) {
                         subtitlesDir?.let {
                             val saved = File(staging, "external/subtitles")
-                            if (saved.exists()) {
-                                it.deleteRecursively()
-                                copyDirectoryContents(saved, it)
-                            }
+                            if (saved.isDirectory) restoreTargets += saved to it
                         }
                     }
-
                     if (restoreCredentials) {
                         val savedKeyStore = File(staging, "keystore")
-                        if (savedKeyStore.exists()) {
-                            keyStoreDir.deleteRecursively()
-                            copyDirectoryContents(savedKeyStore, keyStoreDir)
-                        }
+                        if (savedKeyStore.isDirectory) restoreTargets += savedKeyStore to keyStoreDir
                     }
 
+                    val appStateBeforeRestore = FullBackupAppStateSnapshot.capture(context)
+                    FullBackupRestoreTransaction.replace(
+                        targets = restoreTargets,
+                        afterInstall = {
+                            if (restoreSettings)
+                                PreferenceParser.restoreSettings(requireActivity(), Uri.fromFile(settingsFile))
+                            // Existing backups without a playback entry remain supported.
+                            if (restoreSettings) {
+                                val playbackFile = File(staging, PlaybackStateBackup.ENTRY)
+                                if (playbackFile.isFile)
+                                    PlaybackStateBackup.restore(context, playbackFile.readText(Charsets.UTF_8))
+                            }
+                            AutoFullBackup.deferAfterRestore(context)
+                        },
+                        rollbackAfterInstall = {
+                            appStateBeforeRestore.restore(context, restoreEqualizers = !restoreAppDb)
+                        }
+                    )
+
                     staging.deleteRecursively()
-                    AutoFullBackup.deferAfterRestore(context)
                     true
                 } catch (e: Exception) {
                     Log.e("FullBackup", "Full restore failed", e)
@@ -680,8 +714,8 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
         val parent = destination.parentFile ?: throw IOException("Restore destination has no parent")
         val staged = File(parent, destination.name + ".restore-new")
         val previous = File(parent, destination.name + ".restore-old")
+        if (previous.exists()) throw IOException("Previous restore backup still exists")
         staged.deleteRecursively()
-        previous.deleteRecursively()
         copyDirectoryContents(source, staged)
         var movedOld = false
         try {
@@ -703,14 +737,15 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
         if (!source.isFile || source.length() == 0L) throw IOException("Restore database is missing or empty")
         val parent = destination.parentFile ?: throw IOException("Restore destination has no parent")
         val staged = File(parent, destination.name + ".restore-new")
-        if (staged.exists() && !staged.delete()) throw IOException("Cannot clear staged database")
-        if (!FileUtils.copyFile(source, staged)) throw IOException("Cannot stage restored database")
         val liveFiles = listOf(destination, File(parent, destination.name + "-wal"), File(parent, destination.name + "-shm"), File(parent, destination.name + "-journal"))
         val backups = mutableListOf<Pair<File, File>>()
+        val restoreBackups = liveFiles.map { File(parent, it.name + ".restore-old") }
+        if (restoreBackups.any { it.exists() }) throw IOException("Previous restore backup still exists")
+        if (staged.exists() && !staged.delete()) throw IOException("Cannot clear staged database")
+        if (!FileUtils.copyFile(source, staged)) throw IOException("Cannot stage restored database")
         try {
             liveFiles.filter { it.exists() }.forEach { live ->
                 val backup = File(parent, live.name + ".restore-old")
-                if (backup.exists() && !backup.delete()) throw IOException("Cannot clear old restore backup")
                 if (!live.renameTo(backup)) throw IOException("Cannot stage existing database")
                 backups += live to backup
             }
@@ -734,6 +769,7 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
             val restored = withContext(Dispatchers.IO) {
                 try {
                     val db = File(requireContext().getDir("db", Context.MODE_PRIVATE).toString() + Medialibrary.VLC_MEDIA_DB_NAME)
+                    validateRestoreDatabase(src)
                     replaceDatabaseFileSafely(src, db)
                     true
                 } catch (e: Exception) {
@@ -765,25 +801,7 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                     val stagedAppDb = File(requireContext().cacheDir, "vlc_appdb_restore")
                     stagedAppDb.deleteRecursively()
                     if (!stagedAppDb.mkdirs()) return@withContext false
-
-                    val extracted = ZipInputStream(BufferedInputStream(FileInputStream(src))).use { zip ->
-                        var entry = zip.nextEntry
-                        var extracted = false
-                        while (entry != null) {
-                            if (!entry.isDirectory) {
-                                val safeName = File(entry.name).name
-                                if (safeName.isNotEmpty()) {
-                                    val outFile = File(stagedAppDb, safeName)
-                                    FileOutputStream(outFile).use { output -> zip.copyTo(output) }
-                                    extracted = true
-                                }
-                            }
-                            zip.closeEntry()
-                            entry = zip.nextEntry
-                        }
-                        extracted
-                    }
-                    if (!extracted) throw IOException("App database backup is empty")
+                    extractAppDatabaseBackup(src, stagedAppDb)
                     replaceDirectoryContentsSafely(stagedAppDb, dbDir)
                     stagedAppDb.deleteRecursively()
                     true

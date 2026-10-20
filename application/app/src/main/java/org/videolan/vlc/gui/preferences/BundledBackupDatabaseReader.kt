@@ -6,6 +6,21 @@ import java.io.File
 /** Reads a staged VLC media database with the SQLite version shipped in the APK. */
 object BundledBackupDatabaseReader {
     @JvmStatic
+    fun validate(file: File) {
+        val db = BundledSQLiteDriver().open(file.absolutePath, 0x00000001)
+        try {
+            db.prepare("PRAGMA quick_check").use { statement ->
+                check(statement.step()) { "Restore database integrity check returned no result" }
+                do {
+                    check(statement.getText(0) == "ok") { "Restore database integrity check failed" }
+                } while (statement.step())
+            }
+        } finally {
+            db.close()
+        }
+    }
+
+    @JvmStatic
     fun read(file: File, artwork: Long): FullBackupLibrarySnapshot {
         val db = BundledSQLiteDriver().open(file.absolutePath, 0x00000001)
         try {

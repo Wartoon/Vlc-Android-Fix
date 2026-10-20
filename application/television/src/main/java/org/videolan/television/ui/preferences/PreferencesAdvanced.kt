@@ -92,6 +92,8 @@ import org.videolan.vlc.gui.preferences.pendingFullBackupReduction
 import org.videolan.vlc.gui.preferences.PlaybackStateBackup
 import org.videolan.vlc.gui.preferences.validateRestoreDatabase
 import org.videolan.vlc.gui.preferences.validateRestoreDatabaseDirectory
+import org.videolan.vlc.gui.preferences.readFullBackupManifest
+import org.videolan.vlc.gui.preferences.extractAppDatabaseBackup
 import org.videolan.vlc.gui.browser.EXTRA_MRL
 import org.videolan.vlc.gui.browser.FilePickerActivity
 import org.videolan.vlc.gui.browser.KEY_PICKER_TYPE
@@ -539,7 +541,7 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
 
                     val manifest = File(staging, "manifest.json")
                     if (!manifest.isFile) throw IOException("Backup manifest missing")
-                    val manifestText = manifest.readText()
+                    val manifestText = readFullBackupManifest(manifest)
                     val manifestJson = try {
                         org.json.JSONObject(manifestText)
                     } catch (e: org.json.JSONException) {
@@ -674,14 +676,15 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
         if (!source.isFile || source.length() == 0L) throw IOException("Restore database is missing or empty")
         val parent = destination.parentFile ?: throw IOException("Restore destination has no parent")
         val staged = File(parent, destination.name + ".restore-new")
-        if (staged.exists() && !staged.delete()) throw IOException("Cannot clear staged database")
-        if (!FileUtils.copyFile(source, staged)) throw IOException("Cannot stage restored database")
         val liveFiles = listOf(destination, File(parent, destination.name + "-wal"), File(parent, destination.name + "-shm"), File(parent, destination.name + "-journal"))
         val backups = mutableListOf<Pair<File, File>>()
+        val restoreBackups = liveFiles.map { File(parent, it.name + ".restore-old") }
+        if (restoreBackups.any { it.exists() }) throw IOException("Previous restore backup still exists")
+        if (staged.exists() && !staged.delete()) throw IOException("Cannot clear staged database")
+        if (!FileUtils.copyFile(source, staged)) throw IOException("Cannot stage restored database")
         try {
             liveFiles.filter { it.exists() }.forEach { live ->
                 val backup = File(parent, live.name + ".restore-old")
-                if (backup.exists() && !backup.delete()) throw IOException("Cannot clear old restore backup")
                 if (!live.renameTo(backup)) throw IOException("Cannot stage existing database")
                 backups += live to backup
             }
@@ -705,6 +708,7 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
             val restored = withContext(Dispatchers.IO) {
                 try {
                     val db = File(activity.getDir("db", Context.MODE_PRIVATE).toString() + Medialibrary.VLC_MEDIA_DB_NAME)
+                    validateRestoreDatabase(src)
                     replaceDatabaseFileSafely(src, db)
                     true
                 } catch (e: Exception) {
@@ -736,25 +740,7 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                     val stagedAppDb = File(activity.cacheDir, "vlc_appdb_restore")
                     stagedAppDb.deleteRecursively()
                     if (!stagedAppDb.mkdirs()) return@withContext false
-
-                    val extracted = ZipInputStream(BufferedInputStream(FileInputStream(src))).use { zip ->
-                        var entry = zip.nextEntry
-                        var extracted = false
-                        while (entry != null) {
-                            if (!entry.isDirectory) {
-                                val safeName = File(entry.name).name
-                                if (safeName.isNotEmpty()) {
-                                    val outFile = File(stagedAppDb, safeName)
-                                    FileOutputStream(outFile).use { output -> zip.copyTo(output) }
-                                    extracted = true
-                                }
-                            }
-                            zip.closeEntry()
-                            entry = zip.nextEntry
-                        }
-                        extracted
-                    }
-                    if (!extracted) throw IOException("App database backup is empty")
+                    extractAppDatabaseBackup(src, stagedAppDb)
                     replaceDirectoryContentsSafely(stagedAppDb, dbDir)
                     stagedAppDb.deleteRecursively()
                     true
