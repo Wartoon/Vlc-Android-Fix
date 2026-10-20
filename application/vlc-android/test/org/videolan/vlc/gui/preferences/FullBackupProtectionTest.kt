@@ -7,9 +7,30 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 import java.io.IOException
+import java.io.File
+import java.nio.file.Files
 
 /** Regression guards for protecting the only retained full backup. */
 class FullBackupProtectionTest {
+    @Test fun currentDatabaseValidationCopiesCommittedWalAlongsideMainDatabase() {
+        val root = Files.createTempDirectory("vlc-backup-wal-test").toFile()
+        try {
+            val source = File(root, "vlc_media.db").apply { writeText("main database") }
+            File(root, "vlc_media.db-wal").writeText("committed wal")
+            File(root, "vlc_media.db-shm").writeText("transient shared memory")
+            val destination = File(File(root, "staged"), source.name)
+            destination.parentFile!!.mkdirs()
+
+            copyBackupDatabaseWithWal(source, destination)
+
+            assertEquals("main database", destination.readText())
+            assertEquals("committed wal", File(destination.parentFile, destination.name + "-wal").readText())
+            assertFalse(File(destination.parentFile, destination.name + "-shm").exists())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     @Test fun backupCannotBeAcceptedWithoutAppDatabaseEntries() {
         try {
             validateAppDbBackupEntries(emptyList())
