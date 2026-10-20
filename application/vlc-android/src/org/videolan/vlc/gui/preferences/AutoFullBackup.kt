@@ -15,6 +15,7 @@ import androidx.work.WorkerParameters
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 import org.videolan.resources.AppContextProvider
 import org.videolan.tools.Settings
@@ -30,7 +31,11 @@ private const val LAST_AUTO_FULL_BACKUP_ERROR = "vlc_last_auto_full_backup_error
 private const val DAY_MILLIS = 24L * 60 * 60 * 1000
 internal const val FORCE_FULL_BACKUP_NOW = "vlc_force_full_backup_now"
 internal const val ACCEPT_REDUCED_LIBRARY = "vlc_accept_reduced_library"
+private const val USER_REQUEST = "vlc_full_backup_now"
+private const val USER_REQUEST_ACCEPT_REDUCED = "vlc_full_backup_now_accept_reduced"
 internal fun isAutomaticBackupRequest(forced: Boolean) = !forced
+internal fun manualBackupWorkName(acceptReducedLibrary: Boolean): String =
+    if (acceptReducedLibrary) USER_REQUEST_ACCEPT_REDUCED else USER_REQUEST
 
 /** Pure scheduling decision; successful manual backups reset the same 24h clock. */
 internal fun fullBackupIsDue(enabled: Boolean, lastSuccess: Long, now: Long): Boolean =
@@ -47,7 +52,6 @@ internal fun shouldRunFullBackup(force: Boolean, due: Boolean): Boolean = force 
 object AutoFullBackup {
     private const val PERIODIC = "vlc_full_backup_daily"
     private const val OPPORTUNITY = "vlc_full_backup_opportunity"
-    private const val USER_REQUEST = "vlc_full_backup_now"
     private fun conditions(): Constraints = Constraints.Builder()
         .setRequiresBatteryNotLow(true)
         .setRequiresStorageNotLow(true)
@@ -95,7 +99,7 @@ object AutoFullBackup {
             .setBackoffCriteria(androidx.work.BackoffPolicy.EXPONENTIAL, 30, TimeUnit.MINUTES)
             .build()
         WorkManager.getInstance(context.applicationContext)
-            .enqueueUniqueWork(USER_REQUEST, ExistingWorkPolicy.REPLACE, request)
+            .enqueueUniqueWork(manualBackupWorkName(acceptReducedLibrary), ExistingWorkPolicy.KEEP, request)
     }
 
     fun deferAfterRestore(context: Context) {
@@ -176,10 +180,16 @@ class AutoFullBackupWorker(context: Context, params: WorkerParameters) : Corouti
         } catch (e: FullBackupLibraryReduced) {
             if (forced) AutoFullBackup.manualBackupFailed(e) else AutoFullBackup.automaticBackupFailed(app, e)
             Result.failure()
+        } catch (e: FullBackupUnsupported) {
+            if (forced) AutoFullBackup.manualBackupFailed(e) else AutoFullBackup.automaticBackupFailed(app, e)
+            Result.failure()
         } catch (_: FullBackupDeferred) {
             // Playback, scanning, a concurrent manual backup, or a recent
             // successful backup are not failures. WorkManager retries later.
             if (shouldRunFullBackup(forced, AutoFullBackup.isDue(app))) Result.retry() else Result.success()
+        } catch (e: CancellationException) {
+            // WorkManager cancellation is not a backup failure; preserve cancellation semantics.
+            throw e
         } catch (e: Exception) {
             if (forced) {
                 AutoFullBackup.manualBackupFailed(e)

@@ -45,6 +45,11 @@ class AutoFullBackupTest {
         assertTrue(isAutomaticBackupRequest(forced = false))
     }
 
+    @Test fun manualRequestsWithDifferentReductionDecisionsDoNotReplaceEachOther() {
+        assertTrue(manualBackupWorkName(acceptReducedLibrary = false) !=
+            manualBackupWorkName(acceptReducedLibrary = true))
+    }
+
     @Test fun internalBackupWorkerStateIsExcludedFromSettingsRestore() {
         val restoreBlacklist = Settings.getRestoreBlacklist()
         assertTrue("vlc_last_full_backup_success" in restoreBlacklist)

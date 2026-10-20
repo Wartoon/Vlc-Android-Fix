@@ -172,6 +172,7 @@ task generateSources(type: Jar) {
 }
 
 dependencies {
+    implementation "androidx.sqlite:sqlite-bundled:2.5.2"
     devApi project(':libvlcjni:libvlc')
     devApi project(':medialibrary')
     debugApi "org.videolan.android:libvlc-all:$rootProject.ext.libvlcVersion"

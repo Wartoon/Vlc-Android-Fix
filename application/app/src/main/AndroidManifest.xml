@@ -2,6 +2,8 @@
     xmlns:tools="http://schemas.android.com/tools"
         android:installLocation="auto">
 
+    <uses-sdk tools:overrideLibrary="androidx.sqlite.driver.bundled, androidx.sqlite.db.framework, androidx.sqlite.db" />
+
     <application
         android:name=".VLCApplication"
         android:allowBackup="true"
