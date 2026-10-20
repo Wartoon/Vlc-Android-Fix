@@ -65,7 +65,7 @@ checks = {
     "standalone restore refuses unreadable nested source directories": 'source.listFiles() ?: throw IOException("Cannot list restore source' in tv,
     "full backup validation rejects the same unsafe path forms as restore": "validateFullBackupEntryPath(name)" in protection and "backupEntryPathsRejectUnsafeSeparatorsAndEmptySegments" in protection_tests and "name.contains('\\\\')" in restore_validation and "entry.name.contains(92.toChar())" in dual and "entry.name.contains(92.toChar())" in tv,
     "TV module imports its public backup destination helper": "fun tvFullBackupFile(storageRoot: File)" in storage and "import org.videolan.vlc.gui.preferences.tvFullBackupFile" in tv,
-    "TV daily-backup toggle schedules immediately and refreshes its summary": "AUTO_FULL_BACKUP_ENABLED ->" in tv and "AutoFullBackup.configure(requireContext())" in tv and "AutoFullBackup.summary(requireContext())" in tv,
+    "TV daily-backup toggle schedules immediately and refreshes its summary": "AUTO_FULL_BACKUP_ENABLED ->" in tv and "AutoFullBackup.configure(context)" in tv and "AutoFullBackup.summary(context)" in tv,
     "legacy TV backup migration validates database contents without rotating saved generations": "inspectFullBackupLibrary(staged, parent, requirePlayback = true)" in storage and "verifyAndReplaceFullBackup(staged, destination)" in storage,
 }
 

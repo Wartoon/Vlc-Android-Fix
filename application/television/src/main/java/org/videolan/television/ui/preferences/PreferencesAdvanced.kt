@@ -168,8 +168,9 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
 
     override fun onStart() {
         super.onStart()
+        val context = activity ?: return
         findPreference<CheckBoxPreference>(AUTO_FULL_BACKUP_ENABLED)?.summary =
-            AutoFullBackup.summary(requireContext())
+            AutoFullBackup.summary(context)
         preferenceScreen.sharedPreferences!!.registerOnSharedPreferenceChangeListener(this)
     }
 
@@ -802,8 +803,9 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
         if (sharedPreferences == null || key == null) return
         when (key) {
             AUTO_FULL_BACKUP_ENABLED -> {
-                AutoFullBackup.configure(requireContext())
-                findPreference<CheckBoxPreference>(key)?.summary = AutoFullBackup.summary(requireContext())
+                val context = activity ?: return
+                AutoFullBackup.configure(context)
+                findPreference<CheckBoxPreference>(key)?.summary = AutoFullBackup.summary(context)
             }
             KEY_AOUT -> {
                 launch { restartLibVLC() }
