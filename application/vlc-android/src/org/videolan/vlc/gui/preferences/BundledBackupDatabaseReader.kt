@@ -43,7 +43,7 @@ object BundledBackupDatabaseReader {
     }
 
     @JvmStatic
-    fun read(file: File, artwork: Long): FullBackupLibrarySnapshot {
+    internal fun read(file: File, artwork: Long): FullBackupLibrarySnapshot {
         val db = BundledSQLiteDriver().open(file.absolutePath, 0x00000001)
         try {
             fun count(table: String): Long {

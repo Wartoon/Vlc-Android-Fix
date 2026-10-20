@@ -5,11 +5,6 @@ import java.io.IOException
 import java.io.RandomAccessFile
 import java.util.zip.CRC32
 import java.util.zip.ZipFile
-import java.io.BufferedOutputStream
-import java.io.FileInputStream
-import java.io.FileOutputStream
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 
 /** Location of the TV application's full backup in shared device storage. */
 internal fun tvFullBackupFile(storageRoot: File): File =
@@ -79,57 +74,6 @@ internal fun replaceBySameDirectoryRename(staged: File, destination: File) {
         throw IOException("Could not rename staged backup into place")
 }
 
-/** Export app databases as consistent SQLite snapshots in the legacy flat ZIP format. */
-internal fun writeConsistentAppDatabaseBackup(source: File, destination: File) {
-    if (!source.isDirectory) throw IOException("App database directory is missing")
-    val parent = destination.parentFile ?: throw IOException("App database backup has no parent")
-    if (!parent.isDirectory && !parent.mkdirs()) throw IOException("Cannot create app database backup directory")
-    val snapshotRoot = File.createTempFile("vlc-appdb-snapshots-", ".dir", parent)
-    val stagedArchive = File.createTempFile("vlc-appdb-backup-", ".zip.tmp", parent)
-    try {
-        if (!snapshotRoot.delete() || !snapshotRoot.mkdir())
-            throw IOException("Cannot prepare app database snapshot directory")
-        val children = source.listFiles() ?: throw IOException("Cannot list app database directory")
-        val archivedFiles = mutableListOf<File>()
-        children.forEach { file ->
-            if (!file.isFile) return@forEach
-            when {
-                isRestoreDatabaseFileName(file.name) -> {
-                    val snapshot = File(snapshotRoot, file.name)
-                    createConsistentSqliteSnapshot(file, snapshot)
-                    archivedFiles += snapshot
-                }
-                file.name.endsWith("-wal") || file.name.endsWith("-shm") ||
-                    file.name.endsWith("-journal") -> Unit
-                else -> {
-                    val copy = File(snapshotRoot, file.name)
-                    file.inputStream().use { input -> copy.outputStream().use { output -> input.copyTo(output) } }
-                    archivedFiles += copy
-                }
-            }
-        }
-        ZipOutputStream(BufferedOutputStream(FileOutputStream(stagedArchive))).use { zip ->
-            archivedFiles.forEach { file ->
-                zip.putNextEntry(ZipEntry(file.name))
-                FileInputStream(file).use { input -> input.copyTo(zip) }
-                zip.closeEntry()
-            }
-        }
-        val validation = File.createTempFile("vlc-appdb-validate-", ".dir", parent)
-        try {
-            if (!validation.delete() || !validation.mkdir())
-                throw IOException("Cannot prepare app database backup validation")
-            extractAppDatabaseBackup(stagedArchive, validation)
-        } finally {
-            validation.deleteRecursively()
-        }
-        RandomAccessFile(stagedArchive, "rw").use { it.fd.sync() }
-        replaceBySameDirectoryRename(stagedArchive, destination)
-    } finally {
-        snapshotRoot.deleteRecursively()
-        stagedArchive.delete()
-    }
-}
 /**
  * Three generations in total: primary ZIP and two historical ZIPs.
  * Save an independent copy of the previous primary before replacing it.
