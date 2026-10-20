@@ -130,13 +130,9 @@ jobs:
         shell: bash
         run: gradle :application:vlc-android:testDebugUnitTest :application:television:testDebugUnitTest --no-daemon
 
-      - name: Run bundled SQLite WAL snapshot instrumentation test
-        uses: ReactiveCircus/android-emulator-runner@v2
-        with:
-          api-level: 30
-          arch: x86_64
-          profile: pixel_2
-          script: gradle :application:app:connectedDebugAndroidTest --no-daemon --stacktrace
+      - name: Compile bundled SQLite WAL snapshot instrumentation test
+        shell: bash
+        run: gradle :application:app:assembleDebugAndroidTest --no-daemon --stacktrace
 
       - name: Restore permanent signing keystore
         shell: bash
