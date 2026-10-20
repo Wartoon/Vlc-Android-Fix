@@ -23,7 +23,11 @@ import java.util.zip.ZipOutputStream
 internal class FullBackupDeferred(message: String) : IOException(message)
 
 internal fun sharedBackupActionsVisible(packageName: String): Boolean =
-    packageName != "org.videolan.vlc.tvfix"
+    packageName in setOf(
+        "org.videolan.vlc.tvfix",
+        "org.videolan.vlc.internalstorage",
+        "org.videolan.vlc.smb"
+    )
 
 /**
  * One shared implementation for user-triggered and scheduled FULL backups.

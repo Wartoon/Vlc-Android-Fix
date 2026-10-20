@@ -59,9 +59,11 @@ class AutoFullBackupTest {
         assertTrue(PlaybackStateBackup.RESTORE_PENDING in restoreBlacklist)
     }
 
-    @Test fun tvUsesItsDedicatedFullBackupPreferences() {
-        assertFalse(sharedBackupActionsVisible("org.videolan.vlc.tvfix"))
+    @Test fun sharedFullBackupPreferencesAreVisibleForAllSupportedPackages() {
+        assertTrue(sharedBackupActionsVisible("org.videolan.vlc.tvfix"))
         assertTrue(sharedBackupActionsVisible("org.videolan.vlc.internalstorage"))
+        assertTrue(sharedBackupActionsVisible("org.videolan.vlc.smb"))
+        assertFalse(sharedBackupActionsVisible("org.videolan.vlc.unsupported"))
     }
 
     @RunWith(RobolectricTestRunner::class)

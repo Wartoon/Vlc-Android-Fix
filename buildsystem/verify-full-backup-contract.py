@@ -13,6 +13,7 @@ engine = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/Full
 protection = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/FullBackupProtection.kt").read_text()
 restore_validation = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/RestoreDatabaseValidation.kt").read_text()
 protection_tests = Path("application/vlc-android/test/org/videolan/vlc/gui/preferences/FullBackupProtectionTest.kt").read_text()
+auto_tests = Path("application/vlc-android/test/org/videolan/vlc/gui/preferences/AutoFullBackupTest.kt").read_text()
 dual = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/PreferencesAdvanced.kt").read_text()
 tv = Path("application/television/src/main/java/org/videolan/television/ui/preferences/PreferencesAdvanced.kt").read_text()
 dual_uses_transaction = "FullBackupRestoreTransaction.replace" in dual
@@ -31,7 +32,9 @@ checks = {
     )) and "filter { it.key !in Settings.getRestoreBlacklist() }" in parser,
     "candidate backups include and validate app databases": "validateAppDbBackupEntries(appDbEntries)" in protection and "validateRestoreDatabaseDirectory(appDbDirectory)" in protection and "listBackupChildren(appDbDir)" in engine,
     "Dual Room database names without extensions are accepted and restored": all(name in restore_validation for name in ("vlc_database", "moviepedia_database")) and "isRestoreDatabaseFileName(fileName)" in protection and "isRestoreDatabaseFileName(it.name)" in restore_validation and "backupAcceptsDualRoomDatabaseNamesWithoutExtensions" in protection_tests and "restoreRecognizesDualRoomDatabaseNamesWithoutExtensions" in protection_tests,
-    "TV shared screen hides its legacy full-restore route": "sharedBackupActionsVisible" in dual and 'findPreference<Preference>("full_restore")?.isVisible = false' in dual,
+    "TV and Dual shared settings expose validated backup actions": 'packageName in setOf(' in engine and all(package in engine for package in ('"org.videolan.vlc.tvfix"', '"org.videolan.vlc.internalstorage"', '"org.videolan.vlc.smb"')) and "sharedFullBackupPreferencesAreVisibleForAllSupportedPackages" in auto_tests,
+    "TV manual backup uses the shared worker and confirms reduced libraries": "AutoFullBackup.requestNow(app)" in tv and "acceptReducedLibrary = true" in tv and "pendingFullBackupReduction(app, dst)" in tv,
+    "manual reduction checks include the live SQLite WAL": "copyBackupDatabaseWithWal(mediaDb, stagedDatabase)" in protection and 'source.name + "-wal"' in protection and "currentDatabaseValidationCopiesCommittedWalAlongsideMainDatabase" in protection_tests,
     "Dual manifest only declares optional components with files": all(f"if (has{component})" in engine for component in ("Artwork", "Subtitles", "Credentials")),
     "Dual restore snapshots and defers auto-backup": not dual_uses_transaction or (
         "FullBackupAppStateSnapshot.capture(context)" in dual and "rollbackAfterInstall" in dual and "AutoFullBackup.deferAfterRestore(context)" in dual

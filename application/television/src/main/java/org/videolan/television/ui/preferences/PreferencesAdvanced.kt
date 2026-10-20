@@ -88,6 +88,7 @@ import org.videolan.vlc.gui.preferences.FullBackupEngine
 import org.videolan.vlc.gui.preferences.FullBackupAppStateSnapshot
 import org.videolan.vlc.gui.preferences.FullBackupRestoreTransaction
 import org.videolan.vlc.gui.preferences.AutoFullBackup
+import org.videolan.vlc.gui.preferences.pendingFullBackupReduction
 import org.videolan.vlc.gui.preferences.PlaybackStateBackup
 import org.videolan.vlc.gui.preferences.validateRestoreDatabase
 import org.videolan.vlc.gui.preferences.validateRestoreDatabaseDirectory
@@ -392,17 +393,29 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
         val dst = fullBackupFile()
         launch {
             if (!(activity as FragmentActivity).getWritePermission(Uri.fromFile(dst))) return@launch
-            val success = try {
-                FullBackupEngine.create(activity.applicationContext, automatic = false)
-                true
+            try {
+                val app = activity.applicationContext
+                val reduction = withContext(Dispatchers.IO) {
+                    pendingFullBackupReduction(app, dst)
+                }
+                if (reduction == null) {
+                    AutoFullBackup.requestNow(app)
+                    Toast.makeText(activity, R.string.full_backup_now_queued, Toast.LENGTH_LONG).show()
+                } else {
+                    android.app.AlertDialog.Builder(activity)
+                        .setTitle(R.string.full_backup_reduction_title)
+                        .setMessage(getString(R.string.full_backup_reduction_details, reduction))
+                        .setNegativeButton(R.string.cancel, null)
+                        .setPositiveButton(R.string.full_backup_reduction_accept) { _, _ ->
+                            AutoFullBackup.requestNow(app, acceptReducedLibrary = true)
+                            Toast.makeText(activity, R.string.full_backup_now_queued, Toast.LENGTH_LONG).show()
+                        }
+                        .show()
+                }
             } catch (e: Exception) {
-                Log.e("FullBackup", "Full backup failed", e)
-                false
+                Log.e("FullBackup", "Could not inspect or request complete backup", e)
+                Toast.makeText(activity, R.string.full_backup_failure, Toast.LENGTH_LONG).show()
             }
-            if (success)
-                Toast.makeText(activity, getString(R.string.full_backup_success), Toast.LENGTH_LONG).show()
-            else
-                Toast.makeText(activity, getString(R.string.full_backup_failure), Toast.LENGTH_LONG).show()
         }
     }
 

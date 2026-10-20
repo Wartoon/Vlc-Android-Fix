@@ -51,7 +51,7 @@ internal fun validateAppDbBackupEntries(entries: Collection<Pair<String, Long>>)
  * explicitly accept a legitimately reduced library. Background backups never
  * use that override.
  */
-internal fun pendingFullBackupReduction(context: Context, destination: File): String? {
+fun pendingFullBackupReduction(context: Context, destination: File): String? {
     if (!destination.isFile) return null
     val previous = inspectFullBackupLibrary(destination, context.cacheDir, requirePlayback = false)
     val mediaDb = File(context.getDir("db", Context.MODE_PRIVATE),
@@ -60,7 +60,28 @@ internal fun pendingFullBackupReduction(context: Context, destination: File): St
     val artwork = context.getExternalFilesDir(null)?.let {
         File(it, Medialibrary.MEDIALIB_FOLDER_NAME.removePrefix("/"))
     }
-    return fullBackupReduction(previous, readFullBackupDatabase(mediaDb, countArtwork(artwork)))
+    val scratch = File.createTempFile("vlc-current-backup-check-", ".dir", context.cacheDir)
+    if (!scratch.delete() || !scratch.mkdir())
+        throw IOException("Cannot prepare current backup database validation")
+    try {
+        val stagedDatabase = File(scratch, mediaDb.name)
+        copyBackupDatabaseWithWal(mediaDb, stagedDatabase)
+        return fullBackupReduction(previous, readFullBackupDatabase(stagedDatabase, countArtwork(artwork)))
+    } finally {
+        if (!scratch.deleteRecursively())
+            android.util.Log.w("FullBackup", "Could not remove current database validation directory")
+    }
+}
+
+/** SQLite may have committed library changes to the WAL while the main DB is stale. */
+internal fun copyBackupDatabaseWithWal(source: File, destination: File) {
+    if (!source.isFile) throw IOException("Current media database missing")
+    source.inputStream().use { input -> destination.outputStream().use { output -> input.copyTo(output) } }
+    val wal = File(source.parentFile, source.name + "-wal")
+    if (wal.isFile) {
+        val stagedWal = File(destination.parentFile, destination.name + "-wal")
+        wal.inputStream().use { input -> stagedWal.outputStream().use { output -> input.copyTo(output) } }
+    }
 }
 
 /**

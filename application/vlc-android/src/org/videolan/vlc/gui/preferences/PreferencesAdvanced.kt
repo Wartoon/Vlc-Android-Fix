@@ -132,8 +132,8 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // The TV module has a validated format-1 restore screen. Keep the legacy
-        // shared TV route unreachable so it cannot bypass those safeguards.
+        // Full backup actions use the same validated restore implementation in
+        // the phone-style settings screen, including when the TV APK runs on a phone.
         if (!sharedBackupActionsVisible(requireContext().packageName)) {
             findPreference<Preference>("full_backup")?.isVisible = false
             findPreference<Preference>("full_restore")?.isVisible = false
