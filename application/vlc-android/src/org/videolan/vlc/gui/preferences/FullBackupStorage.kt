@@ -5,9 +5,14 @@ import java.io.IOException
 import java.io.RandomAccessFile
 import java.util.zip.CRC32
 import java.util.zip.ZipFile
+import java.io.BufferedOutputStream
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 /** Location of the TV application's full backup in shared device storage. */
-internal fun tvFullBackupFile(storageRoot: File): File =
+fun tvFullBackupFile(storageRoot: File): File =
     File(File(File(storageRoot, "VLC"), "VLC TV App Backup"), "VLC-Full-Backup.zip")
 
 /** Stage in the destination directory so the final rename stays on one filesystem. */
@@ -31,6 +36,7 @@ internal fun verifyAndReplaceFullBackup(staged: File, destination: File) {
         val buffer = ByteArray(64 * 1024)
         while (entries.hasMoreElements()) {
             val entry = entries.nextElement()
+            validateFullBackupEntryPath(entry.name)
             if (!seen.add(entry.name)) throw IOException("Duplicate full-backup entry: ${entry.name}")
             if (entry.isDirectory) continue
             val crc = CRC32()
@@ -63,7 +69,7 @@ internal fun verifyAndReplaceFullBackup(staged: File, destination: File) {
 }
 
 /** Atomic on one filesystem on Android and JVMs; preserve the old file if fallback moves fail. */
-private fun replaceBySameDirectoryRename(staged: File, destination: File) {
+internal fun replaceBySameDirectoryRename(staged: File, destination: File) {
     if (staged.parentFile != destination.parentFile)
         throw IOException("Staged backup must share the destination directory")
     // Both files are in the same directory, so Android's filesystem rename
@@ -71,6 +77,58 @@ private fun replaceBySameDirectoryRename(staged: File, destination: File) {
     // keeps this path usable on API 17–20 without android.system.Os.
     if (!staged.renameTo(destination))
         throw IOException("Could not rename staged backup into place")
+}
+
+/** Export app databases as consistent SQLite snapshots in the legacy flat ZIP format. */
+fun writeConsistentAppDatabaseBackup(source: File, destination: File) {
+    if (!source.isDirectory) throw IOException("App database directory is missing")
+    val parent = destination.parentFile ?: throw IOException("App database backup has no parent")
+    if (!parent.isDirectory && !parent.mkdirs()) throw IOException("Cannot create app database backup directory")
+    val snapshotRoot = File.createTempFile("vlc-appdb-snapshots-", ".dir", parent)
+    val stagedArchive = File.createTempFile("vlc-appdb-backup-", ".zip.tmp", parent)
+    try {
+        if (!snapshotRoot.delete() || !snapshotRoot.mkdir())
+            throw IOException("Cannot prepare app database snapshot directory")
+        val children = source.listFiles() ?: throw IOException("Cannot list app database directory")
+        val archivedFiles = mutableListOf<File>()
+        children.forEach { file ->
+            if (!file.isFile) return@forEach
+            when {
+                isRestoreDatabaseFileName(file.name) -> {
+                    val snapshot = File(snapshotRoot, file.name)
+                    createConsistentSqliteSnapshot(file, snapshot)
+                    archivedFiles += snapshot
+                }
+                file.name.endsWith("-wal") || file.name.endsWith("-shm") ||
+                    file.name.endsWith("-journal") -> Unit
+                else -> {
+                    val copy = File(snapshotRoot, file.name)
+                    file.inputStream().use { input -> copy.outputStream().use { output -> input.copyTo(output) } }
+                    archivedFiles += copy
+                }
+            }
+        }
+        ZipOutputStream(BufferedOutputStream(FileOutputStream(stagedArchive))).use { zip ->
+            archivedFiles.forEach { file ->
+                zip.putNextEntry(ZipEntry(file.name))
+                FileInputStream(file).use { input -> input.copyTo(zip) }
+                zip.closeEntry()
+            }
+        }
+        val validation = File.createTempFile("vlc-appdb-validate-", ".dir", parent)
+        try {
+            if (!validation.delete() || !validation.mkdir())
+                throw IOException("Cannot prepare app database backup validation")
+            extractAppDatabaseBackup(stagedArchive, validation)
+        } finally {
+            validation.deleteRecursively()
+        }
+        RandomAccessFile(stagedArchive, "rw").use { it.fd.sync() }
+        replaceBySameDirectoryRename(stagedArchive, destination)
+    } finally {
+        snapshotRoot.deleteRecursively()
+        stagedArchive.delete()
+    }
 }
 /**
  * Stage the old TV backup from shared-storage root in the canonical folder.
@@ -86,6 +144,8 @@ internal fun stageLegacyTvBackup(storageRoot: File): File? {
     val staged = createFullBackupStagingFile(destination)
     try {
         legacy.inputStream().use { input -> staged.outputStream().use { output -> input.copyTo(output) } }
+        val parent = destination.parentFile ?: throw IOException("Backup directory missing")
+        inspectFullBackupLibrary(staged, parent, requirePlayback = true)
         verifyAndReplaceFullBackup(staged, destination)
     } catch (_: IOException) {
         android.util.Log.w("FullBackup", "Could not stage the legacy TV backup; preserving it")

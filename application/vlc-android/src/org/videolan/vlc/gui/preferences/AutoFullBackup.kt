@@ -24,14 +24,18 @@ import java.text.DateFormat
 import java.util.Date
 import java.util.concurrent.TimeUnit
 
-internal const val AUTO_FULL_BACKUP_ENABLED = "vlc_auto_full_backup_enabled"
+const val AUTO_FULL_BACKUP_ENABLED = "vlc_auto_full_backup_enabled"
 private const val LAST_FULL_BACKUP_SUCCESS = "vlc_last_full_backup_success"
 private const val LAST_AUTO_FULL_BACKUP_SUCCESS = "vlc_last_auto_full_backup_success"
 private const val LAST_AUTO_FULL_BACKUP_ERROR = "vlc_last_auto_full_backup_error"
 private const val DAY_MILLIS = 24L * 60 * 60 * 1000
 internal const val FORCE_FULL_BACKUP_NOW = "vlc_force_full_backup_now"
 internal const val ACCEPT_REDUCED_LIBRARY = "vlc_accept_reduced_library"
+private const val USER_REQUEST = "vlc_full_backup_now"
+private const val USER_REQUEST_ACCEPT_REDUCED = "vlc_full_backup_now_accept_reduced"
 internal fun isAutomaticBackupRequest(forced: Boolean) = !forced
+internal fun manualBackupWorkName(acceptReducedLibrary: Boolean): String =
+    if (acceptReducedLibrary) USER_REQUEST_ACCEPT_REDUCED else USER_REQUEST
 
 /** Pure scheduling decision; successful manual backups reset the same 24h clock. */
 internal fun fullBackupIsDue(enabled: Boolean, lastSuccess: Long, now: Long): Boolean =
@@ -54,7 +58,6 @@ internal fun shouldRetryScheduledFullBackup(enabled: Boolean, due: Boolean): Boo
 object AutoFullBackup {
     private const val PERIODIC = "vlc_full_backup_daily"
     private const val OPPORTUNITY = "vlc_full_backup_opportunity"
-    private const val USER_REQUEST = "vlc_full_backup_now"
     private fun conditions(): Constraints = Constraints.Builder()
         .setRequiresBatteryNotLow(true)
         .setRequiresStorageNotLow(true)
@@ -102,7 +105,7 @@ object AutoFullBackup {
             .setBackoffCriteria(androidx.work.BackoffPolicy.EXPONENTIAL, 30, TimeUnit.MINUTES)
             .build()
         WorkManager.getInstance(context.applicationContext)
-            .enqueueUniqueWork(USER_REQUEST, ExistingWorkPolicy.REPLACE, request)
+            .enqueueUniqueWork(manualBackupWorkName(acceptReducedLibrary), ExistingWorkPolicy.KEEP, request)
     }
 
     fun deferAfterRestore(context: Context) {
@@ -190,6 +193,9 @@ class AutoFullBackupWorker(context: Context, params: WorkerParameters) : Corouti
             if (forced) AutoFullBackup.manualBackupSucceeded() else AutoFullBackup.automaticBackupSucceeded(app)
             Result.success()
         } catch (e: FullBackupLibraryReduced) {
+            if (forced) AutoFullBackup.manualBackupFailed(e) else AutoFullBackup.automaticBackupFailed(app, e)
+            Result.failure()
+        } catch (e: FullBackupUnsupported) {
             if (forced) AutoFullBackup.manualBackupFailed(e) else AutoFullBackup.automaticBackupFailed(app, e)
             Result.failure()
         } catch (_: FullBackupDeferred) {

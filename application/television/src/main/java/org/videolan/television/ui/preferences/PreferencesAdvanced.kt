@@ -42,15 +42,19 @@ import androidx.core.os.bundleOf
 import androidx.core.text.isDigitsOnly
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.preference.CheckBoxPreference
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
 import androidx.preference.Preference
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.videolan.medialibrary.interfaces.Medialibrary
+import org.videolan.vlc.gui.preferences.replaceWithConsistentSqliteBackup
+import org.videolan.vlc.gui.preferences.writeConsistentAppDatabaseBackup
 import org.videolan.resources.AndroidDevices
 import org.videolan.resources.EXPORT_SETTINGS_FILE
 import org.videolan.resources.ROOM_DATABASE
@@ -88,12 +92,15 @@ import org.videolan.vlc.gui.preferences.FullBackupEngine
 import org.videolan.vlc.gui.preferences.FullBackupAppStateSnapshot
 import org.videolan.vlc.gui.preferences.FullBackupRestoreTransaction
 import org.videolan.vlc.gui.preferences.AutoFullBackup
+import org.videolan.vlc.gui.preferences.AUTO_FULL_BACKUP_ENABLED
 import org.videolan.vlc.gui.preferences.pendingFullBackupReduction
 import org.videolan.vlc.gui.preferences.PlaybackStateBackup
 import org.videolan.vlc.gui.preferences.validateRestoreDatabase
 import org.videolan.vlc.gui.preferences.validateRestoreDatabaseDirectory
 import org.videolan.vlc.gui.preferences.readFullBackupManifest
 import org.videolan.vlc.gui.preferences.extractAppDatabaseBackup
+import org.videolan.vlc.gui.preferences.removeSqliteSharedMemoryFiles
+import org.videolan.vlc.gui.preferences.tvFullBackupFile
 import org.videolan.vlc.gui.browser.EXTRA_MRL
 import org.videolan.vlc.gui.browser.FilePickerActivity
 import org.videolan.vlc.gui.browser.KEY_PICKER_TYPE
@@ -161,6 +168,8 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
 
     override fun onStart() {
         super.onStart()
+        findPreference<CheckBoxPreference>(AUTO_FULL_BACKUP_ENABLED)?.summary =
+            AutoFullBackup.summary(requireContext())
         preferenceScreen.sharedPreferences!!.registerOnSharedPreferenceChangeListener(this)
     }
 
@@ -300,8 +309,15 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                         if ((activity as FragmentActivity).getWritePermission(Uri.fromFile(dst))) {
                             val copied = withContext(Dispatchers.IO) {
                                 val db = File(activity.getDir("db", Context.MODE_PRIVATE).toString() + Medialibrary.VLC_MEDIA_DB_NAME)
-
-                                FileUtils.copyFile(db, dst)
+                                try {
+                                    replaceWithConsistentSqliteBackup(db, dst)
+                                    true
+                                } catch (e: CancellationException) {
+                                    throw e
+                                } catch (e: Exception) {
+                                    Log.e("DatabaseBackup", "Media database backup failed", e)
+                                    false
+                                }
                             }
                             Toast.makeText(activity, getString(if (copied) R.string.dump_db_succes else R.string.dump_db_failure), Toast.LENGTH_LONG).show()
                         }
@@ -317,10 +333,15 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                         val copied = withContext(Dispatchers.IO) {
                             val db = File((activity as FragmentActivity).getDir("db", Context.MODE_PRIVATE).parent!! + "/databases")
 
-                            val files = db.listFiles()?.map { it.path }?.toTypedArray()
-
-                            if (files == null) false else
-                                FileUtils.zip(files, dst.path)
+                            try {
+                                writeConsistentAppDatabaseBackup(db, dst)
+                                true
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                Log.e("DatabaseBackup", "App database backup failed", e)
+                                false
+                            }
 
                         }
                         Toast.makeText(activity, getString(if (copied) R.string.dump_db_succes else R.string.dump_db_failure), Toast.LENGTH_LONG).show()
@@ -369,6 +390,8 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                         )!!.toUri()
                         )
                         (activity as PreferencesActivity).setRestartApp()
+                    } catch (e: CancellationException) {
+                        throw e
                     } catch (e: Exception) {
                         Log.e("EqualizerSettings", "onActivityResult: ${e.message}", e)
                         Toast.makeText(activity, R.string.invalid_settings_file, Toast.LENGTH_LONG).show()
@@ -414,6 +437,8 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                         }
                         .show()
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e("FullBackup", "Could not inspect or request complete backup", e)
                 Toast.makeText(activity, R.string.full_backup_failure, Toast.LENGTH_LONG).show()
@@ -539,6 +564,7 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                         }
                     }
 
+                    removeSqliteSharedMemoryFiles(staging)
                     val manifest = File(staging, "manifest.json")
                     if (!manifest.isFile) throw IOException("Backup manifest missing")
                     val manifestText = readFullBackupManifest(manifest)
@@ -592,6 +618,9 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                         if (savedKeyStore.isDirectory) restoreTargets += savedKeyStore to keyStoreDir
                     }
 
+                    if (restoreTargets.isEmpty() && !restoreSettings)
+                        throw IOException("No selected restore component is available")
+
                     val appStateBeforeRestore = FullBackupAppStateSnapshot.capture(context)
                     FullBackupRestoreTransaction.replace(
                         targets = restoreTargets,
@@ -611,6 +640,9 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
 
                     staging.deleteRecursively()
                     true
+                } catch (e: CancellationException) {
+                    staging.deleteRecursively()
+                    throw e
                 } catch (e: Exception) {
                     Log.e("FullBackup", "Full restore failed", e)
                     staging.deleteRecursively()
@@ -632,7 +664,8 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
         if (!source.isDirectory) throw IOException("Restore source directory missing")
         if (!destination.exists() && !destination.mkdirs())
             throw IOException("Cannot create restore directory")
-        source.listFiles()?.forEach { child ->
+        val children = source.listFiles() ?: throw IOException("Cannot list restore source: ${source.name}")
+        children.forEach { child ->
             val target = File(destination, child.name)
             if (child.isDirectory) copyDirectoryContents(child, target)
             else {
@@ -711,6 +744,8 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                     validateRestoreDatabase(src)
                     replaceDatabaseFileSafely(src, db)
                     true
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     Log.e("DatabaseRestore", "Media database restore failed", e)
                     false
@@ -744,6 +779,9 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                     replaceDirectoryContentsSafely(stagedAppDb, dbDir)
                     stagedAppDb.deleteRecursively()
                     true
+                } catch (e: CancellationException) {
+                    File(activity.cacheDir, "vlc_appdb_restore").deleteRecursively()
+                    throw e
                 } catch (e: Exception) {
                     Log.e("DatabaseRestore", "App database restore failed", e)
                     false
@@ -763,6 +801,10 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
         if (sharedPreferences == null || key == null) return
         when (key) {
+            AUTO_FULL_BACKUP_ENABLED -> {
+                AutoFullBackup.configure(requireContext())
+                findPreference<CheckBoxPreference>(key)?.summary = AutoFullBackup.summary(requireContext())
+            }
             KEY_AOUT -> {
                 launch { restartLibVLC() }
                 Settings.getInstance(activity).let {

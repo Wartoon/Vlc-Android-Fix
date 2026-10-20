@@ -7,11 +7,13 @@ import org.videolan.medialibrary.interfaces.Medialibrary
 import java.io.File
 import java.io.IOException
 import java.lang.reflect.InvocationTargetException
+import java.io.RandomAccessFile
 import java.util.zip.CRC32
 import java.util.zip.ZipFile
 
 /** A valid ZIP can still contain a library that silently lost its media sources. */
 internal class FullBackupLibraryReduced(message: String) : IOException(message)
+internal class FullBackupUnsupported(message: String) : IOException(message)
 
 data class FullBackupLibrarySnapshot(
     val media: Long,
@@ -65,7 +67,7 @@ fun pendingFullBackupReduction(context: Context, destination: File): String? {
         throw IOException("Cannot prepare current backup database validation")
     try {
         val stagedDatabase = File(scratch, mediaDb.name)
-        copyBackupDatabaseWithWal(mediaDb, stagedDatabase)
+        createConsistentSqliteSnapshot(mediaDb, stagedDatabase)
         return fullBackupReduction(previous, readFullBackupDatabase(stagedDatabase, countArtwork(artwork)))
     } finally {
         if (!scratch.deleteRecursively())
@@ -73,14 +75,59 @@ fun pendingFullBackupReduction(context: Context, destination: File): String? {
     }
 }
 
-/** SQLite may have committed library changes to the WAL while the main DB is stale. */
-internal fun copyBackupDatabaseWithWal(source: File, destination: File) {
-    if (!source.isFile) throw IOException("Current media database missing")
-    source.inputStream().use { input -> destination.outputStream().use { output -> input.copyTo(output) } }
-    val wal = File(source.parentFile, source.name + "-wal")
-    if (wal.isFile) {
-        val stagedWal = File(destination.parentFile, destination.name + "-wal")
-        wal.inputStream().use { input -> stagedWal.outputStream().use { output -> input.copyTo(output) } }
+/** Use bundled SQLite's VACUUM INTO to capture a consistent, single-file snapshot. */
+internal fun createConsistentSqliteSnapshot(source: File, destination: File) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP)
+        throw FullBackupUnsupported("Consistent database backups require Android 5.0 or newer")
+    if (!source.isFile) throw IOException("Backup database is missing: ${source.name}")
+    if (destination.exists()) throw IOException("Backup snapshot destination already exists")
+    try {
+        val reader = Class.forName("org.videolan.vlc.gui.preferences.BundledBackupDatabaseReader")
+        reader.getMethod("backup", File::class.java, File::class.java).invoke(null, source, destination)
+    } catch (e: InvocationTargetException) {
+        throw IOException("Could not create a consistent SQLite backup: ${source.name}", e.targetException)
+    } catch (e: LinkageError) {
+        throw IOException("Bundled SQLite backup support is unavailable", e)
+    } catch (e: Exception) {
+        throw IOException("Bundled SQLite backup support is unavailable", e)
+    }
+}
+
+/** Keep any previous standalone backup and its sidecars until the new snapshot is installed. */
+fun replaceWithConsistentSqliteBackup(source: File, destination: File) {
+    val parent = destination.parentFile ?: throw IOException("Backup destination has no parent")
+    if (!parent.isDirectory && !parent.mkdirs()) throw IOException("Cannot create backup destination directory")
+    val staged = File.createTempFile("vlc-db-backup-", ".tmp", parent)
+    val liveFiles = listOf(destination, File(parent, destination.name + "-wal"),
+        File(parent, destination.name + "-shm"), File(parent, destination.name + "-journal"))
+    val token = System.nanoTime().toString()
+    val moved = mutableListOf<Pair<File, File>>()
+    var installed = false
+    try {
+        if (!staged.delete()) throw IOException("Cannot prepare database backup staging file")
+        createConsistentSqliteSnapshot(source, staged)
+        RandomAccessFile(staged, "rw").use { it.fd.sync() }
+        liveFiles.filter { it.exists() }.forEach { live ->
+            val previous = File(parent, "${live.name}.backup-old-$token")
+            if (!live.renameTo(previous)) throw IOException("Cannot preserve previous database backup")
+            moved += live to previous
+        }
+        if (!staged.renameTo(destination)) throw IOException("Cannot install database backup")
+        installed = true
+        moved.forEach { (_, previous) ->
+            if (previous.exists() && !previous.delete())
+                android.util.Log.w("FullBackup", "Could not remove an older database backup sidecar")
+        }
+    } catch (failure: Exception) {
+        if (installed && destination.exists() && !destination.delete())
+            failure.addSuppressed(IOException("Cannot remove incomplete database backup"))
+        moved.asReversed().forEach { (live, previous) ->
+            if (previous.exists() && !previous.renameTo(live))
+                failure.addSuppressed(IOException("Cannot restore previous database backup file"))
+        }
+        throw failure
+    } finally {
+        if (staged.exists()) staged.delete()
     }
 }
 
@@ -172,7 +219,7 @@ private fun readWithBundledSqlite(file: File, artwork: Long): FullBackupLibraryS
 }
 
 /** Verify CRC/size for every entry, required records, and the actual DB tables. */
-private fun inspectFullBackupLibrary(
+internal fun inspectFullBackupLibrary(
     archive: File, verificationDirectory: File, requirePlayback: Boolean
 ): FullBackupLibrarySnapshot {
     if (!verificationDirectory.isDirectory && !verificationDirectory.mkdirs())
@@ -189,9 +236,9 @@ private fun inspectFullBackupLibrary(
         while (iterator.hasMoreElements()) {
             val entry = iterator.nextElement()
             val name = entry.name
+            validateFullBackupEntryPath(name)
             if (!entries.add(name)) throw IOException("Duplicate backup ZIP entry")
-            if (entries.size > 100000 || name.startsWith("/") ||
-                name.split('/').any { it == ".." })
+            if (entries.size > 100000)
                 throw IOException("Invalid backup ZIP entry")
             if (entry.isDirectory) continue
             val crc = CRC32()
@@ -251,7 +298,7 @@ private fun inspectFullBackupLibrary(
             if (requirePlayback) {
                 val appDbDirectory = File(scratch, "appdb")
                 if (!appDbDirectory.mkdirs()) throw IOException("Cannot prepare app database validation")
-                appDbEntries.forEach { (name, _) ->
+                appDbEntries.filterNot { (name, _) -> name.endsWith("-shm") }.forEach { (name, _) ->
                     val entry = zip.getEntry(name) ?: throw IOException("App database entry missing")
                     val relativeName = name.removePrefix("appdb/")
                     if (relativeName.isEmpty() || relativeName.split('/').any { it.isEmpty() || it == "." || it == ".." })

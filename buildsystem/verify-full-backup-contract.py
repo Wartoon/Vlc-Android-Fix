@@ -10,9 +10,10 @@ settings = Path("application/tools/src/main/java/org/videolan/tools/Settings.kt"
 parser = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/search/PreferenceParser.kt").read_text()
 worker = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/AutoFullBackup.kt").read_text()
 engine = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/FullBackupEngine.kt").read_text()
+storage = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/FullBackupStorage.kt").read_text()
 protection = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/FullBackupProtection.kt").read_text()
 restore_validation = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/RestoreDatabaseValidation.kt").read_text()
-bundled_database_reader = Path("application/app/src/main/java/org/videolan/vlc/gui/preferences/BundledBackupDatabaseReader.kt").read_text()
+bundled_database_reader = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/BundledBackupDatabaseReader.kt").read_text()
 protection_tests = Path("application/vlc-android/test/org/videolan/vlc/gui/preferences/FullBackupProtectionTest.kt").read_text()
 auto_tests = Path("application/vlc-android/test/org/videolan/vlc/gui/preferences/AutoFullBackupTest.kt").read_text()
 dual = Path("application/vlc-android/src/org/videolan/vlc/gui/preferences/PreferencesAdvanced.kt").read_text()
@@ -41,7 +42,7 @@ checks = {
     "standalone TV database restores validate media databases and bound app database ZIP extraction": all(token in shared_tv and token in tv for token in ("validateRestoreDatabase(src)", "extractAppDatabaseBackup(src, stagedAppDb)")) and "validateRestoreDatabaseDirectory(destination)" in restore_validation and "MAX_STANDALONE_DATABASE_BACKUP_BYTES" in restore_validation,
     "standalone TV restores preserve interrupted restore rollback files": "if (previous.exists()) throw IOException(\"Previous restore backup still exists\")" in shared_tv and "if (previous.exists()) throw IOException(\"Previous restore backup still exists\")" in tv and "if (restoreBackups.any { it.exists() }) throw IOException(\"Previous restore backup still exists\")" in shared_tv and "if (restoreBackups.any { it.exists() }) throw IOException(\"Previous restore backup still exists\")" in tv,
     "TV manual backup uses the shared worker and confirms reduced libraries": "AutoFullBackup.requestNow(app)" in tv and "acceptReducedLibrary = true" in tv and "pendingFullBackupReduction(app, dst)" in tv,
-    "manual reduction checks include the live SQLite WAL": "copyBackupDatabaseWithWal(mediaDb, stagedDatabase)" in protection and 'source.name + "-wal"' in protection and "currentDatabaseValidationCopiesCommittedWalAlongsideMainDatabase" in protection_tests,
+    "manual reduction checks use a consistent database snapshot with WAL rows": "createConsistentSqliteSnapshot(mediaDb, stagedDatabase)" in protection and "backupIncludesCommittedWalRowsInOneValidatedFile" in Path("application/app/src/test/java/org/videolan/vlc/gui/preferences/BundledBackupDatabaseReaderTest.kt").read_text(),
     "Dual manifest only declares optional components with files": all(f"if (has{component})" in engine for component in ("Artwork", "Subtitles", "Credentials")),
     "Dual restore snapshots and defers auto-backup": not dual_uses_transaction or (
         "FullBackupAppStateSnapshot.capture(context)" in dual and "rollbackAfterInstall" in dual and "AutoFullBackup.deferAfterRestore(context)" in dual
@@ -50,6 +51,22 @@ checks = {
         "FullBackupAppStateSnapshot.capture(context)" in tv and "rollbackAfterInstall" in tv and "AutoFullBackup.deferAfterRestore(context)" in tv
     ),
     "manual requests are not recorded or announced as automatic": "isAutomaticBackupRequest(forced)" in worker and "if (forced)" in worker,
+    "duplicate manual requests do not cancel work and worker cancellation propagates": "ExistingWorkPolicy.KEEP, request" in worker and "catch (e: CancellationException)" in worker and "throw e" in worker,
+    "manual backup requests with different reduction decisions remain queued separately": "manualBackupWorkName(acceptReducedLibrary)" in worker and "USER_REQUEST_ACCEPT_REDUCED" in worker and "manualRequestsWithDifferentReductionDecisionsDoNotReplaceEachOther" in auto_tests,
+    "pre-Android 5 database backups fail clearly without infinite automatic retries": "Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP" in protection and "FullBackupUnsupported" in protection and "catch (e: FullBackupUnsupported)" in worker and "Result.failure()" in worker,
+    "full backups exclude transient SQLite shared-memory files before validation and restore": 'it.name.endsWith("-shm")' in engine and "removeSqliteSharedMemoryFiles(staging)" in shared_tv and "removeSqliteSharedMemoryFiles(staging)" in tv and 'name.endsWith("-shm")' in restore_validation,
+    "backup and restore UI coroutines preserve cancellation": "catch (e: CancellationException)" in dual and "throw e" in dual and "catch (e: CancellationException)" in tv and "throw e" in tv,
+    "standalone TV database backup coroutines preserve cancellation": all(
+        "catch (e: CancellationException)" in tv.split(start, 1)[1].split(end, 1)[0]
+        for start, end in (("\"dump_media_db\" ->", "\"dump_app_db\" ->"), ("\"dump_app_db\" ->", "\"export_settings\" ->"))
+    ),
+    "full restore cannot report success when no selected component can be installed": all("restoreTargets.isEmpty() && !restoreSettings" in code for code in (shared_tv, tv)),
+    "full and standalone database backups use consistent SQLite snapshots": "createConsistentSqliteSnapshot" in engine and "replaceWithConsistentSqliteBackup(db, dst)" in tv and "writeConsistentAppDatabaseBackup(db, dst)" in tv and '"VACUUM INTO ?"' in bundled_database_reader,
+    "standalone restore refuses unreadable nested source directories": 'source.listFiles() ?: throw IOException("Cannot list restore source' in tv,
+    "full backup validation rejects the same unsafe path forms as restore": "validateFullBackupEntryPath(name)" in protection and "backupEntryPathsRejectUnsafeSeparatorsAndEmptySegments" in protection_tests and "name.contains('\\\\')" in restore_validation and "entry.name.contains(92.toChar())" in dual and "entry.name.contains(92.toChar())" in tv,
+    "TV module imports its public backup destination helper": "fun tvFullBackupFile(storageRoot: File)" in storage and "import org.videolan.vlc.gui.preferences.tvFullBackupFile" in tv,
+    "TV daily-backup toggle schedules immediately and refreshes its summary": "AUTO_FULL_BACKUP_ENABLED ->" in tv and "AutoFullBackup.configure(requireContext())" in tv and "AutoFullBackup.summary(requireContext())" in tv,
+    "legacy TV backup migration validates database contents without rotating saved generations": "inspectFullBackupLibrary(staged, parent, requirePlayback = true)" in storage and "verifyAndReplaceFullBackup(staged, destination)" in storage,
 }
 
 failed = [name for name, passed in checks.items() if not passed]

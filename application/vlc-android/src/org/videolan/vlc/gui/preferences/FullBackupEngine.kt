@@ -69,6 +69,7 @@ object FullBackupEngine {
         val target = destination(app)
         withContext(Dispatchers.IO) {
             var staged: File? = null
+            var databaseSnapshots: File? = null
             try {
                 val legacyTvBackup = if (app.packageName == "org.videolan.vlc.tvfix")
                     stageLegacyTvBackup(File(AndroidDevices.EXTERNAL_PUBLIC_DIRECTORY))
@@ -84,6 +85,10 @@ object FullBackupEngine {
                 val hasArtwork = artworkDir?.isDirectory == true && containsBackupFiles(artworkDir)
                 val hasSubtitles = subtitlesDir?.isDirectory == true && containsBackupFiles(subtitlesDir)
                 val hasCredentials = keyStoreDir.isDirectory && containsBackupFiles(keyStoreDir)
+                val snapshots = File.createTempFile("vlc-database-snapshots-", ".dir", app.cacheDir)
+                if (!snapshots.delete() || !snapshots.mkdir())
+                    throw IOException("Cannot prepare database snapshot directory")
+                databaseSnapshots = snapshots
                 val temporary = createFullBackupStagingFile(target)
                 staged = temporary
                 ZipOutputStream(BufferedOutputStream(FileOutputStream(temporary))).use { zip ->
@@ -113,11 +118,26 @@ object FullBackupEngine {
                     zip.write(playback.toByteArray(Charsets.UTF_8))
                     zip.closeEntry()
 
-                    listBackupChildren(mediaDbDir).forEach { file ->
-                        if (file.name.startsWith(Medialibrary.VLC_MEDIA_DB_NAME.removePrefix("/")))
-                            addFile(zip, file, "medialibrary/db/${file.name}")
+                    val mediaDbName = Medialibrary.VLC_MEDIA_DB_NAME.removePrefix("/")
+                    val mediaSnapshot = File(snapshots, "media/$mediaDbName")
+                    if (!mediaSnapshot.parentFile!!.mkdirs())
+                        throw IOException("Cannot prepare media database snapshot")
+                    createConsistentSqliteSnapshot(File(mediaDbDir, mediaDbName), mediaSnapshot)
+                    addFile(zip, mediaSnapshot, "medialibrary/db/$mediaDbName")
+
+                    val appDbChildren = listBackupChildren(appDbDir)
+                    appDbChildren.filter { it.isFile && isRestoreDatabaseFileName(it.name) }.forEach { database ->
+                        val snapshot = File(File(snapshots, "appdb"), database.name)
+                        if (!snapshot.parentFile!!.isDirectory && !snapshot.parentFile!!.mkdirs())
+                            throw IOException("Cannot prepare app database snapshot")
+                        createConsistentSqliteSnapshot(database, snapshot)
+                        addFile(zip, snapshot, "appdb/${database.name}")
                     }
-                    listBackupChildren(appDbDir).forEach { addFile(zip, it, "appdb/${it.name}") }
+                    appDbChildren.filter { it.isFile && !isRestoreDatabaseFileName(it.name) &&
+                        !it.name.endsWith("-wal") && !it.name.endsWith("-shm") &&
+                        !it.name.endsWith("-journal") }.forEach {
+                        addFile(zip, it, "appdb/${it.name}")
+                    }
                     artworkDir?.takeIf { hasArtwork }?.let { addDirectory(zip, it, "artwork/medialib") }
                     subtitlesDir?.takeIf { hasSubtitles }?.let { addDirectory(zip, it, "external/subtitles") }
                     if (hasCredentials) addDirectory(zip, keyStoreDir, "keystore")
@@ -134,6 +154,7 @@ object FullBackupEngine {
                 throw e
             } finally {
                 staged?.delete()
+                databaseSnapshots?.deleteRecursively()
             }
         }
         AutoFullBackup.recordSuccess(app, automatic)

@@ -188,7 +188,6 @@ android {
 
 dependencies {
     implementation project(':application:vlc-android')
-    implementation "androidx.sqlite:sqlite-bundled:2.5.2"
     implementation project(':application:television')
     implementation project(':application:remote-access-server')
     testImplementation project(':application:television')
@@ -198,6 +197,7 @@ dependencies {
     androidTestImplementation "androidx.test.espresso:espresso-core:$rootProject.espressoVersion"
     androidTestImplementation "androidx.test.espresso:espresso-intents:$rootProject.espressoVersion"
     testImplementation "junit:junit:$rootProject.ext.junitVersion"
+    testImplementation "androidx.sqlite:sqlite-bundled:2.5.2"
     androidTestImplementation "androidx.room:room-testing:$rootProject.ext.roomVersion"
     testImplementation "androidx.arch.core:core-testing:$rootProject.ext.archVersion"
     androidTestImplementation "androidx.arch.core:core-testing:$rootProject.ext.archVersion"

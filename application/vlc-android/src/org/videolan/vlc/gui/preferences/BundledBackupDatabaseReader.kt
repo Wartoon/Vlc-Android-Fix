@@ -5,6 +5,28 @@ import java.io.File
 
 /** Reads a staged VLC media database with the SQLite version shipped in the APK. */
 object BundledBackupDatabaseReader {
+    /** Create a transactionally consistent single-file snapshot, including committed WAL rows. */
+    @JvmStatic
+    fun backup(source: File, destination: File) {
+        check(source.isFile) { "Backup source database is missing" }
+        check(!destination.exists() || destination.length() == 0L) {
+            "Backup destination must be absent or empty"
+        }
+        val db = BundledSQLiteDriver().open(source.absolutePath, 0x00000001)
+        try {
+            db.prepare("VACUUM INTO ?").use { statement ->
+                statement.bindText(1, destination.absolutePath)
+                statement.step()
+            }
+        } finally {
+            db.close()
+        }
+        check(destination.isFile && destination.length() > 0L) {
+            "SQLite did not create a database backup"
+        }
+        validate(destination)
+    }
+
     @JvmStatic
     fun validate(file: File) {
         val db = BundledSQLiteDriver().open(file.absolutePath, 0x00000001)

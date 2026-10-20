@@ -33,8 +33,18 @@ fun readFullBackupManifest(file: File): String {
 
 private val extensionlessRoomDatabaseNames = setOf("vlc_database", "moviepedia_database")
 
+/** Keep archived paths compatible with every restore extractor and filesystem. */
+internal fun validateFullBackupEntryPath(name: String) {
+    val path = if (name.endsWith('/')) name.dropLast(1) else name
+    if (path.isEmpty() || name.startsWith('/') || name.contains('\\') || name.contains('\u0000') ||
+        path.split('/').any { it.isEmpty() || it == "." || it == ".." })
+        throw IOException("Invalid backup ZIP entry path")
+}
+
 internal fun isRestoreDatabaseFileName(name: String): Boolean =
-    name in extensionlessRoomDatabaseNames || name.endsWith(".db") || name.endsWith(".sqlite")
+    name in extensionlessRoomDatabaseNames ||
+        name.endsWith(".db") || name.endsWith(".db3") ||
+        name.endsWith(".sqlite") || name.endsWith(".sqlite3")
 
 /** Reject corrupt or non-SQLite databases before any live restore target is changed. */
 fun validateRestoreDatabase(file: File) {
@@ -83,6 +93,14 @@ fun validateRestoreDatabaseDirectory(directory: File) {
     databases.forEach(::validateRestoreDatabase)
 }
 
+/** SQLite shared-memory files are transient and must never be restored from an archive. */
+fun removeSqliteSharedMemoryFiles(directory: File) {
+    if (!directory.isDirectory) return
+    directory.walkTopDown().filter { it.isFile && it.name.endsWith("-shm") }.forEach {
+        if (!it.delete()) throw IOException("Cannot remove transient SQLite shared-memory file")
+    }
+}
+
 /** Safely stages the flat ZIP format written by the standalone app-database export. */
 fun extractAppDatabaseBackup(source: File, destination: File) {
     if (!source.isFile) throw IOException("App database backup is missing")
@@ -117,5 +135,6 @@ fun extractAppDatabaseBackup(source: File, destination: File) {
         }
     }
     if (entryCount == 0) throw IOException("App database backup is empty")
+    removeSqliteSharedMemoryFiles(destination)
     validateRestoreDatabaseDirectory(destination)
 }

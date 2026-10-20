@@ -12,6 +12,20 @@ import java.nio.file.Files
 
 /** Regression guards for protecting the only retained full backup. */
 class FullBackupProtectionTest {
+    @Test fun backupEntryPathsRejectUnsafeSeparatorsAndEmptySegments() {
+        listOf("artwork\\cover.jpg", "artwork//cover.jpg", "artwork/./cover.jpg", "artwork/../cover.jpg")
+            .forEach { name ->
+                try {
+                    validateFullBackupEntryPath(name)
+                    fail("Expected unsafe backup path to be rejected: $name")
+                } catch (expected: IOException) {
+                    assertTrue(expected.message.orEmpty().contains("path"))
+                }
+            }
+        validateFullBackupEntryPath("artwork/cover.jpg")
+        validateFullBackupEntryPath("artwork/medialib/")
+    }
+
     @Test fun manifestReadRejectsContentOver64KiB() {
         val file = Files.createTempFile("vlc-backup-manifest", ".json").toFile()
         try {
@@ -37,31 +51,28 @@ class FullBackupProtectionTest {
         }
     }
 
-    @Test fun currentDatabaseValidationCopiesCommittedWalAlongsideMainDatabase() {
-        val root = Files.createTempDirectory("vlc-backup-wal-test").toFile()
-        try {
-            val source = File(root, "vlc_media.db").apply { writeText("main database") }
-            File(root, "vlc_media.db-wal").writeText("committed wal")
-            File(root, "vlc_media.db-shm").writeText("transient shared memory")
-            val destination = File(File(root, "staged"), source.name)
-            destination.parentFile!!.mkdirs()
-
-            copyBackupDatabaseWithWal(source, destination)
-
-            assertEquals("main database", destination.readText())
-            assertEquals("committed wal", File(destination.parentFile, destination.name + "-wal").readText())
-            assertFalse(File(destination.parentFile, destination.name + "-shm").exists())
-        } finally {
-            root.deleteRecursively()
-        }
-    }
-
     @Test fun backupCannotBeAcceptedWithoutAppDatabaseEntries() {
         try {
             validateAppDbBackupEntries(emptyList())
             fail("Expected missing app database to be rejected")
         } catch (expected: IOException) {
             assertTrue(expected.message.orEmpty().contains("App database missing"))
+        }
+    }
+
+    @Test fun restoreRemovesTransientSqliteSharedMemoryButKeepsWal() {
+        val root = Files.createTempDirectory("vlc-backup-shm-test").toFile()
+        try {
+            val databaseDirectory = File(root, "medialibrary/db").apply { mkdirs() }
+            File(databaseDirectory, "vlc_media.db-shm").writeText("transient")
+            File(databaseDirectory, "vlc_media.db-wal").writeText("committed")
+
+            removeSqliteSharedMemoryFiles(root)
+
+            assertFalse(File(databaseDirectory, "vlc_media.db-shm").exists())
+            assertEquals("committed", File(databaseDirectory, "vlc_media.db-wal").readText())
+        } finally {
+            root.deleteRecursively()
         }
     }
 
@@ -79,6 +90,8 @@ class FullBackupProtectionTest {
     @Test fun restoreRecognizesDualRoomDatabaseNamesWithoutExtensions() {
         assertTrue(isRestoreDatabaseFileName("vlc_database"))
         assertTrue(isRestoreDatabaseFileName("moviepedia_database"))
+        assertTrue(isRestoreDatabaseFileName("favorites.sqlite3"))
+        assertTrue(isRestoreDatabaseFileName("history.db3"))
         assertFalse(isRestoreDatabaseFileName("vlc_database-wal"))
         assertFalse(isRestoreDatabaseFileName("vlc_database-shm"))
     }

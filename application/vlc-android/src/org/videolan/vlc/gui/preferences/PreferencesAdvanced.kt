@@ -47,6 +47,7 @@ import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
 import androidx.preference.Preference
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.videolan.medialibrary.interfaces.Medialibrary
@@ -333,8 +334,13 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                         if (getWritePermission(Uri.fromFile(dst))) {
                             val copied = withContext(Dispatchers.IO) {
                                 val db = File(requireContext().getDir("db", Context.MODE_PRIVATE).toString() + Medialibrary.VLC_MEDIA_DB_NAME)
-
-                                FileUtils.copyFile(db, dst)
+                                try {
+                                    replaceWithConsistentSqliteBackup(db, dst)
+                                    true
+                                } catch (e: Exception) {
+                                    Log.e("DatabaseBackup", "Media database backup failed", e)
+                                    false
+                                }
                             }
                             if (copied)
                                 UiTools.snackerConfirm(requireActivity(), getString(R.string.dump_db_succes), confirmMessage = R.string.share, overAudioPlayer = false) {
@@ -362,10 +368,13 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                         val copied = withContext(Dispatchers.IO) {
                             val db = File(requireContext().getDir("db", Context.MODE_PRIVATE).parent!! + "/databases")
 
-                            val files = db.listFiles()?.map { it.path }?.toTypedArray()
-
-                            if (files == null) false else
-                                FileUtils.zip(files, dst.path)
+                            try {
+                                writeConsistentAppDatabaseBackup(db, dst)
+                                true
+                            } catch (e: Exception) {
+                                Log.e("DatabaseBackup", "App database backup failed", e)
+                                false
+                            }
 
                         }
                         if (copied)
@@ -470,6 +479,8 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                             Toast.makeText(requireContext(), R.string.full_backup_now_queued, Toast.LENGTH_LONG).show()
                         }.show()
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e("FullBackup", "Could not inspect or request complete backup", e)
                 Toast.makeText(requireContext(), R.string.full_backup_failure, Toast.LENGTH_LONG).show()
@@ -601,6 +612,7 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                         }
                     }
 
+                    removeSqliteSharedMemoryFiles(staging)
                     val manifest = File(staging, "manifest.json")
                     if (!manifest.isFile) throw IOException("Backup manifest missing")
                     val manifestJson = try {
@@ -651,6 +663,9 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
                         if (savedKeyStore.isDirectory) restoreTargets += savedKeyStore to keyStoreDir
                     }
 
+                    if (restoreTargets.isEmpty() && !restoreSettings)
+                        throw IOException("No selected restore component is available")
+
                     val appStateBeforeRestore = FullBackupAppStateSnapshot.capture(context)
                     FullBackupRestoreTransaction.replace(
                         targets = restoreTargets,
@@ -672,6 +687,9 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
 
                     staging.deleteRecursively()
                     true
+                } catch (e: CancellationException) {
+                    staging.deleteRecursively()
+                    throw e
                 } catch (e: Exception) {
                     Log.e("FullBackup", "Full restore failed", e)
                     staging.deleteRecursively()
@@ -694,7 +712,8 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
         if (!source.isDirectory) throw IOException("Restore source directory missing")
         if (!destination.exists() && !destination.mkdirs())
             throw IOException("Cannot create restore directory")
-        source.listFiles()?.forEach { child ->
+        val children = source.listFiles() ?: throw IOException("Cannot list restore source: ${source.name}")
+        children.forEach { child ->
             val target = File(destination, child.name)
             if (child.isDirectory) copyDirectoryContents(child, target)
             else {
