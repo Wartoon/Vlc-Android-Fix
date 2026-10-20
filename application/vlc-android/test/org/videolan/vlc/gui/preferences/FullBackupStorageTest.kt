@@ -23,7 +23,7 @@ class FullBackupStorageTest {
     }
 
 
-    @Test fun legacyRootTvBackupIsPreservedAndStagedInCanonicalFolder() = withTemporaryFolder { root ->
+    @Test fun invalidLegacyRootTvBackupIsPreservedWithoutStaging() = withTemporaryFolder { root ->
         val legacy = File(root, "VLC-Full-Backup.zip")
         ZipOutputStream(legacy.outputStream()).use { zip ->
             for (name in arrayOf("manifest.json", "settings/settings.json",
@@ -36,12 +36,8 @@ class FullBackupStorageTest {
 
         assertEquals(legacy, stageLegacyTvBackup(root))
         val canonical = tvFullBackupFile(root)
-        assertTrue(canonical.isFile)
+        assertFalse(canonical.exists())
         assertTrue(legacy.isFile)
-        java.util.zip.ZipFile(canonical).use { archive ->
-            assertEquals("legacy-backup", archive.getInputStream(
-                archive.getEntry("manifest.json")).bufferedReader().readText())
-        }
     }
 
     @Test fun malformedBackupNeverReplacesExistingBackup() = withTemporaryFolder { root ->

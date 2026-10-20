@@ -4,9 +4,12 @@ import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.io.File
 import java.nio.file.Files
 
+@RunWith(AndroidJUnit4::class)
 class BundledBackupDatabaseReaderTest {
     @Test fun backupIncludesCommittedWalRowsInOneValidatedFile() {
         val root = Files.createTempDirectory("vlc-bundled-sqlite-backup-").toFile()
