@@ -1,8 +1,27 @@
 package org.videolan.vlc.gui.preferences
 
 import android.database.sqlite.SQLiteDatabase
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
+
+internal const val MAX_FULL_BACKUP_MANIFEST_BYTES = 64L * 1024L
+
+/** Read a restore manifest with a byte cap, even if the file changes while read. */
+fun readFullBackupManifest(file: File): String {
+    val bytes = ByteArrayOutputStream()
+    file.inputStream().use { input ->
+        val buffer = ByteArray(4096)
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            if (bytes.size().toLong() + count.toLong() > MAX_FULL_BACKUP_MANIFEST_BYTES)
+                throw IOException("Backup manifest exceeds 64 KiB")
+            bytes.write(buffer, 0, count)
+        }
+    }
+    return bytes.toString(Charsets.UTF_8.name())
+}
 
 private val extensionlessRoomDatabaseNames = setOf("vlc_database", "moviepedia_database")
 

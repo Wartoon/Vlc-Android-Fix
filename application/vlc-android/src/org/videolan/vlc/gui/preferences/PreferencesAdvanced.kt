@@ -619,7 +619,7 @@ class PreferencesAdvanced : BasePreferenceFragment(), SharedPreferences.OnShared
 
                     val manifest = File(staging, "manifest.json")
                     if (!manifest.isFile) throw IOException("Backup manifest missing")
-                    val manifestText = manifest.readText()
+                    val manifestText = readFullBackupManifest(manifest)
                     val backupSourcePackage = validateDualManifest(manifestText)
                     if (restoreCredentials && backupSourcePackage != context.packageName)
                         throw IOException("Credentials cannot be restored across VLC Dual variants")

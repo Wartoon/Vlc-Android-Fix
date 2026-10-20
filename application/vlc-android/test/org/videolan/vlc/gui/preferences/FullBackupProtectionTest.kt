@@ -12,6 +12,31 @@ import java.nio.file.Files
 
 /** Regression guards for protecting the only retained full backup. */
 class FullBackupProtectionTest {
+    @Test fun manifestReadRejectsContentOver64KiB() {
+        val file = Files.createTempFile("vlc-backup-manifest", ".json").toFile()
+        try {
+            file.writeBytes(ByteArray(65_537) { 'x'.code.toByte() })
+            try {
+                readFullBackupManifest(file)
+                fail("Expected oversized manifest to be rejected")
+            } catch (expected: IOException) {
+                assertTrue(expected.message.orEmpty().contains("manifest"))
+            }
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test fun manifestReadAcceptsSmallContent() {
+        val file = Files.createTempFile("vlc-backup-manifest", ".json").toFile()
+        try {
+            file.writeText("{\"format\":1}")
+            assertEquals("{\"format\":1}", readFullBackupManifest(file))
+        } finally {
+            file.delete()
+        }
+    }
+
     @Test fun currentDatabaseValidationCopiesCommittedWalAlongsideMainDatabase() {
         val root = Files.createTempDirectory("vlc-backup-wal-test").toFile()
         try {
