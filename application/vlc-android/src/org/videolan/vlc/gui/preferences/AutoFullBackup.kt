@@ -20,6 +20,7 @@ import kotlinx.coroutines.withContext
 import org.videolan.resources.AppContextProvider
 import org.videolan.tools.Settings
 import org.videolan.vlc.R
+import java.io.IOException
 import java.text.DateFormat
 import java.util.Date
 import java.util.concurrent.TimeUnit
@@ -29,6 +30,7 @@ private const val LAST_FULL_BACKUP_SUCCESS = "vlc_last_full_backup_success"
 private const val LAST_AUTO_FULL_BACKUP_SUCCESS = "vlc_last_auto_full_backup_success"
 private const val LAST_AUTO_FULL_BACKUP_ERROR = "vlc_last_auto_full_backup_error"
 private const val DAY_MILLIS = 24L * 60 * 60 * 1000
+private const val MAX_MANUAL_BACKUP_ATTEMPTS = 3
 internal const val FORCE_FULL_BACKUP_NOW = "vlc_force_full_backup_now"
 internal const val ACCEPT_REDUCED_LIBRARY = "vlc_accept_reduced_library"
 private const val USER_REQUEST = "vlc_full_backup_now"
@@ -43,6 +45,13 @@ internal fun fullBackupIsDue(enabled: Boolean, lastSuccess: Long, now: Long): Bo
 
 /** An explicitly requested backup is independent of the daily toggle and interval. */
 internal fun shouldRunFullBackup(force: Boolean, due: Boolean): Boolean = force || due
+
+/** Keep temporary storage failures from ending a user-requested backup immediately. */
+internal fun shouldRetryManualBackup(error: Exception, attemptCount: Int): Boolean =
+    error is IOException && attemptCount < MAX_MANUAL_BACKUP_ATTEMPTS
+
+/** Periodic WorkManager checks can run before the shared 24-hour success interval. */
+internal fun shouldRetryScheduledFullBackup(enabled: Boolean, due: Boolean): Boolean = enabled && !due
 
 /**
  * No alarm or wake-up exact-time guarantee. WorkManager schedules a daily
@@ -171,7 +180,12 @@ class AutoFullBackupWorker(context: Context, params: WorkerParameters) : Corouti
     override suspend fun doWork(): Result {
         val app = applicationContext
         val forced = inputData.getBoolean(FORCE_FULL_BACKUP_NOW, false)
-        if (!shouldRunFullBackup(forced, AutoFullBackup.isDue(app))) return Result.success()
+        val enabled = AutoFullBackup.isEnabled(app)
+        val due = AutoFullBackup.isDue(app)
+        if (!shouldRunFullBackup(forced, due)) {
+            if (shouldRetryScheduledFullBackup(enabled, due)) return Result.retry()
+            return Result.success()
+        }
         return try {
             FullBackupEngine.create(app, automatic = isAutomaticBackupRequest(forced), force = forced,
                 allowReduction = forced && inputData.getBoolean(ACCEPT_REDUCED_LIBRARY, false))
@@ -192,6 +206,11 @@ class AutoFullBackupWorker(context: Context, params: WorkerParameters) : Corouti
             throw e
         } catch (e: Exception) {
             if (forced) {
+                if (shouldRetryManualBackup(e, runAttemptCount)) {
+                    Log.w("AutoFullBackup", "Retrying manually requested backup after storage I/O failure " +
+                        "(attempt=${runAttemptCount + 1})", e)
+                    return Result.retry()
+                }
                 AutoFullBackup.manualBackupFailed(e)
                 Result.failure()
             } else {

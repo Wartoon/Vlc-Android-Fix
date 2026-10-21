@@ -10,6 +10,7 @@ import org.junit.runner.RunWith
 import org.junit.Test
 import org.robolectric.annotation.Config
 import org.robolectric.RobolectricTestRunner
+import java.io.IOException
 
 class AutoFullBackupTest {
     private val day = 24L * 60 * 60 * 1000
@@ -34,6 +35,19 @@ class AutoFullBackupTest {
         assertTrue(shouldRunFullBackup(true, true))
         assertFalse(shouldRunFullBackup(false, false))
         assertTrue(shouldRunFullBackup(false, true))
+    }
+
+    @Test fun enabledScheduledBackupRetriesWhenPeriodicRunIsEarly() {
+        assertTrue(shouldRetryScheduledFullBackup(true, false))
+        assertFalse(shouldRetryScheduledFullBackup(true, true))
+        assertFalse(shouldRetryScheduledFullBackup(false, false))
+    }
+
+    @Test fun manualStorageErrorsRetryOnlyForLimitedAttempts() {
+        assertTrue(shouldRetryManualBackup(IOException("storage temporarily unavailable"), 0))
+        assertTrue(shouldRetryManualBackup(IOException("storage temporarily unavailable"), 2))
+        assertFalse(shouldRetryManualBackup(IOException("storage temporarily unavailable"), 3))
+        assertFalse(shouldRetryManualBackup(IllegalStateException("programming error"), 0))
     }
 
     @Test fun aClockSetBackwardsDoesNotTriggerRepeatedBackups() {
