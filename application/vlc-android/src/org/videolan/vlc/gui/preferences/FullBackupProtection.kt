@@ -75,7 +75,7 @@ fun pendingFullBackupReduction(context: Context, destination: File): String? {
     }
 }
 
-/** Use bundled SQLite's VACUUM INTO to capture a consistent, single-file snapshot. */
+/** Capture a consistent single-file snapshot, including committed WAL rows. */
 internal fun createConsistentSqliteSnapshot(source: File, destination: File) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP)
         throw FullBackupUnsupported("Consistent database backups require Android 5.0 or newer")
